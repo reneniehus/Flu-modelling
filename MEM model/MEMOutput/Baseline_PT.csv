@@ -1,0 +1,2 @@
+ReportingCountryMnemonic,NominatorType,PreEpidemicThreshold,PostEpidemicThreshold,MeanStartWeek(ofSeason),MeanStartWeek(weekNr),MeanLength,NumberOfSeasons,CI40,CI90,CI97.5,IsUsageApproved
+PT,ILI,21.32,18.31,13,NA,11,5,56.2106614854758,97.1978294917198,123.816614080358,0
