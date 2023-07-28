@@ -1,5 +1,5 @@
-source("./code/setup01.R")
-source("./code/Flu/DK_model/bayesian_functions.R")
+source("setup01.R")
+source("DK_model/bayesian_functions.R")
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ### Data ##########
@@ -42,7 +42,7 @@ aus_ili %>% filter(date>"2022-03-01") -> df_aus
 ### Priors ##########
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # some basic prior explorations
-source("./code/Rene sandbox/priors_explore.R")
+source("bayesian_priors/priors_explore.R")
 # current prior exploration
 
 # prob severe, but consider that infections here are "fully immunising" infections
@@ -65,10 +65,10 @@ inv_logit(-10)
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ### Speciality scripts ##########
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-source("./code/flu/DK_model/SIR_paras_explore.R")
-source("./code/flu/DK_model/fit_project_flu_sims.R")
-source("./code/flu/DK_model/fit_project_flu_real.R")
-source("./code/flu/DK_model/fit_diff_length.R")
+source("DK_model/SIR_paras_explore.R")
+source("DK_model/fit_project_flu_sims.R")
+source("DK_model/fit_project_flu_real.R")
+source("DK_model/fit_diff_length.R")
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ### Modelling ##########

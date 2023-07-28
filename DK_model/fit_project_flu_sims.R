@@ -1,8 +1,8 @@
-# ---- |-Setup: cmdstanr ----
+# ---- |-Setup: cmdstanr (we are using cmdstanr instead of rstan because it has more features) ----
 library(cmdstanr)
-options(mc.cores = detectCores()-1 )
+options(mc.cores = detectCores()-1 ) # detect number of cores for parallel chains
 set_cmdstan_path(path = NULL)
-mod <- cmdstan_model(stan_file='./stan/immu_dyn_00.stan')
+mod <- cmdstan_model(stan_file='stan/immu_dyn_00.stan') # compiles the stan model into an .exe
 
 # ---- |-Simulate: "Australian wave" ----
 wave_settings_SIR_Rnull = list(
@@ -30,6 +30,12 @@ stan_list = list(
   severe_obs = (df_hosp_sel$severe_obs_weekly) %>% replace_na(replace = 0),
   pop=df_hosp_sel$pop[1]
 )
+# here the model is being fit:
+# seed is the seed for pseudorandom numbers and allow to reproduce exactly the same posterior
+# chains gives number of independently run chains (we want >1, and may as well use our processor kernels)
+# iter_sampling gives the samples that we get after warm up phase (which is set as a default if not specified)
+# thin=5 means we only keep every 5th sample to have less stuff in memory
+# max_treedepth is a parameter of the HMC search and requires adaptation if there are many divergent transisions
 fit01 <- mod$sample(
   data = stan_list,
   seed = 12,
@@ -71,7 +77,7 @@ p_cf0 + p_cf1 + p_cf2
 ### Australia + EU starting off ##########
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ---- |-Simulate: Australian wave + start of EU wave  ----
-mod2 <- cmdstan_model(stan_file='./stan/immu_dyn_01_eustart.stan')
+mod2 <- cmdstan_model(stan_file='stan/immu_dyn_01_eustart.stan')
 #
 wave_settings_SIR_Rnull = list(
   I_ini=0.000001,
