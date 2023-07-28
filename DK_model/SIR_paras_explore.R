@@ -1,4 +1,5 @@
-
+source("setup01.R")
+source("DK_model/bayesian_functions.R")
 # I_ini
 wave_settings_SIR$I_ini = 0.0001 * 1/50;  wave_df1 = sim_wave_SIR(wave_settings_SIR,"low" )
 wave_settings_SIR$I_ini = 0.0001 * 1;    wave_df2 = sim_wave_SIR(wave_settings_SIR,"high")

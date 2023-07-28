@@ -1,3 +1,6 @@
+source("setup01.R")
+source("DK_model/bayesian_functions.R")
+
 # ---- |-Setup: cmdstanr (we are using cmdstanr instead of rstan because it has more features) ----
 library(cmdstanr)
 options(mc.cores = detectCores()-1 ) # detect number of cores for parallel chains
