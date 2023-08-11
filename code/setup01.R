@@ -64,6 +64,7 @@ compare <- rethinking::compare
 . %>% dfSummary %>% view() -> viewsummary
 filter_log <- tidylog::filter
 left_join_log <- tidylog::left_join
+g = glimpse
 detach(package:tidylog, unload = T)
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
