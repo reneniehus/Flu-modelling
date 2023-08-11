@@ -1,11 +1,10 @@
-model_SIR_simple = function( params=NULL, data=NULL, country_short_input, agegroup_input, target_input, scenario_tag){
+model_SIR_simple = function( params=NULL, data=NULL, country_short_input, scenario_tag){
   
-    
+  warning("Need to fix which data we work with!")
   data_mock = data %>% 
     filter(country_short == country_short_input, 
-           target == target_input, 
-           agegroup == agegroup_input)
-  warning("Need to fix which data we work with!")
+           target == params$SIR_simple$target, 
+           agegroup == params$SIR_simple$agegroup)
   data_mock %<>% filter(date>"2022-06-01")
   data_mock_fit = data_mock
   # Projection dates

@@ -13,7 +13,7 @@ run_flu_models = function(params=NULL, data=NULL){
     target = "ILIcases"
     scenario_tag = "A"
     
-    df = model_SIR_simple( params, data, country_short, agegroup, target, scenario_tag)
+    df = model_SIR_simple( params, data, country_short, scenario_tag)
     
     df_out %<>% bind_rows(df) # Add DK model to the df_out
   }

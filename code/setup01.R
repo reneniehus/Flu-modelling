@@ -40,6 +40,7 @@ library(fst)
 library(tictoc)
 library( "EcdcColors" )
 library(cmdstanr)
+library( scoringutils )
 # libraries not to include 
 # library(tsibble)
 
