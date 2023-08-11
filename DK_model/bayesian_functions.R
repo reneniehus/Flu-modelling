@@ -4,7 +4,7 @@ wave_settings_SIR = list(
   beta = 0.20,
   prop_severe = 0.02,
   sigma_m = log(50)*0.0001
-  )
+)
 sim_wave_SIR = function(wave_settings_SIR,sim_name="no_name"){
   
   # simulate 1 wave of a pathogen
@@ -243,7 +243,7 @@ sim_wave_SIR_Rnull_w = function(wave_settings_SIR_Rnull,sim_name="no_name"){
       geom_point(alpha=0.2)+
       geom_line(aes(y=severe_mean),col="blue") +
       geom_point(data=wave_df_w,aes(x=i_day,y=severe_obs_weekly/7),col="red")+
-     labs(caption=mcaption)
+      labs(caption=mcaption)
   }
   
   
@@ -259,15 +259,17 @@ wave_settings = list(
   rate_infectious = 0.2777778, # 1/(3.6),
   prop_severe = 0.02,
   seed_rand = 12,
-  add_observation_settings=list(sigma_m=log(50)*0.01)
+  add_observation_settings=list(sigma_m=log(50)*0.01,
+                                seed=12)
 )
 # helper functions for sim_wave_SIR_ll
 make_observation_from_epi_signal = function(severe_mean, add_observation_settings){
+  set.seed(add_observation_settings$seed)
   severe_obs_log = rnorm( length(severe_mean),mean = log( severe_mean ),sd = add_observation_settings$sigma_m )
   severe_obs = exp(severe_obs_log)
 }
+
 sim_wave_SIR_ll = function(wave_settings,sim_name="no_name"){
-  
   # simulate 1 wave of a pathogen
   # strongly simplifying assumptions: well mixed
   pop=wave_settings$pop # population size, big enough to make things look smooth
@@ -304,11 +306,8 @@ sim_wave_SIR_ll = function(wave_settings,sim_name="no_name"){
   delta_I = na_v
   delta_R = na_v
   
-  # Initial conditions for BA.1 wave
-  # start with fully susceptible population
-  # introduce hypothetical Omicron BA.1 (at fraction I_ini into population) and then save the resulting level of immunity
   I[1] = I_ini
-  S[1] = S_ini # 
+  S[1] = S_ini 
   R[1] = 1 - (I_ini+S_ini)
   for ( t in 2:length(t_v) ) { # t = 2
     delta_infective_exposures[t] = beta*S[t-1] *I[t-1]                        # eq1
@@ -321,43 +320,48 @@ sim_wave_SIR_ll = function(wave_settings,sim_name="no_name"){
     # assume no delays: a fraction of infectious exposures will be detected
     delta_severe[t] = delta_infective_exposures[t] * prop_severe;             # eq5
     severe_mean[t] = delta_severe[t]*pop                                      # eq6
-    severe_obs_log[t] = rnorm(n=1,mean = log( severe_mean[t] ),sd = sigma_m ) # eq7
-    severe_obs[t] = exp(severe_obs_log[t])
     # warning if first wave is not complete 
     if (t==length(t_v) & I[t]>I_ini ) print("Wave not complete!")
   }
   
+  # make wave fatter (overlapping sub-epidemics)
+  if (wave_settings$fat_wave==T) {
+    # have 1 wave first, then 2 waves, then 1 wave again, then normalise
+    severe_mean %>% sum() -> mtarget
+    severe_fat = severe_mean + 2 * c(rep(0,1*14),severe_mean[ 1: (length(severe_mean)-1*14) ]) + 
+      1 * c(rep(0,2*14),severe_mean[ 1: (length(severe_mean)-2*14) ])
+    severe_fat = severe_fat/sum(severe_fat)
+    severe_fat = severe_fat*mtarget
+    severe_mean = severe_fat
+  }
+  
   # make observation process based on epi signal
-  severe_obs = make_observation_from_epi_signal( severe_mean, wave_settings$add_observation_settings )
-  
-  
-  set.seed( wave_settings$seed_rand )
+  id_second_to_last = (2:length(severe_mean))
+  severe_obs[id_second_to_last] = make_observation_from_epi_signal( severe_mean[id_second_to_last], wave_settings$add_observation_settings )
   # fill first position in other vectors
+  # FIXME: maybe these should not be imputed, but simply not fit!
   severe_obs[1] = severe_obs[2]
   severe_mean[1] = severe_mean[2]
-  severe_obs_log[1] = log(severe_obs[1])
-  
-  # make wave fatter
-  severe_mean %>% sum() -> mtarget
-  severe_fat = severe_mean + 2 * c(rep(0,1*14),severe_mean[ 1: (length(severe_mean)-1*14) ]) + 
-    1 * c(rep(0,2*14),severe_mean[ 1: (length(severe_mean)-2*14) ])
-  severe_fat = severe_fat/sum(severe_fat)
-  severe_fat = severe_fat*mtarget
   
   # first wave saving and plotting
-  tibble(t_v,severe_obs,severe_mean,severe_fat,severe_obs_log,pop,S,I,R,delta_S,delta_I,delta_R,delta_infective_exposures,sim_name) -> wave_df_d
+  tibble(t_v,severe_obs,severe_mean,severe_obs_log,pop,S,I,R,delta_S,delta_I,delta_R,delta_infective_exposures,sim_name) -> wave_df_d
   
-  # convert daily to weekly
-  for (i in 1:n_week) {
-    day_start = (i-1)*7+1 # f(i=1)=1 , f(i=2)=8
-    day_end = day_start+6
-    severe_mean_weekly[i] = sum( severe_mean[day_start:day_end] )
-    severe_mean_weekly_fat[i] = sum( severe_fat[day_start:day_end] )
-    severe_obs_weekly[i] = rpois(n=1,lambda=severe_mean_weekly[i])
-    severe_obs_weekly_fat[i] = rpois(n=1,lambda=severe_mean_weekly_fat[i])
-    i_day[i] = t_v[day_start]
+  
+  # convert time series to line list data
+  df_for_ll = wave_df_d %>% select(t_v,severe_obs)
+  wave_ll = make_ll_from_epi( df_for_ll , make_ll_settings )
+  
+  make_ll_from_epi = function(df_for_ll , make_ll_settings) {
+    #
+    #
   }
-  tibble(t_vw,i_day,severe_mean_weekly,severe_obs_weekly,severe_mean_weekly_fat,severe_obs_weekly_fat,pop) -> wave_df_w
+  
+  df_out = list(
+    wave_df_daily=wave_df_d,
+    wave_ll = wave_ll
+    
+  )
+  
   
   if (F){
     mcaption = paste("Contagion wave, starting with", I_ini, "infections and simulated over" ,length(t_v), "days")
@@ -368,8 +372,7 @@ sim_wave_SIR_ll = function(wave_settings,sim_name="no_name"){
       labs(caption=mcaption)
   }
   
-  
-  return(wave_df_w)
+  return(df_out)
 }
 
 
