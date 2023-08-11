@@ -39,6 +39,7 @@ library(EpiEstim)
 library(fst)
 library(tictoc)
 library( "EcdcColors" )
+library(cmdstanr)
 # libraries not to include 
 # library(tsibble)
 

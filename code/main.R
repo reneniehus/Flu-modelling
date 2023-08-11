@@ -11,10 +11,11 @@ source("code/run_flu_models.R")
 source("code/process_and_save.R")
 
 # ---- |-load flu data ----
-data = load_flu_data(params) # loads the data
+data = load_flu_data( params ) # loads the data
 
 # ---- |-run models (i.e. fitting and projections) ----
-models_out = run_flu_models(params,data) # runs the model scripts
+models_out = run_flu_models( params, data ) # runs the model scripts
 
 # ---- |-save final output including basic figures ----
-process_and_save( params,models_out ) # processing the model output, with figures and saves
+process_and_save( params, models_out ) # processing the model output, with figures and saves
+
