@@ -2,7 +2,7 @@
 source("code/setup01.R")
 
 # ---- |-load task specific settings ----
-source("code/settings_version0.R") # changed by the user
+source("code/settings/settings_version0.R") # changed by the user
 params=settings() # calls the function that creates the params-list
 
 # sourcing other files, models etc
