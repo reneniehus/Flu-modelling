@@ -9,6 +9,8 @@ params=settings() # calls the function that creates the params-list
 source("code/load_flu_data.R")
 source("code/run_flu_models.R")
 source("code/process_and_save.R")
+source("code/model_SIR_simple.R")
+source("code/model_last_year_burden.R")
 
 # ---- |-load flu data ----
 data = load_flu_data( params ) # loads the data
@@ -18,4 +20,8 @@ models_out = run_flu_models( params, data ) # runs the model scripts
 
 # ---- |-save final output including basic figures ----
 process_and_save( params, models_out ) # processing the model output, with figures and saves
+
+# plots for checking
+models_out %>% ggplot(aes(x=date,y=value,group=sample_or_quantile)) +
+  geom_line(alpha=0.2) + coord_cartesian(ylim=c(0,5000))
 
