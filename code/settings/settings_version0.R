@@ -11,13 +11,16 @@ settings = function() {
   # ---- |-Countries ----
   
   # ---- |-Models ----
-  params$models_to_run = c("last_year_burden") # "SIR_simple",
+  params$models_to_run = c("arima_simple") # "SIR_simple",
   # Settings for SIR_simple
   params$SIR_simple$target = "ILIcases"
   params$SIR_simple$agegroup = "age_total"
   # Settings for last_year_burden
   params$last_year_burden$target = "ILIcases"
   params$last_year_burden$agegroup = "age_total"
+  
+  params$arima_simple$target = "ILIcases"
+  params$arima_simple$agegroup = "age_total"
   
   # ---- |-Fitting and uncertainty ----
   
