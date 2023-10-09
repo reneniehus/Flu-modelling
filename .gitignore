@@ -2,3 +2,4 @@
 .Rhistory
 .RData
 .Ruserdata
+stan/SIR_simple.rds
