@@ -12,8 +12,7 @@ model_SIR_simple = function( params=NULL, data=NULL, country_short_input, scenar
   data_mock_project$date = data_mock_project$date+365
   
   options(mc.cores = detectCores()-1 )
-  set_cmdstan_path(path = NULL)
-  mod2 <- cmdstan_model(stan_file='./stan/SIR_simple.stan') # This compiles the script
+  #mod2 <- cmdstan_model(stan_file='./stan/SIR_simple.stan') # This compiles the script
   
   stan_list = list(
     n_week_fit = nrow(data_mock_fit),
@@ -23,12 +22,16 @@ model_SIR_simple = function( params=NULL, data=NULL, country_short_input, scenar
     Rnull = params$Rnull,
     rate_infectious = params$rate_infectious
   )
-  fit02 <- mod2$sample(
-    data = stan_list,
-    seed = 12,
-    chains = 8,
-    parallel_chains = 8,iter_sampling=1500,thin=10,max_treedepth = 15
-  )
+  fit02=rstan::stan(
+    file='./stan/SIR_simple.stan',
+    chains=8 ,thin=8,iter=300,
+    seed=12, cores = getOption("mc.cores", 1L),
+    control=list(
+      #adapt_delta=0.9,
+      #max_treedepth=14
+    ),
+    data=stan_list
+  ) # X mins
   
   # Create an output dataframe
   df_out = fit02 %>% gather_draws(gen_severe_obs_project[t_vw]) %>%

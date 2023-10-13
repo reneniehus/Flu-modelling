@@ -11,7 +11,7 @@ settings = function() {
   # ---- |-Countries ----
   
   # ---- |-Models ----
-  params$models_to_run = c("arima_simple") # "SIR_simple",
+  params$models_to_run = c("SIR_simple") # "SIR_simple",
   # Settings for SIR_simple
   params$SIR_simple$target = "ILIcases"
   params$SIR_simple$agegroup = "age_total"
