@@ -31,7 +31,8 @@ belongs_complete_group = c( rep(0,each=group_left) , rep(1,each = length(point_i
 data_loc = data_loc %>% mutate( 
   point_group = point_identities, 
   belongs_complete_group=belongs_complete_group,  
-  x_linear = x_linear
+  x_linear = x_linear,
+  df_i=c(1:nrow(.))
   )
 
 data_loc %>% ggplot(aes(x=truth_date,y=value)) + geom_line() + geom_point(aes(col=as.factor(point_group),pch=as.factor(belongs_complete_group)),size=7) 
@@ -52,6 +53,7 @@ data_loc_pred_1w$truth_date = data_loc_pred_last$truth_date + 7
 data_loc_pred_1w$value <- data_loc_pred_1w$value_log <- data_loc_pred_1w$value_sqrt <- NA
 data_loc_pred_1w$point_group = data_loc_pred_last$point_group + 1
 data_loc_pred_1w$x_linear = wahead
+data_loc_pred_1w$df_i = data_loc_pred_last$df_i + 1
 
 data_loc_pred_last = data_loc_pred_1w
 # 2 week pred
@@ -61,6 +63,7 @@ data_loc_pred_2w$truth_date = data_loc_pred_last$truth_date + 7
 data_loc_pred_2w$value <- data_loc_pred_2w$value_log <- data_loc_pred_2w$value_sqrt <- NA
 data_loc_pred_2w$point_group = data_loc_pred_last$point_group + 0
 data_loc_pred_2w$x_linear = wahead
+data_loc_pred_2w$df_i = data_loc_pred_last$df_i + 1
 
 data_loc_pred_last = data_loc_pred_2w
 
@@ -71,6 +74,7 @@ data_loc_pred_3w$truth_date = data_loc_pred_last$truth_date + 7
 data_loc_pred_3w$value <- data_loc_pred_3w$value_log <- data_loc_pred_3w$value_sqrt <- NA
 data_loc_pred_3w$point_group = data_loc_pred_last$point_group + 0
 data_loc_pred_3w$x_linear = wahead
+data_loc_pred_3w$df_i = data_loc_pred_last$df_i + 1
 
 data_loc_pred_last = data_loc_pred_3w
 
@@ -81,6 +85,7 @@ data_loc_pred_4w$truth_date = data_loc_pred_last$truth_date + 7
 data_loc_pred_4w$value <- data_loc_pred_4w$value_log <- data_loc_pred_4w$value_sqrt <- NA
 data_loc_pred_4w$point_group = data_loc_pred_last$point_group + 0
 data_loc_pred_4w$x_linear = wahead
+data_loc_pred_4w$df_i = data_loc_pred_last$df_i + 1
 
 data_loc_pred_last = data_loc_pred_4w
 
@@ -112,7 +117,7 @@ mod1_path = c("./stan/piecewise_01_starting.stan")
 options(mc.cores = 8 )
 fit01=rstan::stan(
   file=mod1_path,
-  chains=8 ,thin=8,iter=150,
+  chains=8 ,thin=8,iter=800,
   seed=12, cores = getOption("mc.cores", 1L),
   control=list(
     #adapt_delta=0.9,
@@ -125,12 +130,60 @@ load(file=paste0("../Big data/respicasting_fit01.Rdata") )
 
 # checks by hand
 fit = fit01
-fit@date
+fit@date # Nov 12 17:26:41
 fit@model_pars
 
-mypars = c("mu")
+mypars = c("gen_y")
 precis(fit,mypars,depth=2)
 
 # adding predictions
-data_loc_pred_all
+data_mod = fit %>% gather_draws( gen_y[df_i] ) %>% 
+  mode_qi(.width=0.5) %>% select(df_i ,.value,.lower,.upper)
 
+data_res = data_loc_pred_all %>% left_join(data_mod , by="df_i")
+
+data_res %>% ggplot(aes(x=truth_date)) + 
+  geom_point(aes(y=value_log)) +
+  geom_line(aes(y=.value)) + 
+  geom_ribbon(aes(ymin=.lower, ymax=.upper ))
+
+# format data for submission
+# https://github.com/european-modelling-hubs/flu-forecast-hub/wiki/Submission-format
+# Please use 2020-03-08 as origin_date for this test
+df_n_data = nrow(data_loc_for_stan)
+
+myorigin_date = ymd("2020-03-08")
+mytarget = "ILI incidence"
+
+# only point estimate
+model_gen01 = fit %>% gather_draws( gen_y[df_i] ) %>% 
+  filter(df_i > df_n_data ) %>% 
+  mode_qi(.width=c(0.5) ) %>% 
+  select(df_i ,.value) %>% 
+  mutate(output_type="median",output_type_id="") %>% 
+  select(df_i,value=.value,output_type,output_type_id); g(model_gen01)
+# quanitles
+model_gen02 = fit %>% gather_draws( gen_y[df_i] ) %>% 
+  filter(df_i > df_n_data ) %>% 
+  column_stats_ingroups(mycolumn=.value,mygroup = "df_i",probs=c(0.1,0.2,0.8,0.9) ) %>% 
+  mutate(output_type="quantile",output_type_id=format(quant,nsmall=2)) %>% 
+  select(df_i,value=val,output_type,output_type_id); g(model_gen02)
+
+respicast_df = bind_rows(model_gen01 , model_gen02) %>% left_join( data_loc_pred_all %>% rename(value_truth=value) , by="df_i" ) %>% 
+  mutate(
+    origin_date=myorigin_date,
+    target=mytarget,
+    horizon=df_i-df_n_data,
+    ) %>% 
+  select( 
+    origin_date,
+    target,
+    target_end_date=truth_date,
+    horizon,
+    location,
+    output_type,
+    output_type_id,
+    value
+    ) 
+g(respicast_df)
+write_csv( respicast_df ,file="./output/2020-03-08-ECDC-norrsken.csv" )

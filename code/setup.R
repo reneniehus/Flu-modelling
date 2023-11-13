@@ -117,6 +117,11 @@ mean_qi <- function(...) ggdist::mean_qi(...,.width=0.80)
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ### Super basic helpers ##########
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# my own very basic functions
+odds <- function(p){
+  (p/(1-p)) -> mout
+  return(mout)
+}
 inv_odds <- function( odds ){
   # body
   mp <- odds / (1+odds)
@@ -126,10 +131,7 @@ odds_log <- function( p ) {
   log(p/(1-p)) -> mout
   return(mout)
 }
-odds <- function(p){
-  (p/(1-p)) -> mout
-  return(mout)
-}
+logit <- odds_log
 #
 countries <- c("Austria", "Belgium", "Bulgaria", "Croatia", "Cyprus", "Czechia", 
                "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", 
@@ -179,6 +181,26 @@ ecdc_datetoweek <- function( date_in ){
   year_week <- paste0( substr( iso_week, 1, 4 ), "-", substr( iso_week, 7, 8 ) )
   return( year_week )
 }
+
+#  less simple functions, more specific to project
+quantile_df <- function(x, probs = c(0.25, 0.5, 0.75)) {
+  tibble(
+    val = quantile(x, probs, na.rm = TRUE),
+    quant = probs
+  )
+}
+
+column_stats_ingroups = function( df , mycolumn,mygroup , ... ) {
+  mycolumn = enquo(mycolumn)
+  mygroup = enquo(mygroup)
+  
+  mysumm = df %>% ungroup() %>% 
+    reframe( quantile_df( !!mycolumn , ... ), 
+             .by = !!mygroup )
+  return(mysumm)
+}
+
+
 
 
 # EU_long(c("DE","PL","DE","PT"))
