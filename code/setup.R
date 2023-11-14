@@ -87,6 +87,29 @@ mfirst <- function(v ){
   mout = v[1]
   return(mout)
 }
+# 
+odds <- function(p){
+  (p/(1-p)) -> mout
+  return(mout)
+}
+inv_odds <- function( odds ){
+  # body
+  mp <- odds / (1+odds)
+  return(mp)
+} # try it: inv_odds( (0.4/0.6) )
+odds_log <- function( p ) {
+  log(p/(1-p)) -> mout
+  return(mout)
+}
+logit <- odds_log
+#
+zero_plus_eps = function(vector_with_zeros,eps=1/(100*10^6) ){
+  (vector_with_zeros==0) %>% sum() -> n_zeros
+  #print(paste("zero_plus_eps() is adding a mass of:", n_zeros*eps))
+  vector_with_zeros[vector_with_zeros==0] = eps
+  return(vector_with_zeros)
+}
+
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ### Other Options ##########
@@ -114,25 +137,10 @@ geom_ribbon <- function(...) ggplot2::geom_ribbon(...,alpha=0.4)
 ggplot <- function(...) ggplot2::ggplot(...) + scale_color_brewer(palette="Dark2")
 
 mean_qi <- function(...) ggdist::mean_qi(...,.width=0.80)
+
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-### Super basic helpers ##########
+### Medium-complex functions ##########
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# my own very basic functions
-odds <- function(p){
-  (p/(1-p)) -> mout
-  return(mout)
-}
-inv_odds <- function( odds ){
-  # body
-  mp <- odds / (1+odds)
-  return(mp)
-} # try it: inv_odds( (0.4/0.6) )
-odds_log <- function( p ) {
-  log(p/(1-p)) -> mout
-  return(mout)
-}
-logit <- odds_log
-#
 countries <- c("Austria", "Belgium", "Bulgaria", "Croatia", "Cyprus", "Czechia", 
                "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", 
                "Hungary", "Iceland", "Ireland", "Italy", "Latvia", "Liechtenstein", 
@@ -148,7 +156,8 @@ countries_short <- c("AT", "BE", "BG", "HR", "CY", "CZ",
 # EL 
 #EU_short("Greece") <- "EL"
 # EU_short("Greece","EL")
-EU_short <- function(name_long,greece="GR"){
+EU_short <- function(name_long,greece="GR" # or "EL
+                     ){
   name_short = name_long
   for (i in 1:length(name_long)) name_short[i] <- countries_short[which(countries%in%name_long[i])]
   if (name_long=="Greece"&greece=="GR") name_short<-"GR"
@@ -156,8 +165,11 @@ EU_short <- function(name_long,greece="GR"){
   return(name_short)
 }
 #name_short=c("DE","PL","DE","PT")
-EU_long <- function(name_short){
+EU_long <- function(name_short,greece="GR" # or "EL
+                    ){
   name_long = name_short
+  if (name_short=="EL"&greece=="EL") name_short<-"GR"
+  
   for (i in 1:length(name_long)) name_long[i] <- countries[which(countries_short%in%name_short[i])]
   return(name_long)
 }
