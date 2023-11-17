@@ -1,19 +1,26 @@
 # ---- |-Set up ----
 source("code/setup.R")
-# ---- |-Stuff for settings ----
+# ---- |-Settings and parameters ----
 data_points_fitted = 10
 size_group = 2
 weeks_forecast = 4
+myeps = 1/100000
+mytransformation = "log"
 myorigin_date = ymd("2020-03-08")
 mytarget = "ILI incidence"
 myquantiles = c(0.01, 0.025, seq(0.05, 0.95, by = 0.05), 0.975, 0.99)
-fit_rerun = T
+fit_rerun = F
+# Transformed settings and parameters
+x_linear_adjust = sum( seq(1:size_group)-1 ) / size_group
+if (mytransformation == "log") {
+  data_transform = base::log
+  data_backtransform = base::exp
+}
 
 # ---- |-Load data for all countries ----
 data = read_csv(file="./data/2020-03-08-ILI_incidence.csv",show_col_types=F)
 data = data %>% 
-  mutate(value_log = log( value %>% zero_plus_eps( eps=1/100000 ) )) %>% 
-  mutate(value_sqrt = sqrt( value %>% zero_plus_eps( eps=1/100000 )  ))
+  mutate(value_transformed = data_transform( value %>% zero_plus_eps( eps=myeps ) )) 
 
 # ---- |-Loop: for each country ----
 country_v = unique(data$location) ; 
@@ -47,11 +54,12 @@ for (country_i in country_v) {
     point_group = point_identities, 
     belongs_complete_group=belongs_complete_group,  
     x_linear = x_linear
-  )
+  ) %>% 
+    mutate(x_linear=x_linear-x_linear_adjust )
+    
   if (F) {
   data_loc %>% ggplot(aes(x=truth_date,y=value)) + geom_line() + geom_point(aes(col=as.factor(point_group),pch=as.factor(belongs_complete_group)),size=7) 
-  data_loc %>% ggplot(aes(x=truth_date,y=value_log)) + geom_line() + geom_point(aes(col=as.factor(point_group),pch=as.factor(belongs_complete_group)),size=7) 
-  data_loc %>% ggplot(aes(x=truth_date,y=value_sqrt)) + geom_line() + geom_point(aes(col=as.factor(point_group),pch=as.factor(belongs_complete_group)),size=7) 
+  data_loc %>% ggplot(aes(x=truth_date,y=value_transformed)) + geom_line() + geom_point(aes(col=as.factor(point_group),pch=as.factor(belongs_complete_group)),size=7) 
   }
   # filter out points without full group
   df_stan = data_loc %>% filter_log(belongs_complete_group==1)
@@ -67,7 +75,7 @@ for (country_i in country_v) {
     df_stan_predict_extra[[wahead]] = df_stan_predict_last
     # stays same: location, issue_date
     df_stan_predict_extra[[wahead]]$truth_date = df_stan_predict_last$truth_date + 7
-    df_stan_predict_extra[[wahead]]$value <- df_stan_predict_extra[[wahead]]$value_log <- df_stan_predict_extra[[wahead]]$value_sqrt <- NA
+    df_stan_predict_extra[[wahead]]$value <- df_stan_predict_extra[[wahead]]$value_transformed <- NA
     df_stan_predict_extra[[wahead]]$point_group = point_group_predict
     df_stan_predict_extra[[wahead]]$x_linear = wahead
     
@@ -76,6 +84,7 @@ for (country_i in country_v) {
   df_stan_predict_extra = bind_rows(df_stan_predict_extra)
   df_stan_predict_all = bind_rows(df_stan_predict,df_stan_predict_extra) %>% 
     mutate(df_i=1:nrow(.) ) # add row counter to merge predictions
+  
   
   # ---- |-Prepare list for stan ----
   # make stan list
@@ -86,13 +95,13 @@ for (country_i in country_v) {
     n_group = n_distinct(df_stan$point_group),
     group = fct_inorder(as.character(df_stan$point_group)) %>% as.numeric(),
     
-    group_intercept=df_stan %>% filter(x_linear==0) %>% pull(value_log),
+    group_intercept= df_stan %>% group_by(point_group) %>% summarise( group_intercept=mean(value_transformed) ) %>% pull(group_intercept),
     x_linear = df_stan_predict_all$x_linear,
-    y = df_stan$value_log,
+    y = df_stan$value_transformed,
     #
     prior_intercept_sd=0.1,
-    prior_slope_sd=1,
-    prior_slope_diff_sd=0.1
+    #prior_slope_sd=1,
+    prior_slope_diff=0.1
   )
   # ---- |-Fit stan model ----
   myfile=paste0("../Big data/respicasting_",country_i,"_fit01.Rdata" )
@@ -101,7 +110,7 @@ for (country_i in country_v) {
     options(mc.cores = 8 )
     fit01=rstan::stan(
       file=mod1_path,
-      chains=8 ,thin=8,iter=1000,
+      chains=8 ,thin=8,iter=1500,
       seed=12, cores = getOption("mc.cores", 1L),
       control=list(
         #adapt_delta=0.9,
@@ -112,11 +121,10 @@ for (country_i in country_v) {
     save(fit01,stan_list,file=myfile )
   }
   load(file=myfile )
-  
+  fit = fit01
   # ---- |-Checks by hand ----
   if (F) { # checks by hand
     
-    fit = fit01
     fit@date # Nov 12 17:26:41
     fit@model_pars
     
@@ -126,12 +134,13 @@ for (country_i in country_v) {
   
   if (F) { # add predictions and look
     data_mod = fit %>% gather_draws( gen_y[df_i] ) %>% 
+      mutate(.value=data_backtransform(.value)) %>% 
       mode_qi(.width=0.5) %>% select(df_i ,.value,.lower,.upper)
     
     data_res = df_stan_predict_all %>% left_join(data_mod , by="df_i")
     
     data_res %>% ggplot(aes(x=truth_date)) + 
-      geom_point(aes(y=value_log)) +
+      geom_point(aes(y=value)) +
       geom_line(aes(y=.value)) + 
       geom_ribbon(aes(ymin=.lower, ymax=.upper ))
   }
@@ -144,6 +153,7 @@ for (country_i in country_v) {
   # only point estimate
   model_gen01 = fit %>% gather_draws( gen_y[df_i] ) %>% 
     filter(df_i > df_n_data ) %>% 
+    mutate(.value=data_backtransform(.value)) %>% 
     mode_qi(.width=c(0.5) ) %>% 
     select(df_i ,.value) %>% 
     mutate(output_type="median",output_type_id="") %>% 
@@ -151,8 +161,9 @@ for (country_i in country_v) {
   # quanitles
   model_gen02 = fit %>% gather_draws( gen_y[df_i] ) %>% 
     filter(df_i > df_n_data ) %>% 
+    mutate(.value=data_backtransform(.value)) %>% 
     column_stats_ingroups(mycolumn=.value,mygroup = "df_i",probs=myquantiles ) %>% 
-    mutate(output_type="quantile",output_type_id=format(quant,nsmall=2)) %>% 
+    mutate(output_type="quantile",output_type_id=format(quant,nsmall=3)) %>% 
     select(df_i,value=val,output_type,output_type_id); g(model_gen02)
   
   respicast_df_list[[country_i]] = bind_rows(model_gen01 , model_gen02) %>% left_join( df_stan_predict_all %>% rename(value_truth=value) , by="df_i" ) %>% 
@@ -166,7 +177,7 @@ for (country_i in country_v) {
       target,
       target_end_date=truth_date,
       horizon,
-      location,
+      location, 
       output_type,
       output_type_id,
       value
@@ -176,4 +187,9 @@ respicast_df = bind_rows(respicast_df_list)
 
 length(country_v) * (length(myquantiles) + 1 ) * weeks_forecast
 
-write_csv( respicast_df ,file="./output/2020-03-08-ECDC-norrsken.csv" )
+# manual correction of dates
+respicast_df_new = respicast_df %>% mutate(target_end_date = target_end_date+1337)
+respicast_df_new$origin_date = ymd("2023/11/15")
+respicast_df_new$target_end_date %>% table()
+
+write_csv( respicast_df_new , file="./output/2023-11-15-ECDC-norrsken.csv" )

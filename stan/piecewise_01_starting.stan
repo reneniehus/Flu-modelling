@@ -11,9 +11,8 @@ data {
   real x_linear[n_with_predict] ; //
   real y[n]; // obervations
   
-  real<lower=0> prior_slope_diff_sd; // prior
   real<lower=0> prior_intercept_sd; // prior
-  real<lower=0> prior_slope_sd; // prior
+  real<lower=0> prior_slope_diff; // prior
 }
 transformed data {
   int n_slope_diff = n_group - 1 ;
@@ -23,6 +22,7 @@ parameters {
   real slope[n_group]; //
   
   real<lower=0> sigma; // residual error
+  real<lower=0> prior_slope_diff_sd;
 }
 transformed parameters {
   real mu[n] ;
@@ -49,19 +49,19 @@ model {
   
   // priors (classic)
   for (i in 1:n_group) intercept[i] ~ normal(group_intercept[i], prior_intercept_sd ) ;
-  for (i in 1:n_group) slope[i] ~ normal(0, prior_slope_sd ) ;
+  // for (i in 1:n_group) slope[i] ~ normal(0, prior_slope_sd ) ;
   
   // priors (regularisation)
   for (i in 2:n_group) slope_diff[i-1] ~ normal(0 , prior_slope_diff_sd );
-  
+  prior_slope_diff_sd ~ exponential( 1/prior_slope_diff );
 }
 generated quantities {
   // declare generated variables ("gen_variables")
   real gen_y[n_with_predict]; 
   
   //
-  real intercept_pred = y[n];
-  real slope_pred = slope[n_group] + normal_rng(0,prior_slope_sd);
+  real intercept_pred = mu[n];
+  real slope_pred = slope[n_group] + normal_rng(0,prior_slope_diff_sd);
   
   // calculate "gen_variables"
   for (i in 1:n_with_predict) {
