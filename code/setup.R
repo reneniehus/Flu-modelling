@@ -62,12 +62,13 @@ combine <- gridExtra::combine
 area <- patchwork::area
 view <- summarytools::view
 compare <- rethinking::compare
-#
+# keeping only select functions from tidy_log 
 . %>% dfSummary %>% view() -> viewsummary
 filter_log <- tidylog::filter
 left_join_log <- tidylog::left_join
-g = glimpse
 detach(package:tidylog, unload = T)
+# simplify calling functions
+g = glimpse
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ### Super basic functions ##########
@@ -102,6 +103,13 @@ odds_log <- function( p ) {
   return(mout)
 }
 logit <- odds_log
+#
+inv_logit = function (x) 
+{
+  p <- 1/(1 + exp(-x))
+  p <- ifelse(x == Inf, 1, p)
+  return(p)
+}
 #
 zero_plus_eps = function(vector_with_zeros,eps=1/(100*10^6) ){
   (vector_with_zeros==0) %>% sum() -> n_zeros
@@ -159,18 +167,23 @@ countries_short <- c("AT", "BE", "BG", "HR", "CY", "CZ",
 EU_short <- function(name_long,greece="GR" # or "EL
                      ){
   name_short = name_long
-  for (i in 1:length(name_long)) name_short[i] <- countries_short[which(countries%in%name_long[i])]
-  if (name_long=="Greece"&greece=="GR") name_short<-"GR"
-  if (name_long=="Greece"&greece!="GR") name_short<-"EL"
+  for (i in 1:length(name_long)) {
+    name_short[i] <- countries_short[which(countries%in%name_long[i])]
+    if (name_long[i]=="Greece"&greece=="GR") name_short[i]<-"GR"
+    if (name_long[i]=="Greece"&greece!="GR") name_short[i]<-"EL"
+  }
+ 
   return(name_short)
 }
-#name_short=c("DE","PL","DE","PT")
+#name_short=c("DE","PL","DE","GR"); EU_long(name_short,"EL")
 EU_long <- function(name_short,greece="GR" # or "EL
                     ){
   name_long = name_short
-  if (name_short=="EL"&greece=="EL") name_short<-"GR"
-  
-  for (i in 1:length(name_long)) name_long[i] <- countries[which(countries_short%in%name_short[i])]
+  for (i in 1:length(name_long)) {
+    if (name_short[i]=="EL"&greece=="EL") name_short[i]<-"GR"
+    name_long[i] <- countries[which(countries_short%in%name_short[i])]
+    
+  } 
   return(name_long)
 }
 
@@ -212,11 +225,6 @@ column_stats_ingroups = function( df , mycolumn,mygroup , ... ) {
   return(mysumm)
 }
 
-
-
-
-# EU_long(c("DE","PL","DE","PT"))
-# EU_short("Germany")
 ggsave_as <- function(p,figname,height=10,width=16){
   ggsave(plot=p,filename=paste0(here(), "/figures/",figname,".pdf"),
          height=height,width=width,unit="cm")
@@ -228,6 +236,9 @@ ggsave_as_png <- function(p,figname,height=10,width=16){
          height=height,width=width,unit="cm")
   
 }
+
+
+
 
 # very end: timing
 end_time <- Sys.time()

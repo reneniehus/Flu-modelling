@@ -1,36 +1,73 @@
 # ---- |-Set up ----
 source("code/setup.R")
 # ---- |-Settings and parameters ----
-data_points_fitted = 10
-size_group = 2
+myorigin_date = ymd("2023-12-13")
+truth_date_latest = ymd("2023-11-26")
+
+mytarget = "ILI incidence"
 weeks_forecast = 4
+data_points_fitted = 8
+size_group = 2
 myeps = 1/100000
 mytransformation = "log"
-myorigin_date = ymd("2020-03-08")
-mytarget = "ILI incidence"
 myquantiles = c(0.01, 0.025, seq(0.05, 0.95, by = 0.05), 0.975, 0.99)
-fit_rerun = F
+fit_rerun = T
+
 # Transformed settings and parameters
 x_linear_adjust = sum( seq(1:size_group)-1 ) / size_group
 if (mytransformation == "log") {
   data_transform = base::log
   data_backtransform = base::exp
+  cat("Transformation: log")
 }
+if (mytransformation == "sqrt") {
+  data_transform = base::sqrt
+  data_backtransform = function(x){x^2}
+  cat("Transformation: sqrt")
+}
+iter_stan = 2000
 
 # ---- |-Load data for all countries ----
-data = read_csv(file="./data/2020-03-08-ILI_incidence.csv",show_col_types=F)
-data = data %>% 
-  mutate(value_transformed = data_transform( value %>% zero_plus_eps( eps=myeps ) )) 
+# data = read_csv("https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/ILIARIRates.csv",show_col_types=F)
+# data = data %>% filter(age=="total") %>% filter(indicator=="ILIconsultationrate") %>% 
+#   filter(countryname%in%countries)
+# data = data %>% mutate(location=EU_short(countryname))
+# data = data %>% mutate(truth_date = ISOweek2date(paste0(yearweek,"-7") ))
+# data = data %>% 
+#   mutate(value_transformed = data_transform( value %>% zero_plus_eps( eps=myeps ) )) 
+# (data$truth_date) %>% weekdays() %>% table()
+# g(data)
+#
+data2 = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/flu-forecast-hub/main/target-data/ERVISS/latest-ILI_incidence.csv",show_col_types=F)
+g(data2)
+data2 = data2 %>% 
+  mutate(value_transformed = data_transform( value %>% zero_plus_eps( eps=myeps ) ))
+data = data2
+# rmove countries where data is not up to date
+countries_select = data %>% group_by(location) %>% 
+  summarise(max_truth_date = max(truth_date)) %>% 
+  filter(max_truth_date==truth_date_latest) %>% pull(location)
+data_removed = data %>% group_by(location) %>% 
+  summarise(max_truth_date = max(truth_date)) %>% 
+  filter(max_truth_date!=truth_date_latest)
+data = data %>%  filter(location %in% countries_select)
+countries_removed = nrow(data_removed)
 
 # ---- |-Loop: for each country ----
-country_v = unique(data$location) ; 
+library(crayon)
+country_v = unique(data$location) ;
+pr=paste("Data for",countries_removed,"locations not up to date\n"); cat(red(pr))
+pr=paste("Data loaded for",length(country_v),"locations\n"); cat(blue(pr))
 respicast_df_list = list()
 for (country_i in country_v) {
   # ---- |-Filtering  ----
-  sentence=paste0("Running: ",country_i);print(sentence)
+  sentence=paste0(">Running: ",EU_long(country_i),"\n");cat(sentence)
   data_loc = data %>% 
-    filter_log(location==country_i) %>% 
+    filter(location==country_i) %>% 
+    arrange(truth_date) %>% 
+    mutate(day_diff=as.numeric(truth_date-lag(truth_date,1)),.before = location) %>% 
     tail(n=data_points_fitted) # filter only the last data_points_fitted weekly data point
+  if( any(data_loc$day_diff[-1]!=7) ) { pr=paste("Warning: Check day diffs for:",country_i,"\n"); cat(red(pr))}
   if (F) data_loc %>% ggplot(aes(x=truth_date,y=value)) + geom_line() + geom_point() 
   
   # ---- |-Adding grouping to data points  ----
@@ -56,13 +93,13 @@ for (country_i in country_v) {
     x_linear = x_linear
   ) %>% 
     mutate(x_linear=x_linear-x_linear_adjust )
-    
+  
   if (F) {
-  data_loc %>% ggplot(aes(x=truth_date,y=value)) + geom_line() + geom_point(aes(col=as.factor(point_group),pch=as.factor(belongs_complete_group)),size=7) 
-  data_loc %>% ggplot(aes(x=truth_date,y=value_transformed)) + geom_line() + geom_point(aes(col=as.factor(point_group),pch=as.factor(belongs_complete_group)),size=7) 
+    data_loc %>% ggplot(aes(x=truth_date,y=value)) + geom_line() + geom_point(aes(col=as.factor(point_group),pch=as.factor(belongs_complete_group)),size=7) 
+    data_loc %>% ggplot(aes(x=truth_date,y=value_transformed)) + geom_line() + geom_point(aes(col=as.factor(point_group),pch=as.factor(belongs_complete_group)),size=7) 
   }
   # filter out points without full group
-  df_stan = data_loc %>% filter_log(belongs_complete_group==1)
+  df_stan = data_loc %>% filter(belongs_complete_group==1)
   
   # ---- |-Extend data frame with "future rows" ----
   #
@@ -110,7 +147,7 @@ for (country_i in country_v) {
     options(mc.cores = 8 )
     fit01=rstan::stan(
       file=mod1_path,
-      chains=8 ,thin=8,iter=1500,
+      chains=8 ,thin=8,iter=iter_stan,
       seed=12, cores = getOption("mc.cores", 1L),
       control=list(
         #adapt_delta=0.9,
@@ -125,7 +162,7 @@ for (country_i in country_v) {
   # ---- |-Checks by hand ----
   if (F) { # checks by hand
     
-    fit@date # Nov 12 17:26:41
+    fit@date # Dec  4 21:26:58 2023
     fit@model_pars
     
     mypars = c("slope")
@@ -188,8 +225,33 @@ respicast_df = bind_rows(respicast_df_list)
 length(country_v) * (length(myquantiles) + 1 ) * weeks_forecast
 
 # manual correction of dates
-respicast_df_new = respicast_df %>% mutate(target_end_date = target_end_date+1337)
-respicast_df_new$origin_date = ymd("2023/11/15")
-respicast_df_new$target_end_date %>% table()
+# respicast_df_new = respicast_df %>% mutate(target_end_date = target_end_date+1337)
+# respicast_df_new$origin_date = ymd("2023/11/15")
+# respicast_df_new$target_end_date %>% table()
 
-write_csv( respicast_df_new , file="./output/2023-11-15-ECDC-norrsken.csv" )
+if (mytransformation=="log") write_csv( respicast_df , file="./output/flu-forecast-hub/ECDC-norrsken_green/2023-12-13-ECDC-norrsken_green.csv" )
+if (mytransformation=="sqrt") write_csv( respicast_df , file="./output/flu-forecast-hub/ECDC-norrsken_blue/2023-12-13-ECDC-norrsken_blue.csv" )
+
+# https://github.com/Infectious-Disease-Modeling-Hubs/hubVis
+# remotes::install_github("Infectious-Disease-Modeling-Hubs/hubVis")
+library(hubVis)
+
+mod_log = read_csv(file="./output/flu-forecast-hub/ECDC-norrsken_green/2023-12-13-ECDC-norrsken_green.csv")
+mod_sqrt = read_csv(file="./output/flu-forecast-hub/ECDC-norrsken_blue/2023-12-13-ECDC-norrsken_blue.csv")
+
+
+plot_mod_log = mod_log %>% mutate(model_id="log",
+                                  target_date=target_end_date,
+                                  output_type_id = as.numeric(output_type_id)) %>% 
+  filter(output_type != "median")
+plot_mod_sqrt = mod_sqrt %>% mutate(model_id="sqrt",
+                                    target_date=target_end_date,
+                                    output_type_id = as.numeric(output_type_id)) %>% 
+  filter(output_type != "median")
+
+
+plot_step_ahead_model_output(bind_rows(plot_mod_log,plot_mod_sqrt),
+                             data %>% mutate(time_idx=truth_date) %>% filter(truth_date>ymd("2023-10-01")),
+                             facet=c("location"), facet_scales = "free",
+                             intervals = c(0.5),interactive=F) 
+

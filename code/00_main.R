@@ -1,3 +1,4 @@
+# script that outlines the work flow for BOTH flu forecasting and scenario modelling
 # ---- |-Set up ----
 source("code/setup.R")
 
