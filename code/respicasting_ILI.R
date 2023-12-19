@@ -3,6 +3,7 @@ source("code/setup.R")
 # ---- |-Settings and parameters ----
 myorigin = c("2023-12-20")
 truth_date_latest = ymd("2023-12-10")
+mytarget = "ILI incidence"
 weeks_forecast = 6
 data_points_fitted = 8
 size_group = 2
@@ -211,7 +212,7 @@ for (i_trans in tranv_v) { # run same model for diff scaling
       mutate(
         origin_date=myorigin_date,
         target=mytarget,
-        horizon= as.numeric((truth_date-(myorigin_date-3))/7) ,
+        horizon= as.numeric((truth_date-(myorigin_date-3))/7 + 1) ,
       ) %>% 
       select( 
         origin_date,
@@ -230,7 +231,7 @@ for (i_trans in tranv_v) { # run same model for diff scaling
   
   # filter correct forecasting dates
   respicast_df_unfiltered = respicast_df
-  respicast_df = respicast_df %>% filter_log(target_end_date>myorigin_date,horizon<5) 
+  respicast_df = respicast_df %>% filter_log(target_end_date>(myorigin_date-7),horizon<5) 
   
   
   if (mytransformation=="log") write_csv( respicast_df , file=paste0("./output/flu-forecast-hub/ECDC-norrsken_green/",myorigin,"-ECDC-norrsken_green.csv") )

@@ -29,3 +29,6 @@ models_out %>% ggplot(aes(x=date,y=value,group=sample_or_quantile)) +
 # starting a forecasting script for RespiCast
 source("./code/respicasting_ILI.R")
 source("./code/respicasting_ARI.R")
+# covid
+source("./code/respicasting_covid_cases.R")
+
