@@ -49,11 +49,10 @@ for (i_trans in tranv_v) { # run same model for diff scaling
   countries_select = data %>% group_by(location) %>% 
     summarise(max_truth_date = max(truth_date)) %>% 
     filter(max_truth_date %in% c(truth_date_latest,truth_date_latest-7) ) %>% pull(location)
-  data_removed = data %>% group_by(location) %>% 
-    summarise(max_truth_date = max(truth_date)) %>% 
-    filter(max_truth_date!=truth_date_latest)
+  
+  countries_removed = data %>% select(location) %>% distinct() %>% filter(!location %in% countries_select) %>% nrow()
+  
   data = data %>%  filter(location %in% countries_select)
-  countries_removed = nrow(data_removed)
   
   # ---- |-Loop: for each country ----
   library(crayon)
@@ -210,9 +209,10 @@ for (i_trans in tranv_v) { # run same model for diff scaling
     
     respicast_df_list[[country_i]] = bind_rows(model_gen01 , model_gen02) %>% left_join( df_stan_predict_all %>% rename(value_truth=value) , by="df_i" ) %>% 
       mutate(
-        origin_date=myorigin_date,
+        origin_date=as.character(myorigin_date),
         target=mytarget,
-        horizon= as.numeric((truth_date-(myorigin_date-3))/7) ,
+        horizon= as.numeric((truth_date-(myorigin_date-3))/7 + 1) ,
+        truth_date = as.character(truth_date)
       ) %>% 
       select( 
         origin_date,
@@ -231,7 +231,7 @@ for (i_trans in tranv_v) { # run same model for diff scaling
   
   # filter correct forecasting dates
   respicast_df_unfiltered = respicast_df
-  respicast_df = respicast_df %>% filter_log(target_end_date>(myorigin_date-7),horizon<5) 
+  respicast_df = respicast_df %>% filter_log(horizon%in%c(1:4)) 
   
   
   if (mytransformation=="log") write_csv( respicast_df , file=paste0("./output/ari-forecast-hub/ECDC-norrsken_green/",myorigin,"-ECDC-norrsken_green.csv") )
