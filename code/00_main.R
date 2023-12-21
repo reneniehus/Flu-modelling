@@ -28,8 +28,23 @@ models_out %>% ggplot(aes(x=date,y=value,group=sample_or_quantile)) +
 
 # ---- |-Respicasting: Norrsken ----
 # starting a forecasting script for RespiCast
+# load pop data
+#axiliary data
+aux = list()
+aux$pops = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/covid19-forecast-hub-europe/main/data-locations/locations_eu.csv",
+                show_col_types=F)
+
+
 source("./code/respicasting_ILI.R")
 source("./code/respicasting_ARI.R")
 # covid
 source("./code/respicasting_covid_cases.R")
+source("./code/respicasting_covid_death.R")
+source("./code/respicasting_covid_hosp.R")
+
+
+
+
+
+
 

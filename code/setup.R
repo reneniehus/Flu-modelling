@@ -41,6 +41,9 @@ library(tictoc)
 library( "EcdcColors" )
 library(cmdstanr)
 library( scoringutils )
+library(crayon)
+library(Hmisc)
+
 # libraries not to include 
 # library(tsibble)
 
@@ -161,6 +164,8 @@ countries_short <- c("AT", "BE", "BG", "HR", "CY", "CZ",
                      "LT", "LU", "MT", "NL", "NO", 
                      "PL", "PT", "RO", "SK", "SI", "ES", 
                      "SE")
+
+
 # EL 
 #EU_short("Greece") <- "EL"
 # EU_short("Greece","EL")
