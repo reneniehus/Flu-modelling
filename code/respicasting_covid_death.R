@@ -2,8 +2,8 @@
 source("code/setup.R")
 # ---- |-Settings and parameters ----
 indicator = "death"
-myorigin = c("2023-12-18") # must be Monday of the week of ensemble creation (happening on Tuesday)
-truth_date_latest = ymd("2023-12-23") # 1 week ahead: must be Saturday after ensemble creation
+myorigin = c("2023-12-25") # last: c("2023-12-18") # must be Monday of the week of ensemble creation (happening on Tuesday)
+truth_date_latest = ymd("2023-12-30")# last: ymd("2023-12-23") # 1 week ahead: must be Saturday after ensemble creation
 mytarget = paste0("wk ahead inc ",indicator)
 weeks_forecast = 6
 data_points_fitted = 8

@@ -1,18 +1,20 @@
 # ---- |-Set up ----
 source("code/setup.R")
 # ---- |-Settings and parameters ----
-myorigin = c("2023-12-20")
-truth_date_latest = ymd("2023-12-10")
-mytarget = "ARI incidence"
+clc()
+indicator = "ARI"
+myorigin = c("2023-12-27") # last: c("2023-12-20")
+truth_date_latest = ymd("2023-12-17") # last: ymd("2023-12-10")
+mytarget = paste0(indicator," incidence")
 weeks_forecast = 6
 data_points_fitted = 8
 size_group = 2
 myeps = 1/100000
 myquantiles = c(0.01, 0.025, seq(0.05, 0.95, by = 0.05), 0.975, 0.99)
-fit_rerun = F
+fit_rerun = T
 
 tranv_v = c("log","sqrt")
-for (i_trans in tranv_v) { # run same model for diff scaling
+for (i_trans in tranv_v) { # run same model for diff scaling, i_trans=tranv_v[1]
   mytransformation = i_trans
   
   # Transformed settings and parameters
@@ -31,38 +33,27 @@ for (i_trans in tranv_v) { # run same model for diff scaling
   iter_stan = 2000
   
   # ---- |-Load data for all countries ----
-  # data = read_csv("https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/ILIARIRates.csv",show_col_types=F)
-  # data = data %>% filter(age=="total") %>% filter(indicator=="ILIconsultationrate") %>% 
-  #   filter(countryname%in%countries)
-  # data = data %>% mutate(location=EU_short(countryname))
-  # data = data %>% mutate(truth_date = ISOweek2date(paste0(yearweek,"-7") ))
-  # data = data %>% 
-  #   mutate(value_transformed = data_transform( value %>% zero_plus_eps( eps=myeps ) )) 
-  # (data$truth_date) %>% weekdays() %>% table()
-  # g(data)
-  #
   data2 = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/ari-forecast-hub/main/target-data/ERVISS/latest-ARI_incidence.csv",show_col_types=F)
-  data2 = data2 %>% 
-    mutate(value_transformed = data_transform( value %>% zero_plus_eps( eps=myeps ) ))
   data = data2
-  # rmove countries where data is not up to date
+  
+  # ---- |-Potentially remove countries ----
   countries_select = data %>% group_by(location) %>% 
     summarise(max_truth_date = max(truth_date)) %>% 
     filter(max_truth_date %in% c(truth_date_latest,truth_date_latest-7) ) %>% pull(location)
-  
   countries_removed = data %>% select(location) %>% distinct() %>% filter(!location %in% countries_select) %>% nrow()
-  
   data = data %>%  filter(location %in% countries_select)
-  
-  # ---- |-Loop: for each country ----
-  library(crayon)
   country_v = unique(data$location) ;
   pr=paste("Data for",countries_removed,"locations not up to date\n"); cat(red(pr))
   pr=paste("Data loaded for",length(country_v),"locations\n"); cat(blue(pr))
+  
+  # ---- |-Loop: for each country ----
   respicast_df_list = list()
   for (country_i in country_v) {
+    # loop helpers
+    population_i = aux$pops %>% filter(location==country_i) %>% pull(population)
+    
     # ---- |-Filtering  ----
-    sentence=paste0(">Running: ",EU_long(country_i),"\n");cat(sentence)
+    sentence=paste0(">Running: ",EU_long(country_i)," (pop:",population_i,")\n");cat(sentence)
     data_loc = data %>% 
       filter(location==country_i) %>% 
       arrange(truth_date) %>% 
@@ -70,6 +61,19 @@ for (i_trans in tranv_v) { # run same model for diff scaling
       tail(n=data_points_fitted) # filter only the last data_points_fitted weekly data point
     if( any(data_loc$day_diff[-1]!=7) ) { pr=paste("Warning: Check day diffs for:",country_i,"\n"); cat(red(pr))}
     if (F) data_loc %>% ggplot(aes(x=truth_date,y=value)) + geom_line() + geom_point() 
+    
+    # ---- |-Data transform  ----
+    data_loc = data_loc %>% 
+      # 1: first transform to ensure not exceeding pop size -> to odds
+      mutate(value_odds = odds(value/population_i) ) %>% 
+      # 2: model-specific tranform
+      mutate(value_transformed = data_transform( value_odds %>% zero_plus_eps( eps=myeps ) )) 
+    
+    # ---- |-Data&other warnings  ----
+    if ( any(is.na(data_loc$value))  ) {
+      pr=paste("Warning: NA in values:",country_i,"\n"); cat(red(pr))
+      next; # don't run rest of for-loop, go to next country
+    }
     
     # ---- |-Adding grouping to data points  ----
     point_n = nrow(data_loc)
@@ -139,11 +143,11 @@ for (i_trans in tranv_v) { # run same model for diff scaling
       #
       prior_intercept_sd=0.1,
       #prior_slope_sd=1,
-      prior_slope_diff=0.1
+      prior_slope_diff=0.05
     )
     # ---- |-Fit stan model ----
-    if (mytransformation=="sqrt") myfile=paste0("../Big data/respicasting_",country_i,"sqrt_fit01.Rdata" )
-    if (mytransformation=="log") myfile=paste0("../Big data/respicasting_",country_i,"log_fit01.Rdata" )
+    if (mytransformation=="sqrt") myfile=paste0("../Big data/respicasting_",country_i,"sqrt_fit01",indicator,".Rdata" )
+    if (mytransformation=="log") myfile=paste0("../Big data/respicasting_",country_i,"log_fit01",indicator,".Rdata" )
     
     if (fit_rerun==T) {
       mod1_path = c("./stan/piecewise_01_starting.stan")
@@ -169,13 +173,14 @@ for (i_trans in tranv_v) { # run same model for diff scaling
       fit@date # Dec  4 21:26:58 2023
       fit@model_pars
       
-      mypars = c("slope")
+      mypars = c("slope","slope_diff")
       precis(fit,mypars,depth=2)
     }
     
     if (F) { # add predictions and look
       data_mod = fit %>% gather_draws( gen_y[df_i] ) %>% 
         mutate(.value=data_backtransform(.value)) %>% 
+        mutate(.value=inv_odds(.value)*population_i) %>%
         mode_qi(.width=0.5) %>% select(df_i ,.value,.lower,.upper)
       
       data_res = df_stan_predict_all %>% left_join(data_mod , by="df_i")
@@ -188,13 +193,13 @@ for (i_trans in tranv_v) { # run same model for diff scaling
     
     # ---- |-format data for submission ----
     # https://github.com/european-modelling-hubs/flu-forecast-hub/wiki/Submission-format
-    # Please use 2020-03-08 as origin_date for this test
     df_n_data = nrow(df_stan)
     
     # only point estimate
     model_gen01 = fit %>% gather_draws( gen_y[df_i] ) %>% 
       filter(df_i > df_n_data ) %>% 
       mutate(.value=data_backtransform(.value)) %>% 
+      mutate(.value=inv_odds(.value)*population_i) %>%
       mode_qi(.width=c(0.5) ) %>% 
       select(df_i ,.value) %>% 
       mutate(output_type="median",output_type_id="") %>% 
@@ -203,10 +208,11 @@ for (i_trans in tranv_v) { # run same model for diff scaling
     model_gen02 = fit %>% gather_draws( gen_y[df_i] ) %>% 
       filter(df_i > df_n_data ) %>% 
       mutate(.value=data_backtransform(.value)) %>% 
+      mutate(.value=inv_odds(.value)*population_i) %>%
       column_stats_ingroups(mycolumn=.value,mygroup = "df_i",probs=myquantiles ) %>% 
       mutate(output_type="quantile",output_type_id=as.character(round(quant,3))) %>% 
       select(df_i,value=val,output_type,output_type_id); # g(model_gen02)
-    
+    # put it all together
     respicast_df_list[[country_i]] = bind_rows(model_gen01 , model_gen02) %>% left_join( df_stan_predict_all %>% rename(value_truth=value) , by="df_i" ) %>% 
       mutate(
         origin_date=as.character(myorigin_date),
@@ -234,21 +240,26 @@ for (i_trans in tranv_v) { # run same model for diff scaling
   respicast_df = respicast_df %>% filter_log(horizon%in%c(1:4)) 
   
   
-  if (mytransformation=="log") write_csv( respicast_df , file=paste0("./output/ari-forecast-hub/ECDC-norrsken_green/",myorigin,"-ECDC-norrsken_green.csv") )
-  if (mytransformation=="sqrt") write_csv( respicast_df , file=paste0("./output/ari-forecast-hub/ECDC-norrsken_blue/",myorigin,"-ECDC-norrsken_blue.csv") )
+  if (mytransformation=="log") write_csv( respicast_df , file=paste0(
+    "./output/ari-forecast-hub/ECDC-norrsken_green/",myorigin,"-ECDC-norrsken_green",indicator,".csv") )
+  if (mytransformation=="sqrt") write_csv( respicast_df , file=paste0(
+    "./output/ari-forecast-hub/ECDC-norrsken_blue/",myorigin,"-ECDC-norrsken_blue",indicator,".csv") )
   
 } # through different scaling
 
 respicast_df %>% select(horizon,target_end_date) %>% distinct()
-
 
 # https://github.com/Infectious-Disease-Modeling-Hubs/hubVis
 # remotes::install_github("Infectious-Disease-Modeling-Hubs/hubVis")
 if (F){
   
   library(hubVis)
-  mod_log = read_csv(file="./output/ari-forecast-hub/ECDC-norrsken_green/2023-12-20-ECDC-norrsken_green.csv")
-  mod_sqrt = read_csv(file="./output/ari-forecast-hub/ECDC-norrsken_blue/2023-12-20-ECDC-norrsken_blue.csv")
+  mod_log = read_csv(
+    file=paste0(
+      "./output/ari-forecast-hub/ECDC-norrsken_green/",myorigin,"-ECDC-norrsken_green",indicator,".csv"),show_col_types=F )
+  mod_sqrt = read_csv(
+    file=paste0(
+      "./output/ari-forecast-hub/ECDC-norrsken_blue/",myorigin,"-ECDC-norrsken_blue",indicator,".csv"),show_col_types=F )
   plot_mod_log = mod_log %>% mutate(model_id="log",
                                     target_date=target_end_date,
                                     output_type_id = as.numeric(output_type_id)) %>% 
@@ -260,7 +271,7 @@ if (F){
   
   
   plot_step_ahead_model_output(bind_rows(plot_mod_log,plot_mod_sqrt),
-                               data %>% mutate(time_idx=truth_date) %>% filter(truth_date>ymd("2023-10-01")),
+                               data %>% mutate(time_idx=truth_date) %>% filter(truth_date>ymd("2023-11-15")),
                                facet=c("location"), facet_scales = "free",
                                intervals = c(0.5),interactive=F) 
   

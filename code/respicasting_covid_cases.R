@@ -2,15 +2,15 @@
 source("code/setup.R")
 # ---- |-Settings and parameters ----
 indicator = "case"
-myorigin = c("2023-12-18") # must be Monday of the week of ensemble creation (happening on Tuesday)
-truth_date_latest = ymd("2023-12-23") # 1 week ahead: must be Saturday after ensemble creation
+myorigin = c("2023-12-25") # last: c("2023-12-18") # must be Monday of the week of ensemble creation (happening on Tuesday)
+truth_date_latest = ymd("2023-12-30")# last: ymd("2023-12-23") # 1 week ahead: must be Saturday after ensemble creation
 mytarget = paste0("wk ahead inc ",indicator)
 weeks_forecast = 6
 data_points_fitted = 8
 size_group = 2
 myeps = 1/100000
 myquantiles = c(0.01, 0.025, seq(0.05, 0.95, by = 0.05), 0.975, 0.99)
-fit_rerun = T
+fit_rerun = F
 
 tranv_v = c("log","sqrt")
 for (i_trans in tranv_v) { # run diff scaling # i_trans = tranv_v[1]
@@ -262,9 +262,9 @@ if (F){
   
   library(hubVis)
   mod_log = read_csv(file=paste0("./output/covid-forecast-hub/ECDC-norrsken_green/",myorigin,
-                                 "-ECDC-norrsken_green_",indicator,".csv"))
+                                 "-ECDC-norrsken_green_",indicator,".csv"),show_col_types=F)
   mod_sqrt = read_csv(file=paste0("./output/covid-forecast-hub/ECDC-norrsken_blue/",myorigin,
-                                  "-ECDC-norrsken_blue_",indicator,".csv"))
+                                  "-ECDC-norrsken_blue_",indicator,".csv"),show_col_types=F)
   plot_mod_log = mod_log %>% mutate(model_id="log",
                                     target_date=target_end_date,
                                     output_type=type,
@@ -279,7 +279,7 @@ if (F){
   
   plot_step_ahead_model_output(bind_rows(plot_mod_log,plot_mod_sqrt),
                                data %>% mutate(time_idx=truth_date) %>% 
-                                 filter(truth_date>ymd("2023-10-01"),!is.na(value)),
+                                 filter(truth_date>ymd("2023-12-01"),!is.na(value)),
                                facet=c("location"), facet_scales = "free",
                                intervals = c(0.8),interactive=F) 
   

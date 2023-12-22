@@ -120,7 +120,23 @@ zero_plus_eps = function(vector_with_zeros,eps=1/(100*10^6) ){
   vector_with_zeros[vector_with_zeros==0] = eps
   return(vector_with_zeros)
 }
-
+if (F) {
+  ##### adventures in re-scaling ...
+  x_data = seq(from=0.5,to=99.5,length=50)
+  pop_i = 100
+  x_odds = odds(x_data/pop_i)
+  plot(x_data,x_odds)
+  x_logodds = log(x_odds)
+  plot(x_data,x_logodds)
+  x_sqrtodds = sqrt(x_odds)
+  plot(x_data,x_sqrtodds)
+  # backwards: from sqrtodds to data scale
+  pop_i = 100
+  x_sqrtodds = seq(from=-0.1,to=0.1,length=50)
+  x_odds = x_sqrtodds^2
+  x_data = (inv_odds(x_odds))*pop_i
+  plot(x_sqrtodds,x_data)
+}
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ### Other Options ##########

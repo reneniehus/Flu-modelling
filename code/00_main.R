@@ -34,7 +34,6 @@ aux = list()
 aux$pops = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/covid19-forecast-hub-europe/main/data-locations/locations_eu.csv",
                 show_col_types=F)
 
-
 source("./code/respicasting_ILI.R")
 source("./code/respicasting_ARI.R")
 # covid
