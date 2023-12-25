@@ -74,7 +74,7 @@ model {
   for (i in 2:n_group) slope_diff[i-1] ~ normal(0 , prior_slope_diff_sd );
   prior_slope_diff_sd ~ exponential( 1/prior_slope_diff );
   // regularisation based on expectatoin (weighting makes softer regularisation)
-  for (i in 1:n_with_predict) target += 0.5 * normal_lpdf(gen_y[i] | expectation_mu,expectation_sd);
+  for (i in 1:n_with_predict) target += 0.25 * normal_lpdf(gen_y[i] | expectation_mu,expectation_sd);
 }
 generated quantities {
   // declare generated variables ("gen_variables")

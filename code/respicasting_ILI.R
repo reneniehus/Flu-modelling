@@ -16,6 +16,12 @@ my_incidence_denominator = 100000
 myquantiles = c(0.01, 0.025, seq(0.05, 0.95, by = 0.05), 0.975, 0.99)
 fit_rerun = T
 
+submission_path=NA
+if (indicator == "ILI") submission_path = "./output/flu-forecast-hub/"
+if (indicator == "ARI") submission_path = "./output/ari-forecast-hub/"
+if (indicator %in% c("case","death","hosp")) submission_path = "./output/covid-forecast-hub/"
+if(is.na(submission_path)) break("Warning no submission path!")
+
 path_data=NA
 if (indicator == "ILI") path_data = "https://raw.githubusercontent.com/european-modelling-hubs/flu-forecast-hub/main/target-data/ERVISS/latest-ILI_incidence.csv"
 if (indicator == "ARI") path_data = "https://raw.githubusercontent.com/european-modelling-hubs/ari-forecast-hub/main/target-data/ERVISS/latest-ARI_incidence.csv"
@@ -213,7 +219,7 @@ for (i_trans in tranv_v) { # run same model for diff scaling, i_trans = tranv_v[
       precis(fit,mypars,depth=2)
     }
     do_checks = country_i %in% c( "GR","AT","BE","EE","HU" )
-    if ( T&do_checks ) { # add predictions and look
+    if ( F&do_checks ) { # add predictions and look
       browser()
       data_mod = fit %>% gather_draws( gen_y_obs[df_i] ) %>% 
         mutate(.value=data_backtransform(.value)) %>% 
@@ -277,15 +283,15 @@ for (i_trans in tranv_v) { # run same model for diff scaling, i_trans = tranv_v[
   respicast_df_unfiltered = respicast_df
   respicast_df = respicast_df %>% filter_log(horizon%in%c(1:4)) 
   # final checks by hand (remember the unit of the incidence!)
-  browser()
+  
   respicast_df %>% filter(location=="CZ") %>% pull(value) %>% max() # 257.928 -> 110
   respicast_df %>% pull(value) %>% max() # 28411 (28%)
   respicast_df %>% filter(value==max(value))
   
   if (mytransformation=="log") write_csv( respicast_df , file=paste0(
-    "./output/flu-forecast-hub/ECDC-norrsken_green/",myorigin,"-ECDC-norrsken_green",indicator,".csv") )
+    submission_path,"ECDC-norrsken_green/",myorigin,"-ECDC-norrsken_green",indicator,".csv") )
   if (mytransformation=="sqrt") write_csv( respicast_df , file=paste0(
-    "./output/flu-forecast-hub/ECDC-norrsken_blue/",myorigin,"-ECDC-norrsken_blue",indicator,".csv") )
+    submission_path,"ECDC-norrsken_blue/",myorigin,"-ECDC-norrsken_blue",indicator,".csv") )
   
 } # through different scaling
 
@@ -298,10 +304,10 @@ if (F){
   library(hubVis)
   mod_log = read_csv(
     file=paste0(
-      "./output/flu-forecast-hub/ECDC-norrsken_green/",myorigin,"-ECDC-norrsken_green",indicator,".csv"),show_col_types=F )
+      submission_path,"ECDC-norrsken_green/",myorigin,"-ECDC-norrsken_green",indicator,".csv"),show_col_types=F )
   mod_sqrt = read_csv(
     file=paste0(
-      "./output/flu-forecast-hub/ECDC-norrsken_blue/",myorigin,"-ECDC-norrsken_blue",indicator,".csv"),show_col_types=F )
+      submission_path,"ECDC-norrsken_blue/",myorigin,"-ECDC-norrsken_blue",indicator,".csv"),show_col_types=F )
   plot_mod_log = mod_log %>% mutate(model_id="log",
                                     target_date=target_end_date,
                                     output_type_id = as.numeric(output_type_id)) %>% 
@@ -312,17 +318,15 @@ if (F){
     filter(output_type != "median")
   
   
-  
-  
   plot_step_ahead_model_output(bind_rows(plot_mod_log,plot_mod_sqrt),
                                data %>% mutate(time_idx=truth_date) %>% filter(truth_date>ymd("2023-11-15")),
                                facet=c("location"), facet_scales = "free",
-                               intervals = c(0.5),interactive=F) 
+                               intervals = c(0.95),interactive=F) 
   
   mod_log %>% group_by(location) %>% 
     summarise(max_pred=max(value)) %>% 
     left_join(aux$pops %>% select(location,population)) %>% 
-    mutate(max_pred_rel = max_pred/population) %>% arrange(desc(max_pred_rel))
+    mutate(max_pred_rel = max_pred/my_incidence_denominator) %>% arrange(desc(max_pred_rel))
   
 }
 
