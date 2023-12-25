@@ -2,21 +2,37 @@
 source("code/setup.R")
 # ---- |-Settings and parameters ----
 clc()
+
 indicator = "ILI"
 myorigin = c("2023-12-27") # last: c("2023-12-20")
 truth_date_latest = ymd("2023-12-17") # last: ymd("2023-12-10")
 mytarget = paste0(indicator," incidence")
+
 weeks_forecast = 6
 data_points_fitted = 8
 size_group = 2
 myeps = 1/100000
+my_incidence_denominator = 100000
 myquantiles = c(0.01, 0.025, seq(0.05, 0.95, by = 0.05), 0.975, 0.99)
-fit_rerun = F
+fit_rerun = T
+
+path_data=NA
+if (indicator == "ILI") path_data = "https://raw.githubusercontent.com/european-modelling-hubs/flu-forecast-hub/main/target-data/ERVISS/latest-ILI_incidence.csv"
+if (indicator == "ARI") path_data = "https://raw.githubusercontent.com/european-modelling-hubs/ari-forecast-hub/main/target-data/ERVISS/latest-ARI_incidence.csv"
+if (indicator == "case") path_data = "https://raw.githubusercontent.com/european-modelling-hubs/covid19-forecast-hub-europe/main/data-truth/ECDC/truth_ECDC-Incident%20Cases.csv"
+if (indicator == "death") path_data = "https://raw.githubusercontent.com/european-modelling-hubs/covid19-forecast-hub-europe/main/data-truth/ECDC/truncated_ECDC-Incident%20Deaths.csv"
+if (indicator == "hosp") path_data = "https://raw.githubusercontent.com/european-modelling-hubs/covid19-forecast-hub-europe/main/data-truth/OWID/truncated_OWID-Incident%20Hospitalizations.csv"
+if(is.na(path_data)) break("Warning no data path!")
+
+# ---- |-Load data for all countries ----
+# check data:
+# https://github.com/european-modelling-hubs/flu-forecast-hub/tree/main/target-data/ERVISS
+data2 = read_csv(path_data,show_col_types=F)
+data = data2
 
 tranv_v = c("log","sqrt")
-for (i_trans in tranv_v) { # run same model for diff scaling
+for (i_trans in tranv_v) { # run same model for diff scaling, i_trans = tranv_v[1]
   mytransformation = i_trans
-  
   # Transformed settings and parameters
   myorigin_date = ymd(myorigin)
   x_linear_adjust = sum( seq(1:size_group)-1 ) / size_group
@@ -30,11 +46,29 @@ for (i_trans in tranv_v) { # run same model for diff scaling
     data_backtransform = function(x){x^2}
     cat("Transformation: sqrt")
   }
-  iter_stan = 2000
+  iter_stan = 3000
   
-  # ---- |-Load data for all countries ----
-  data2 = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/flu-forecast-hub/main/target-data/ERVISS/latest-ILI_incidence.csv",show_col_types=F)
-  data = data2
+  # ---- |-Get an indicator expectation distribution ---- 
+  temp = data %>% left_join(aux$pops %>% select(location,population), by="location") %>% 
+    mutate( incidence_denominator = my_incidence_denominator ) %>% 
+    mutate( value_odds=odds(value/incidence_denominator) )
+  temp$value_odds %>% inv_odds() %>% max() # almost 5.8%
+  values_transformed = data_transform( temp$value_odds %>% zero_plus_eps( eps=myeps ) )
+  expectation_mu = mean(values_transformed)
+  expectation_sd = sd(values_transformed)
+  (temp$value/100000) %>% quantile(c(0.05,0.5,0.95))
+  if (F) {
+    msim_transformed = rnorm(n = length(values_transformed),mean=expectation_mu,sd=expectation_sd)
+    msim = msim_transformed %>% data_backtransform() %>% inv_odds() 
+    msim %>% quantile(c(0.05,0.5,0.95))
+    tibble(x_real_transformed=sample(x=values_transformed,size=length(values_transformed),replace=F),
+           x_sim_transformed=msim_transformed,
+           i=c(1:length(values_transformed))) %>% 
+      ggplot(aes(x=i)) + geom_point(aes(y=x_real_transformed),alpha=0.2) + 
+      geom_point(aes(y=x_sim_transformed),col="blue",alpha=0.2)
+    # this really does look like a good description of the empirical data
+    
+  }
   
   # ---- |-Potentially remove countries ----
   countries_select = data %>% group_by(location) %>% 
@@ -65,7 +99,7 @@ for (i_trans in tranv_v) { # run same model for diff scaling
     # ---- |-Data transform  ----
     data_loc = data_loc %>% 
       # 1: first transform to ensure not exceeding pop size -> to odds
-      mutate(value_odds = odds(value/population_i) ) %>% 
+      mutate(value_odds = odds(value/my_incidence_denominator) ) %>% 
       # 2: model-specific tranform
       mutate(value_transformed = data_transform( value_odds %>% zero_plus_eps( eps=myeps ) )) 
     
@@ -143,7 +177,9 @@ for (i_trans in tranv_v) { # run same model for diff scaling
       #
       prior_intercept_sd=0.1,
       #prior_slope_sd=1,
-      prior_slope_diff=0.05
+      prior_slope_diff=0.01,
+      expectation_mu = expectation_mu,
+      expectation_sd = expectation_sd
     )
     # ---- |-Fit stan model ----
     if (mytransformation=="sqrt") myfile=paste0("../Big data/respicasting_",country_i,"sqrt_fit01",indicator,".Rdata" )
@@ -176,19 +212,21 @@ for (i_trans in tranv_v) { # run same model for diff scaling
       mypars = c("slope","slope_diff")
       precis(fit,mypars,depth=2)
     }
-    
-    if (F) { # add predictions and look
-      data_mod = fit %>% gather_draws( gen_y[df_i] ) %>% 
+    do_checks = country_i %in% c( "GR","AT","BE","EE","HU" )
+    if ( T&do_checks ) { # add predictions and look
+      browser()
+      data_mod = fit %>% gather_draws( gen_y_obs[df_i] ) %>% 
         mutate(.value=data_backtransform(.value)) %>% 
-        mutate(.value=inv_odds(.value)*population_i) %>%
-        mode_qi(.width=0.5) %>% select(df_i ,.value,.lower,.upper)
+        mutate(.value=inv_odds(.value)*my_incidence_denominator) %>%
+        median_qi(.width=0.50) %>% select(df_i ,.value,.lower,.upper)
       
       data_res = df_stan_predict_all %>% left_join(data_mod , by="df_i")
       
       data_res %>% ggplot(aes(x=truth_date)) + 
         geom_point(aes(y=value)) +
         geom_line(aes(y=.value)) + 
-        geom_ribbon(aes(ymin=.lower, ymax=.upper ))
+        geom_ribbon(aes(ymin=.lower, ymax=.upper )) +
+        scale_y_log10()
     }
     
     # ---- |-format data for submission ----
@@ -196,19 +234,19 @@ for (i_trans in tranv_v) { # run same model for diff scaling
     df_n_data = nrow(df_stan)
     
     # only point estimate
-    model_gen01 = fit %>% gather_draws( gen_y[df_i] ) %>% 
+    model_gen01 = fit %>% gather_draws( gen_y_obs[df_i] ) %>% 
       filter(df_i > df_n_data ) %>% 
       mutate(.value=data_backtransform(.value)) %>% 
-      mutate(.value=inv_odds(.value)*population_i) %>%
-      mode_qi(.width=c(0.5) ) %>% 
+      mutate(.value=inv_odds(.value)*my_incidence_denominator) %>%
+      median_qi(.width=c(0.5) ) %>% 
       select(df_i ,.value) %>% 
       mutate(output_type="median",output_type_id="") %>% 
       select(df_i,value=.value,output_type,output_type_id); # g(model_gen01)
     # quanitles
-    model_gen02 = fit %>% gather_draws( gen_y[df_i] ) %>% 
+    model_gen02 = fit %>% gather_draws( gen_y_obs[df_i] ) %>% 
       filter(df_i > df_n_data ) %>% 
       mutate(.value=data_backtransform(.value)) %>% 
-      mutate(.value=inv_odds(.value)*population_i) %>%
+      mutate(.value=inv_odds(.value)*my_incidence_denominator) %>%
       column_stats_ingroups(mycolumn=.value,mygroup = "df_i",probs=myquantiles ) %>% 
       mutate(output_type="quantile",output_type_id=as.character(round(quant,3))) %>% 
       select(df_i,value=val,output_type,output_type_id); # g(model_gen02)
@@ -238,7 +276,11 @@ for (i_trans in tranv_v) { # run same model for diff scaling
   # filter correct forecasting dates
   respicast_df_unfiltered = respicast_df
   respicast_df = respicast_df %>% filter_log(horizon%in%c(1:4)) 
-  
+  # final checks by hand (remember the unit of the incidence!)
+  browser()
+  respicast_df %>% filter(location=="CZ") %>% pull(value) %>% max() # 257.928 -> 110
+  respicast_df %>% pull(value) %>% max() # 28411 (28%)
+  respicast_df %>% filter(value==max(value))
   
   if (mytransformation=="log") write_csv( respicast_df , file=paste0(
     "./output/flu-forecast-hub/ECDC-norrsken_green/",myorigin,"-ECDC-norrsken_green",indicator,".csv") )
@@ -270,10 +312,17 @@ if (F){
     filter(output_type != "median")
   
   
+  
+  
   plot_step_ahead_model_output(bind_rows(plot_mod_log,plot_mod_sqrt),
                                data %>% mutate(time_idx=truth_date) %>% filter(truth_date>ymd("2023-11-15")),
                                facet=c("location"), facet_scales = "free",
                                intervals = c(0.5),interactive=F) 
+  
+  mod_log %>% group_by(location) %>% 
+    summarise(max_pred=max(value)) %>% 
+    left_join(aux$pops %>% select(location,population)) %>% 
+    mutate(max_pred_rel = max_pred/population) %>% arrange(desc(max_pred_rel))
   
 }
 

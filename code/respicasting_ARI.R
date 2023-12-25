@@ -33,9 +33,11 @@ for (i_trans in tranv_v) { # run same model for diff scaling, i_trans=tranv_v[1]
   iter_stan = 2000
   
   # ---- |-Load data for all countries ----
+  # check data
+  # https://github.com/european-modelling-hubs/ari-forecast-hub/tree/main/target-data/ERVISS
   data2 = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/ari-forecast-hub/main/target-data/ERVISS/latest-ARI_incidence.csv",show_col_types=F)
   data = data2
-  
+  #browser()
   # ---- |-Potentially remove countries ----
   countries_select = data %>% group_by(location) %>% 
     summarise(max_truth_date = max(truth_date)) %>% 

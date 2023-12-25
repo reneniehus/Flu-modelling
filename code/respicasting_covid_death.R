@@ -32,6 +32,8 @@ for (i_trans in tranv_v) { # run diff scaling # i_trans = tranv_v[1]
   iter_stan = 2000
   
   # ---- |-Load data for all countries ----
+  # check data:
+  # https://github.com/european-modelling-hubs/covid19-forecast-hub-europe/tree/main/data-truth/ECDC
   data2 = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/covid19-forecast-hub-europe/main/data-truth/ECDC/truncated_ECDC-Incident%20Deaths.csv",show_col_types=F)
   data2 = data2 %>% 
     rename(truth_date=date)
