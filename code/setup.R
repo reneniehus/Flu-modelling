@@ -69,6 +69,7 @@ compare <- rethinking::compare
 . %>% dfSummary %>% view() -> viewsummary
 filter_log <- tidylog::filter
 left_join_log <- tidylog::left_join
+fill_log <- tidylog::fill
 detach(package:tidylog, unload = T)
 # simplify calling functions
 g = glimpse
@@ -153,8 +154,34 @@ options(stringsAsFactors = FALSE,
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ### Settings for plotting ##########
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-theme_set(theme_gray() +
-            theme(panel.grid.minor = element_blank()))
+# ECDC Font
+if ("Tahoma" %in% extrafont::fonts()) {
+  FONT <- "Tahoma"
+  suppressMessages(extrafont::loadfonts(device = "win"))
+} else if (Sys.info()["sysname"] == "Windows") {
+  suppressMessages(extrafont::font_import(pattern = 'tahoma', prompt = FALSE))
+  suppressMessages(extrafont::loadfonts(device = "win"))
+  FONT <- "Tahoma"
+} else {
+  FONT <- NULL
+}
+
+# Theme (got this from WNV repo)
+.plottheme <- ggplot2::theme(axis.text = ggplot2::element_text(size = 8, family = FONT),
+                             axis.title = ggplot2::element_text(size = 9, family = FONT),
+                             axis.line = ggplot2::element_line(colour = "black"),
+                             axis.line.x = ggplot2::element_blank(),
+                             # --- Setting the background
+                             panel.grid.major = ggplot2::element_blank(),
+                             panel.grid.minor = ggplot2::element_blank(),
+                             panel.background = ggplot2::element_blank(),
+                             # --- Setting the legend
+                             legend.position = "right",
+                             legend.title = ggplot2::element_blank(),
+                             legend.text = ggplot2::element_text(size = 8, family = FONT),
+                             legend.key.width = ggplot2::unit(0.8, "cm"),
+                             legend.key.size = ggplot2::unit(0.4, "cm"))
+
 # amazing: overriding function defaults
 ggplot <- function(...) ggplot2::ggplot(...) + scale_color_brewer(palette="Set3")
 geom_interval <- function(...) ggdist::geom_interval(...,alpha=0.4)
@@ -173,32 +200,36 @@ countries <- c("Austria", "Belgium", "Bulgaria", "Croatia", "Cyprus", "Czechia",
                "Hungary", "Iceland", "Ireland", "Italy", "Latvia", "Liechtenstein", 
                "Lithuania", "Luxembourg", "Malta", "Netherlands", "Norway", 
                "Poland", "Portugal", "Romania", "Slovakia", "Slovenia", "Spain", 
-               "Sweden")
+               "Sweden",
+               # non EU/EEA
+               "Switzerland","England","Norther Ireland","Scotland")
 countries_short <- c("AT", "BE", "BG", "HR", "CY", "CZ", 
                      "DK", "EE", "FI", "FR", "DE", "GR", 
                      "HU", "IS", "IE", "IT", "LV", "LI", 
                      "LT", "LU", "MT", "NL", "NO", 
                      "PL", "PT", "RO", "SK", "SI", "ES", 
-                     "SE")
+                     "SE",
+                     # non EU/EEA
+                     "CH","GB-ENG","GB-NIR","GB-SCT")
 
 
 # EL 
 #EU_short("Greece") <- "EL"
 # EU_short("Greece","EL")
 EU_short <- function(name_long,greece="GR" # or "EL
-                     ){
+){
   name_short = name_long
   for (i in 1:length(name_long)) {
     name_short[i] <- countries_short[which(countries%in%name_long[i])]
     if (name_long[i]=="Greece"&greece=="GR") name_short[i]<-"GR"
     if (name_long[i]=="Greece"&greece!="GR") name_short[i]<-"EL"
   }
- 
+  
   return(name_short)
 }
 #name_short=c("DE","PL","DE","GR"); EU_long(name_short,"EL")
 EU_long <- function(name_short,greece="GR" # or "EL
-                    ){
+){
   name_long = name_short
   for (i in 1:length(name_long)) {
     if (name_short[i]=="EL"&greece=="EL") name_short[i]<-"GR"
@@ -244,6 +275,21 @@ column_stats_ingroups = function( df , mycolumn,mygroup , ... ) {
     reframe( quantile_df( !!mycolumn , ... ), 
              .by = !!mygroup )
   return(mysumm)
+}
+
+weekly_make_daily = function(df_ii){
+  size_of_week = 7
+  adding_half_week_at_tail = 3
+  date_range = range(df_ii$date)
+  daily_v = seq(from=date_range[1],to=date_range[2]+adding_half_week_at_tail,by="day")
+  df_out = tibble(date=daily_v) %>% left_join(df_ii,by = join_by(date))
+  df_out = df_out %>% fill(value,.direction = "down") %>% fill(location,.direction = "down") %>% 
+    mutate( value=rollmean(value,k=size_of_week,fill=NA,align="right") ) %>% 
+    mutate( value=value/size_of_week) 
+  if (F) {
+    df_out %>%  ggplot(aes(x=date,y=value)) + geom_line()
+  } 
+  return(df_out)
 }
 
 ggsave_as <- function(p,figname,height=10,width=16){

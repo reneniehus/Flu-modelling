@@ -1,17 +1,19 @@
 # ---- |-Set up ----
 source("code/setup.R")
 # ---- |-Settings and parameters ----
-clc()
+# clc()
 
 indicator = "ARI"
-myorigin = c("2023-12-27") # last: c("2023-12-20")
-truth_date_latest = ymd("2023-12-17") # last: ymd("2023-12-10")
+# changed on 207h Feb 2024
+myorigin = c("2024-02-28") # last for ILI: c("2024-02-21")
+truth_date_latest = ymd("2024-02-18") # last last for ILI: ymd("2024-02-11")
 mytarget = paste0(indicator," incidence")
 
-weeks_forecast = 6
+################ part below is the same for ILI/ARI/case/death/hosp
+weeks_forecast = 7
 data_points_fitted = 8
 size_group = 2
-myeps = 1/100000
+myeps = 1/(1e6)
 my_incidence_denominator = 100000
 myquantiles = c(0.01, 0.025, seq(0.05, 0.95, by = 0.05), 0.975, 0.99)
 fit_rerun = T
@@ -35,6 +37,9 @@ if(is.na(path_data)) break("Warning no data path!")
 # https://github.com/european-modelling-hubs/flu-forecast-hub/tree/main/target-data/ERVISS
 data2 = read_csv(path_data,show_col_types=F)
 data = data2
+if ( indicator%in%c("case","death","hosp") ) {
+  data = data %>% mutate(truth_date = date) 
+}
 
 tranv_v = c("log","sqrt")
 for (i_trans in tranv_v) { # run same model for diff scaling, i_trans = tranv_v[1]
@@ -52,17 +57,26 @@ for (i_trans in tranv_v) { # run same model for diff scaling, i_trans = tranv_v[
     data_backtransform = function(x){x^2}
     cat("Transformation: sqrt")
   }
-  iter_stan = 3000
+  iter_stan = 2000
   
   # ---- |-Get an indicator expectation distribution ---- 
-  temp = data %>% left_join(aux$pops %>% select(location,population), by="location") %>% 
-    mutate( incidence_denominator = my_incidence_denominator ) %>% 
-    mutate( value_odds=odds(value/incidence_denominator) )
-  temp$value_odds %>% inv_odds() %>% max() # almost 5.8%
+  if (indicator %in%c("ILI","ARI")) {
+    temp = data %>% left_join(aux$pops %>% select(location,population), by="location") %>% 
+      mutate( incidence_denominator = my_incidence_denominator ) %>% 
+      mutate( value_odds=odds(value/incidence_denominator) ) %>% 
+      filter(!is.infinite(value_odds))
+  }
+  if (indicator %in%c("case","death","hosp")) {
+    temp = data %>% left_join(aux$pops %>% select(location,population), by="location") %>% 
+      mutate( incidence_denominator = population ) %>% 
+      mutate( value_odds=odds(value/incidence_denominator) )
+  }
+  
+  temp$value_odds %>% inv_odds() %>% max(na.rm=T) # for death: 0.0003
   values_transformed = data_transform( temp$value_odds %>% zero_plus_eps( eps=myeps ) )
-  expectation_mu = mean(values_transformed)
-  expectation_sd = sd(values_transformed)
-  (temp$value/100000) %>% quantile(c(0.05,0.5,0.95))
+  expectation_mu = mean(values_transformed,na.rm=T)
+  expectation_sd = sd(values_transformed,na.rm=T)
+  (temp$value/100000) %>% quantile(c(0.05,0.5,0.95),na.rm=T)
   if (F) {
     msim_transformed = rnorm(n = length(values_transformed),mean=expectation_mu,sd=expectation_sd)
     msim = msim_transformed %>% data_backtransform() %>% inv_odds() 
@@ -77,9 +91,16 @@ for (i_trans in tranv_v) { # run same model for diff scaling, i_trans = tranv_v[
   }
   
   # ---- |-Potentially remove countries ----
-  countries_select = data %>% group_by(location) %>% 
-    summarise(max_truth_date = max(truth_date)) %>% 
-    filter(max_truth_date %in% c(truth_date_latest,truth_date_latest-7) ) %>% pull(location)
+  if (indicator %in%c("ILI","ARI")) {
+    countries_select = data %>% group_by(location) %>% 
+      summarise(max_truth_date = max(truth_date)) %>% 
+      filter(max_truth_date %in% c(truth_date_latest,truth_date_latest-7) ) %>% pull(location)
+  }
+  if (indicator %in%c("case","death","hosp")) {
+    countries_select = data %>% group_by(location) %>% 
+      summarise(max_truth_date = max(truth_date)) %>% 
+      filter(max_truth_date %in% c(truth_date_latest-14,truth_date_latest-21) ) %>% pull(location)
+  }
   countries_removed = data %>% select(location) %>% distinct() %>% filter(!location %in% countries_select) %>% nrow()
   data = data %>%  filter(location %in% countries_select)
   country_v = unique(data$location) ;
@@ -88,9 +109,12 @@ for (i_trans in tranv_v) { # run same model for diff scaling, i_trans = tranv_v[
   
   # ---- |-Loop: for each country ----
   respicast_df_list = list()
-  for (country_i in country_v) {
+  for (country_i in country_v) { #  country_i = country_v[1]
     # loop helpers
     population_i = aux$pops %>% filter(location==country_i) %>% pull(population)
+    no_population_i = isempty(population_i)
+    if (no_population_i)  {pr=paste("No population size for",country_i,"!!!\n"); cat(red(pr))}
+    if (no_population_i) {next;}
     
     # ---- |-Filtering  ----
     sentence=paste0(">Running: ",EU_long(country_i)," (pop:",population_i,")\n");cat(sentence)
@@ -103,11 +127,17 @@ for (i_trans in tranv_v) { # run same model for diff scaling, i_trans = tranv_v[
     if (F) data_loc %>% ggplot(aes(x=truth_date,y=value)) + geom_line() + geom_point() 
     
     # ---- |-Data transform  ----
-    data_loc = data_loc %>% 
-      # 1: first transform to ensure not exceeding pop size -> to odds
-      mutate(value_odds = odds(value/my_incidence_denominator) ) %>% 
-      # 2: model-specific tranform
-      mutate(value_transformed = data_transform( value_odds %>% zero_plus_eps( eps=myeps ) )) 
+    # 1: first transform to ensure not exceeding pop size -> to odds
+    if (indicator%in%c("ARI","ILI")){
+      data_loc = data_loc %>% 
+        mutate(value_odds = odds(value/my_incidence_denominator) )
+    }
+    if (indicator%in%c("case","death","hosp")){
+      data_loc = data_loc %>% 
+        mutate(value_odds = odds(value/population_i) ) # I double checked units with ERVISS
+    }
+    # 2: model-specific tranform
+    data_loc = data_loc %>%   mutate(value_transformed = data_transform( value_odds %>% zero_plus_eps( eps=myeps ) )) 
     
     # ---- |-Data&other warnings  ----
     if ( any(is.na(data_loc$value))  ) {
@@ -221,10 +251,19 @@ for (i_trans in tranv_v) { # run same model for diff scaling, i_trans = tranv_v[
     do_checks = country_i %in% c( "GR","AT","BE","EE","HU" )
     if ( F&do_checks ) { # add predictions and look
       browser()
-      data_mod = fit %>% gather_draws( gen_y_obs[df_i] ) %>% 
-        mutate(.value=data_backtransform(.value)) %>% 
-        mutate(.value=inv_odds(.value)*my_incidence_denominator) %>%
-        median_qi(.width=0.50) %>% select(df_i ,.value,.lower,.upper)
+      if (indicator%in%c("ARI","ILI")){
+        data_mod = fit %>% gather_draws( gen_y_obs[df_i] ) %>% 
+          mutate(.value=data_backtransform(.value)) %>% 
+          mutate(.value=inv_odds(.value)*my_incidence_denominator) %>%
+          median_qi(.width=0.50) %>% select(df_i ,.value,.lower,.upper)
+      }
+      if (indicator%in%c("case","death","hosp")){
+        data_mod = fit %>% gather_draws( gen_y_obs[df_i] ) %>% 
+          mutate(.value=data_backtransform(.value)) %>% 
+          mutate(.value=inv_odds(.value)*population_i) %>%
+          median_qi(.width=0.50) %>% select(df_i ,.value,.lower,.upper)
+      }
+      
       
       data_res = df_stan_predict_all %>% left_join(data_mod , by="df_i")
       
@@ -239,54 +278,112 @@ for (i_trans in tranv_v) { # run same model for diff scaling, i_trans = tranv_v[
     # https://github.com/european-modelling-hubs/flu-forecast-hub/wiki/Submission-format
     df_n_data = nrow(df_stan)
     
-    # only point estimate
-    model_gen01 = fit %>% gather_draws( gen_y_obs[df_i] ) %>% 
-      filter(df_i > df_n_data ) %>% 
-      mutate(.value=data_backtransform(.value)) %>% 
-      mutate(.value=inv_odds(.value)*my_incidence_denominator) %>%
-      median_qi(.width=c(0.5) ) %>% 
-      select(df_i ,.value) %>% 
-      mutate(output_type="median",output_type_id="") %>% 
-      select(df_i,value=.value,output_type,output_type_id); # g(model_gen01)
-    # quanitles
-    model_gen02 = fit %>% gather_draws( gen_y_obs[df_i] ) %>% 
-      filter(df_i > df_n_data ) %>% 
-      mutate(.value=data_backtransform(.value)) %>% 
-      mutate(.value=inv_odds(.value)*my_incidence_denominator) %>%
-      column_stats_ingroups(mycolumn=.value,mygroup = "df_i",probs=myquantiles ) %>% 
-      mutate(output_type="quantile",output_type_id=as.character(round(quant,3))) %>% 
-      select(df_i,value=val,output_type,output_type_id); # g(model_gen02)
-    # put it all together
-    respicast_df_list[[country_i]] = bind_rows(model_gen01 , model_gen02) %>% left_join( df_stan_predict_all %>% rename(value_truth=value) , by="df_i" ) %>% 
-      mutate(
-        origin_date=as.character(myorigin_date),
-        target=mytarget,
-        horizon= as.numeric((truth_date-(myorigin_date-3))/7 + 1) ,
-        truth_date = as.character(truth_date)
-      ) %>% 
-      select( 
-        origin_date,
-        target,
-        target_end_date=truth_date,
-        horizon,
-        location, 
-        output_type,
-        output_type_id,
-        value
-      ) 
+    if (indicator%in%c("ILI","ARI")) {
+      # only point estimate
+      model_gen01 = fit %>% gather_draws( gen_y_obs[df_i] ) %>% 
+        filter(df_i > df_n_data ) %>% 
+        mutate(.value=data_backtransform(.value)) %>% 
+        mutate(.value=inv_odds(.value)*my_incidence_denominator) %>%
+        median_qi(.width=c(0.5) ) %>% 
+        select(df_i ,.value) %>% 
+        mutate(output_type="median",output_type_id="") %>% 
+        select(df_i,value=.value,output_type,output_type_id); # g(model_gen01)
+      # quanitles
+      model_gen02 = fit %>% gather_draws( gen_y_obs[df_i] ) %>% 
+        filter(df_i > df_n_data ) %>% 
+        mutate(.value=data_backtransform(.value)) %>% 
+        mutate(.value=inv_odds(.value)*my_incidence_denominator) %>%
+        column_stats_ingroups(mycolumn=.value,mygroup = "df_i",probs=myquantiles ) %>% 
+        mutate(output_type="quantile",output_type_id=as.character(round(quant,3))) %>% 
+        select(df_i,value=val,output_type,output_type_id); # g(model_gen02)
+      # put it all together
+      respicast_df_list[[country_i]] = bind_rows(model_gen01 , model_gen02) %>% left_join( df_stan_predict_all %>% rename(value_truth=value) , by="df_i" ) %>% 
+        mutate(
+          origin_date=as.character(myorigin_date),
+          target=mytarget,
+          horizon= as.numeric((truth_date-(myorigin_date-3))/7 + 1) ,
+          truth_date = as.character(truth_date)
+        ) %>% 
+        select( 
+          origin_date,
+          target,
+          target_end_date=truth_date,
+          horizon,
+          location, 
+          output_type,
+          output_type_id,
+          value
+        ) 
+    }
+    
+    if (indicator%in%c("case","death","hosp")) {
+      # only point estimate
+      model_gen01 = fit %>% gather_draws( gen_y[df_i] ) %>% 
+        filter(df_i > df_n_data ) %>% 
+        mutate(.value=data_backtransform(.value)) %>% 
+        mutate(.value=inv_odds(.value)*population_i) %>% 
+        mode_qi(.width=c(0.5) ) %>% 
+        select(df_i ,.value) %>% 
+        mutate(type="point",quantile=as.character(NA)) %>% 
+        select(df_i,value=.value,type,quantile); # g(model_gen01)
+      # quanitles
+      model_gen02 = fit %>% gather_draws( gen_y[df_i] ) %>% 
+        filter(df_i > df_n_data ) %>% 
+        mutate(.value=data_backtransform(.value)) %>% 
+        mutate(.value=inv_odds(.value)*population_i) %>% 
+        column_stats_ingroups(mycolumn=.value,mygroup = "df_i",probs=myquantiles ) %>% 
+        mutate(type="quantile",quantile=as.character(round(quant,3))) %>% 
+        select(df_i,value=val,type,quantile); # g(model_gen02)
+      # put it all together 
+      respicast_df_list[[country_i]] = bind_rows(model_gen01 , model_gen02) %>% 
+        left_join( df_stan_predict_all %>% rename(value_truth=value) , by="df_i" ) %>% 
+        mutate(
+          forecast_date=as.character(myorigin_date),
+          target1=as.numeric((truth_date-(myorigin_date-2))/7) ,
+          truth_date = as.character(truth_date),
+          target2=mytarget,
+          horizon=target1,
+          # target=paste(horizon,mytarget),
+          value=round(value,digits = 0)
+        ) %>% unite(col=target,target1,target2,sep = " ") %>% 
+        select( 
+          forecast_date,
+          target,
+          target_end_date=truth_date,
+          location, 
+          type,
+          quantile,
+          value,
+          horizon
+        ) 
+    }
+    
   } # end of country loop
-  respicast_df = bind_rows(respicast_df_list) 
   
-  length(country_v) * (length(myquantiles) + 1 ) * weeks_forecast
+  if (indicator%in%c("ILI","ARI")) {
+    respicast_df = bind_rows(respicast_df_list) 
+    length(country_v) * (length(myquantiles) + 1 ) * weeks_forecast
+    
+    # filter correct forecasting dates
+    respicast_df_unfiltered = respicast_df
+    respicast_df = respicast_df %>% filter(horizon%in%c(1:4)) 
+    # final checks by hand (remember the unit of the incidence!)
+    
+    respicast_df %>% filter(location=="CZ") %>% pull(value) %>% max() # 257.928 -> 110
+    respicast_df %>% pull(value) %>% max() # 28411 (28%)
+    respicast_df %>% filter(value==max(value))
+  }
   
-  # filter correct forecasting dates
-  respicast_df_unfiltered = respicast_df
-  respicast_df = respicast_df %>% filter_log(horizon%in%c(1:4)) 
-  # final checks by hand (remember the unit of the incidence!)
   
-  respicast_df %>% filter(location=="CZ") %>% pull(value) %>% max() # 257.928 -> 110
-  respicast_df %>% pull(value) %>% max() # 28411 (28%)
-  respicast_df %>% filter(value==max(value))
+  if (indicator%in%c("case","death","hosp")) {
+    respicast_df = bind_rows(respicast_df_list) 
+    
+    length(country_v) * (length(myquantiles) + 1 ) * weeks_forecast
+    
+    # filter correct forecasting dates
+    respicast_df_unfiltered = respicast_df
+    respicast_df = respicast_df %>% filter(horizon %in%c(1:4)) %>% select(-horizon)
+  }
   
   if (mytransformation=="log") write_csv( respicast_df , file=paste0(
     submission_path,"ECDC-norrsken_green/",myorigin,"-ECDC-norrsken_green",indicator,".csv") )
@@ -294,8 +391,6 @@ for (i_trans in tranv_v) { # run same model for diff scaling, i_trans = tranv_v[
     submission_path,"ECDC-norrsken_blue/",myorigin,"-ECDC-norrsken_blue",indicator,".csv") )
   
 } # through different scaling
-
-respicast_df %>% select(horizon,target_end_date) %>% distinct()
 
 # https://github.com/Infectious-Disease-Modeling-Hubs/hubVis
 # remotes::install_github("Infectious-Disease-Modeling-Hubs/hubVis")
@@ -323,12 +418,17 @@ if (F){
                                facet=c("location"), facet_scales = "free",
                                intervals = c(0.95),interactive=F) 
   
-  mod_log %>% group_by(location) %>% 
-    summarise(max_pred=max(value)) %>% 
-    left_join(aux$pops %>% select(location,population)) %>% 
-    mutate(max_pred_rel = max_pred/my_incidence_denominator) %>% arrange(desc(max_pred_rel))
+  if (indicator%in%c("ARI","ILI")){
+    mod_log %>% group_by(location) %>% 
+      summarise(max_pred=max(value)) %>% 
+      left_join(aux$pops %>% select(location,population)) %>% 
+      mutate(max_pred_rel = max_pred/my_incidence_denominator) %>% arrange(desc(max_pred_rel))
+  }
+  if (indicator%in%c("case","death","hosp")){
+    mod_log %>% group_by(location) %>% 
+      summarise(max_pred=max(value)) %>% 
+      left_join(aux$pops %>% select(location,population)) %>% 
+      mutate(max_pred_rel = max_pred/population) %>% arrange(desc(max_pred_rel))
+  }
   
 }
-
-
-

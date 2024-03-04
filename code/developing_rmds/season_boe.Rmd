@@ -1,0 +1,426 @@
+---
+output: html_document
+---
+
+# Season BOE: A Simple COVID-19 Back-of-the-Envelope Model
+
+## Introduction
+
+-   Given that SARS-CoV2 immunity as reached 'equilibrium', can we model viral spread in a very simplified way?
+
+-   high viral attack rate (likely above 50% per year) relative to typical speed of waning (substantial waning within 1/2 year)
+
+    -   immunity has reached an equilibrium: majority of individuals in EU/EEA have had multiple exposures and vaccines, and for impact of infection on transmission the immunity history does not matter
+
+        -   Thus, infection impact on population immunity can be modelled similarity for 22/23 as for 23/24
+
+\*absence of NPIs, and less prevalence-elastic behaviour -\> Rt mostly impacted by immunity, seasonality, variants
+
+\*by accounting for immunity (and variants) can we estimate seasonality?
+
+## Method assumptions in very brief
+
+-   Infection-intensity indicator is *proportional* to the true infection incidence (clearly NOT true with reported cases)
+
+-   Viral transmission is *only* driven through seasonality, immunity accumulation and waning (and new variants)
+
+    -   Thus, at a similar time of the year, a similar Rt value implies a similar level of prevailing population-immunity (assuming no impact of variants)
+
+    -   For example we could say: in Nov 2022 and in Nov 2023 when Rt was close to 1, population-immunity was nearly the same
+
+-   Immunity waning occurs in a relatively simple way ( 100%-immunity-compartment -\> X%-immunity-compartment -\> susceptible with exponential flow )
+
+-   Parametric assumptions
+
+    -   Serial interval (si)=7.7 days
+
+    -   R0 (r0) = 6
+
+    -   Yearly infection attack-rate (ar): 60%
+
+    -   Reduction in susceptibility through infection (re): 90%
+
+## Conceptual model walk through
+
+```{r setup, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(
+	message = FALSE,
+	warning = FALSE,
+	include = FALSE
+)
+# set R up 
+source("../setup.R")
+source("settings.R")
+source("checks.R")
+```
+
+```{r}
+compute_Rt_without_immunity = function( par, 
+                                        df_Rt_value_pop,
+                                        for_optim=F,
+                                        p) {
+  ## recasting parameters (needed due to optim use)
+  p$ar_and_re = par[1]
+  wane_imm_fract_weekly_1_log = par[2]
+  Imm_2_partial = par[3]
+  wane_imm_fract_weekly_2_log = par[4]
+  # waning compartments can be extended
+  # wane_imm_fract_weekly_3_log = par[4]
+  # Imm_3_partial
+  df_all  = df_Rt_value_pop
+  
+  ## transformations
+  wane_imm_fract_weekly_1 = exp(wane_imm_fract_weekly_1_log)
+  wane_imm_fract_weekly_2 = exp(wane_imm_fract_weekly_2_log)
+  # wane_imm_fract_weekly_3 = exp(wane_imm_fract_weekly_3_log)
+  
+  ## country loop
+  # for each location, simulate immunity and update target based on conditions
+  location_v = unique(df_all$location_name)
+  df_save = list()
+  target = 0 # initiate target for optimisation
+  min_target = 0 # initiate minimum target for optimisation
+  for (i in location_v) { # i = location_v[1]
+    df_i = df_all %>% filter(location_name==i) 
+    # normalise infection intensity
+    df_i$value = df_i$value * (0.01/sum( (df_i$value/df_i$population) , na.rm=T  )  )
+    # if(sum(df_i$value/df_i$population) != 0.01) print(paste("Check normalising inc for",i))
+    
+    # initial state
+    Rt_ini = mean(df_i$Rt[1:p$Rt_for_ini_est]) # avoiding impact of noise in Rt 
+    Imm_ini = (p$R0 - Rt_ini)/p$R0 # back-calculating immunity from Rt and R0
+    # assuming that all immunity is recent (thus all into first immunity compartment)
+    df_i$Imm_1 = NA; df_i$Imm_1[1] = Imm_ini # full immunity
+    df_i$Imm_2 = NA; df_i$Imm_2[1] = 0 # partial immunity
+    df_i$Imm = NA; df_i$Imm[1] = df_i$Imm_1[1] + df_i$Imm_2[1]*Imm_2_partial # immunity combined
+    #
+    df_i$waning_1 = NA; df_i$waning_1[1] = 0
+    df_i$waning_2 = NA; df_i$waning_2[1] = 0
+    df_i$new_Imm = NA; df_i$new_Imm[1] = 0
+    df_i$Rt_without_immunity = NA; 
+    df_i$Rt_without_immunity[1] = df_i$Rt[1] * 1/(1-Imm_ini)
+    
+    ## counter-factuals/scenarios/helpers
+    df_i$s1 = NA; df_i$s1[1] = 1
+    df_i$s1_1 = NA; df_i$s1_1[1] = 1
+    df_i$s1_2 = NA; df_i$s1_2[1] = 0
+    # 
+    df_i$s2 = NA; df_i$s2[1] = 1
+    #
+    df_i$s3 = NA; df_i$s3[1] = df_i$s1[1]*df_i$Imm[1]
+    
+    # time loop (through the weeks of a given location)
+    for (t in 2:nrow(df_i) ) { # t = 2
+      # immunity waning (allowing different immunity compartments)
+      # Imm_1 is the full immunity compartment
+      # Imm_2 3, ... are partial immunity compartments
+      waning_1 = df_i$Imm_1[t-1]*wane_imm_fract_weekly_1 
+      waning_2 = df_i$Imm_2[t-1]*wane_imm_fract_weekly_2 
+      df_i$waning_1[t] = waning_1
+      df_i$waning_2[t] = waning_2
+      # accumulation of new immunity (proportional to: value = "infection intensity",dark_factor,NE)
+      new_Imm = df_i$value[t-1]/df_i$population[t-1] * p$ar_and_re
+      df_i$new_Imm[t] = new_Imm
+      # apply changes to Immunity compartments
+      df_i$Imm_1[t] = df_i$Imm_1[t-1] - waning_1 + new_Imm
+      df_i$Imm_2[t] = df_i$Imm_2[t-1] - waning_2 + waning_1
+      if (df_i$Imm_1[t]<0) print("warning1")
+      if (df_i$Imm_2[t]<0) print("warning2")
+      # recompute combined "effective" immunity
+      df_i$Imm[t] = df_i$Imm_1[t] + df_i$Imm_2[t]*Imm_2_partial
+      # compute new Rt without immunity (Rt AS IF immunity would have vanished)
+      df_i$Rt_without_immunity[t] = df_i$Rt[t] * 1/(1-df_i$Imm[t])
+      
+      ## scenarios 
+      # 1: just waning shape
+      waning_s1_1 = df_i$s1_1[t-1]*wane_imm_fract_weekly_1 
+      waning_s1_2 = df_i$s1_2[t-1]*wane_imm_fract_weekly_2
+      df_i$s1_1[t] = df_i$s1_1[t-1] - waning_s1_1 
+      df_i$s1_2[t] = df_i$s1_2[t-1] - waning_s1_2 + waning_s1_1
+      df_i$s1[t] = df_i$s1_1[t] + df_i$s1_2[t]*Imm_2_partial
+      # 2: just accounting for new immunity
+      new_week_eff_immunity = df_i$value[t-1]/df_i$population[t-1] * p$ar_and_re
+      new_week_Rt_modifier = 1 - new_week_eff_immunity
+      new_week_Rt_modifier_inv = 1 / new_week_Rt_modifier
+      df_i$s2[t] = df_i$s2[t-1] * new_week_Rt_modifier_inv
+      # 3: just accounting for immunity from the start
+      df_i$s3[t] = df_i$s1[t]*df_i$Imm[1]
+    }
+    
+    ## "target" allows multiple constraints
+    # regularize: immunity last year ~ immunity 1 year later
+    Imm_diff = df_i$Imm[df_i$Rt_at_zero==1] - df_i$Imm[df_i$Rt_at_zero==2]
+    target_Imm_diff = -dnorm(x=Imm_diff,mean = 0,sd=0.05, log = T)
+    target_Imm_diff_min = -dnorm(x=0,mean = 0,sd=0.05, log = T)
+    # regularize: R0 based on Rt and R0
+    # note: Rt_without immunity can exceed R0, since Rt and Immunity beyong the initial condition don't know about each other 
+    max_Rt_without_immunity = max(df_i$Rt_without_immunity,na.rm=T)
+    target_Rt_without_immunity = -dnorm(x=max_Rt_without_immunity,mean = p$R0,sd=1, log = T)
+    target_Rt_without_immunity_min = -dnorm(x=p$R0,mean = p$R0,sd=1, log = T)
+    # regularize; max immunity in the population
+    
+    target = target + target_Imm_diff + target_Rt_without_immunity
+    min_target = min_target = target_Imm_diff_min + target_Rt_without_immunity_min # -1.157855
+    # print(paste("min target:",min_target %>% round(2)))
+    # print(paste("Max new_Imm",max(df_i$new_Imm) %>% round(3),i))
+    # print(paste("Average waning",mean(df_i$waning) %>% round(3),i))
+    df_save[[i]] = df_i
+  }
+  df_return = bind_rows(df_save) %>% 
+    mutate(target=target, 
+           min_target=min_target)
+  
+  if (for_optim==T) return(target)
+  if (for_optim==F) return(df_return)
+}
+```
+
+### "Infection intensity" data
+
+```{r infection_intensity, paged.print=TRUE}
+# date, value, location
+path_data="../../../Big input data/data_positive_tests.csv"
+x=read.csv(path_data,sep = ";",dec = ",") %>% mutate(WEEK=ymd(WEEK))
+x = x %>% select(date=WEEK,
+             value=POS_TEST_PERC) %>% 
+  mutate(location="NL")
+df_ii = x
+no_duplication_no_gaps_right_order(df_ii)
+df_ii = weekly_make_daily(df_ii)
+df_ii= df_ii %>% fill_log(value, .direction="up")
+no_duplication_no_gaps_right_order(df_ii)
+range_df_ii = range(df_ii$date)
+```
+
+### Obtaining Rt
+
+```{r transmission_intensity}
+library(EpiEstim) # EpiEstim as simple choice to get Rt
+n_location = n_distinct(df_ii$location)
+df_country = list()
+for (i in 1:n_location){
+  country_i = unique(df_ii$location)[i]
+  case_incidenc_location = df_ii %>% filter(location ==country_i) 
+  ## estimate slope
+  case_incidenc_location$value_slope = NA
+  for (i in 2:nrow(case_incidenc_location) ) {
+    last_x = case_incidenc_location$value[i-1]
+    curr_x = case_incidenc_location$value[i]
+    case_incidenc_location$value_slope[i] = ( curr_x/last_x )
+  }
+  ## estimate Rt
+  rt <- estimate_R(case_incidenc_location$value*1000, 
+                   method="parametric_si",
+                   config = make_config(list(
+                     mean_si = p$si_mean, 
+                     std_si = p$si_sd) ) )
+  # extract 
+  filtered_Rt = rt$R$`Mean(R)`
+  filtered_Rt[filtered_Rt>5] = NA # replacing extreme Rt values
+  filtered_Rt[filtered_Rt<0.2] = NA # replacing extreme Rt values
+  Rt_df = tibble( id=rt$R$t_start,Rt=filtered_Rt )
+  
+  df_country[[i]] = case_incidenc_location %>% 
+    mutate(id=c(1:n())) %>% left_join(Rt_df,by="id") %>% select(-id)
+}
+df_transmission = bind_rows(df_country)
+check_df_transmission(df_transmission) 
+```
+
+```{r}
+df_transmission %>% filter(date>"2022-06-01",date<"2024-02-03") %>%  ggplot(aes(x=date,y=value))+ 
+  geom_line() +
+  geom_vline(xintercept = ymd(c("2022-12-08","2023-11-23")),linetype="dashed")
+df_transmission %>% filter(date>"2022-10-01",date<"2024-02-03") %>% ggplot(aes(x=date,y=Rt))+ 
+  geom_line() + 
+  geom_hline(yintercept = 1,linetype="dashed")+
+  geom_vline(xintercept = ymd(c("2022-12-08","2023-11-23")),linetype="dashed")
+
+df_transmission %>% filter(date>"2022-10-01",date<"2024-02-03") %>% ggplot()+ 
+  geom_line(aes(x=date,
+                y=(value_slope-min(value_slope))/(max(value_slope)-min(value_slope)) ) ) + 
+  geom_line(aes(x=date,y= (Rt-min(Rt)) / (max(Rt)-min(Rt))  ),col="orange" ) + 
+  geom_hline(yintercept = 1,linetype="dashed")+
+  geom_vline(xintercept = ymd(c("2022-12-08","2023-11-23")),linetype="dashed")
+```
+
+### Modelling immunity against transmission and obtain augmented Rt
+
+```{r echo=TRUE}
+# add poplation sizes
+df_all = df_transmission %>% left_join(aux$pops,by = join_by(location)) %>% filter(date>"2022-10-01",date<"2024-02-03")
+transmission_focus_dates = (df_all$date) %>% range()
+
+df_all$population =  pop_myexample
+df_all$location_name = "EU"
+df_all$Rt_at_zero = 0
+df_all$Rt_at_zero[10] = 1 # TODO remove hard-coding
+df_all$Rt_at_zero[60] = 2 # TODO remove hard-coding
+(Rt_zero_1 = df_all$date[10]) # "2022-11-12"
+(Rt_zero_2 = df_all$date[60]) # "2023-11-23"
+
+# df should start when Rt ~ 1
+df_Rt_value_pop = df_all %>% filter_log(date>=Rt_zero_1)
+not_too_short_or_long(df_Rt_value_pop)
+```
+
+```{r optimising_boe_parameters}
+# optimising immunity_boe function
+
+# ---- |-grid search  ----
+
+f = function(...) compute_Rt_without_immunity(...,
+                                              df_Rt_value_pop,
+                                              for_optim = T,
+                                              p=p)
+grid_i = 1
+df_grid = list()
+7^4
+for (NE_and_dark_factor_i in seq(from=45,to=60,length.out=15) ) {
+  for ( wane_imm_fract_weekly_1_log_i in seq(from=-3,to=-0.2,length.out=15) ) {
+    for ( Imm_2_partial_i in seq(from=0.5,to=0.7,length.out=15) ) {
+      for ( wane_imm_fract_weekly_2_log_i in seq(from=-12,to=-8,length.out=8) ) {
+        
+        #######################################
+        target_i = f( par=c(NE_and_dark_factor_i,
+                                                      wane_imm_fract_weekly_1_log_i,
+                                                      Imm_2_partial_i,
+                                                      wane_imm_fract_weekly_2_log_i) 
+                                                )
+        df_grid[[grid_i]] = tibble(NE_and_dark_factor=NE_and_dark_factor_i,
+                                   wane_imm_fract_weekly_1_log=wane_imm_fract_weekly_1_log_i,
+                                   Imm_2_partial = Imm_2_partial_i,
+                                   wane_imm_fract_weekly_2_log=wane_imm_fract_weekly_2_log_i,
+                                   target=target_i)
+        grid_i = grid_i + 1
+        #########################################
+      }
+      
+    }
+  }
+}
+df_grid_all = bind_rows(df_grid)
+df_grid_all %>% ggplot(aes(x=NE_and_dark_factor,y=target)) + geom_point() + scale_y_log10()
+df_grid_all %>% ggplot(aes(x=wane_imm_fract_weekly_1_log,y=target)) + geom_point()+ scale_y_log10()
+df_grid_all %>% ggplot(aes(x=Imm_2_partial,y=target)) + geom_point()+ scale_y_log10()
+df_grid_all %>% ggplot(aes(x=wane_imm_fract_weekly_2_log,y=target)) + geom_point()+ scale_y_log10()
+
+df_min = df_grid_all %>% filter(target==min(target)) 
+df_Rt_without_imm = compute_Rt_without_immunity(par=c(df_min$NE_and_dark_factor,
+                                                      df_min$wane_imm_fract_weekly_1_log,
+                                                      df_min$Imm_2_partial,
+                                                      df_min$wane_imm_fract_weekly_2_log) , 
+                                                df_Rt_value_pop , 
+                                                for_optim=F,
+                                                p=p_loop)
+
+c(df_min$NE_and_dark_factor,
+  df_min$wane_imm_fract_weekly_1_log,
+  df_min$Imm_2_partial,
+  df_min$wane_imm_fract_weekly_2_log) %>% dput() %>% round(2) #  50.36  -0.40   0.67 -10.86
+
+
+
+```
+
+```{r}
+# look
+date_start = "2022-11-12"
+
+tibble(
+  date_range=c("ii_range","transmission_focus","Rt_zero"),
+  date_lower=c(range_df_ii[1],transmission_focus_dates[1],Rt_zero_1),
+  date_upper=c(range_df_ii[2],transmission_focus_dates[2],Rt_zero_2)) %>% 
+  ggplot(aes(y=date_range,yend=date_range)) +
+  geom_segment(aes(x=date_lower,xend=date_upper))
+
+df_Rt_without_imm %>% 
+  filter(date>date_start) %>% 
+  ggplot(aes(x=date)) + 
+  geom_line(aes(y=s3),col="orange") + 
+  geom_line(aes(y=1-1/s2),col="blue") + 
+  facet_wrap(~location,scales="free_y") + 
+  theme(axis.ticks.y=element_blank()) + labs(subtitle = "Immunity from past (orange) + new immunity (blue)")
+
+
+df_Rt_without_imm %>% 
+  filter(date>date_start) %>% 
+  ggplot(aes(x=date)) + 
+  geom_line(aes(y=Rt),col="black") + 
+  geom_hline(yintercept = 1,linetype="dashed") + facet_wrap(~location,scales="free_y") + 
+  theme(axis.ticks.y=element_blank()) + labs(subtitle = "Rt empirical, estimated from infection intensity indicator")
+df_Rt_without_imm %>% 
+  filter(date>date_start) %>% 
+  ggplot(aes(x=date)) + 
+  geom_line(aes(y=Rt),col="black") + 
+  geom_line(aes(y=s2*Rt),col="blue") + 
+  geom_hline(yintercept = 1,linetype="dashed") + facet_wrap(~location,scales="free_y") + 
+  theme(axis.ticks.y=element_blank()) + labs(subtitle = "Rt empirical (black) and accounting for new immunity only (blue)")
+
+df_Rt_without_imm %>% 
+  filter(date>date_start) %>% 
+  ggplot(aes(x=date)) + 
+  geom_line(aes(y=Rt_without_immunity),col="purple") + 
+  geom_hline(yintercept = 1,linetype="dashed") + facet_wrap(~location,scales="free_y") + 
+  theme(axis.ticks.y=element_blank()) + labs(subtitle = "Rt as if no past or new immunity")
+
+
+
+```
+
+### Fit augmented Rt
+
+```{r echo=TRUE, fig.height=10, fig.width=10, message=TRUE}
+
+# ---- |-Prepare df for stan ----
+df_stan = df_Rt_without_imm %>% ungroup() %>% 
+  filter(!is.na(Rt)) %>% 
+  mutate(season_t=as.numeric(date-ymd("2022-12-31")) ) %>% 
+  mutate(id=c(1:n()))
+
+# ---- |-Create stan list ----
+stan_list = list(
+  # model input related to data-points, country structure, etc
+  n = nrow(df_stan),
+  n_location = n_distinct(df_stan$location),
+  location_id = fct_inorder(df_stan$location) %>% as.numeric(),
+  location_id_raw = fct_inorder(df_stan$location) %>% levels() %>% enframe,
+  # model input related to seasonality and outcome
+  season_t = df_stan$season_t,
+  y = df_stan$Rt_without_immunity,
+  # model input related to prior information
+  prior = 2
+)
+
+checking_stan_list(stan_list)
+
+# ---- |-Create stan list ----
+fit_season=rstan::stan(
+  file="../../stan/season00_start.stan",
+  chains=8 ,thin=8,iter=400,# 1200,
+  seed=12, cores = getOption("mc.cores", 1L),
+  control=list(
+    #adapt_delta=0.9,
+    # max_treedepth=14
+  ),
+  data=stan_list
+) # 
+save(fit_season,stan_list,file="../../../Big data/fit_season.Rdata")
+load(file="../../../Big data/fit_season.Rdata")
+fit = fit_season
+
+library(rethinking)
+precis(fit,pars=c("season_fold","season_amp"),depth=2) # 40-50% more beta in winter compared to summer
+precis(fit,pars=c("season_fold_log_mu","season_fold_log_sd","y_base","sigma"),depth=2)
+
+# ---- |-Predictive checks ----
+df_pp = fit %>% gather_draws(mu[id]) %>% filter(.draw%in%c(1:50)) %>% 
+  left_join(df_stan , by="id")
+
+df_stan %>% 
+  ggplot(aes(x=date,y=Rt_without_immunity)) + 
+  geom_line() + geom_hline(yintercept = 1) + 
+  geom_line(data=df_pp,aes(x=date,y=.value,group=.draw),alpha=0.2,col="blue" ) +
+  facet_wrap(~location,scales="free_y") + 
+  theme(axis.text.y = element_blank(),axis.ticks.y=element_blank())
+```
