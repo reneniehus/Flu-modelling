@@ -83,8 +83,18 @@ mstand <- function(v){
   return(mout)
 }
 # return the last element of a vector
-mlast <- function(v ){
+mlast <- function(v , n=1 ){
   mout = v[length(v)]
+  if (n>1) {
+    last_element = length(v)
+    used_n = n
+    if (n > length(v)) {
+      used_n = min(length(v),n)
+      cat(red("mlast uses a smaller n"))
+    }
+    first_element = last_element - used_n + 1
+    mout = v[first_element:last_element]
+  }
   return(mout)
 }
 # return the first element of a vector
@@ -277,17 +287,20 @@ column_stats_ingroups = function( df , mycolumn,mygroup , ... ) {
   return(mysumm)
 }
 
-weekly_make_daily = function(df_ii){
+weekly_make_daily = function(df_ii_weekly){
   size_of_week = 7
   adding_half_week_at_tail = 3
-  date_range = range(df_ii$date)
+  date_range = range(df_ii_weekly$date)
   daily_v = seq(from=date_range[1],to=date_range[2]+adding_half_week_at_tail,by="day")
-  df_out = tibble(date=daily_v) %>% left_join(df_ii,by = join_by(date))
-  df_out = df_out %>% fill(value,.direction = "down") %>% fill(location,.direction = "down") %>% 
+  df_out = tibble(date=daily_v) %>% left_join(df_ii_weekly,by = join_by(date))
+  df_out = df_out %>% 
+    mutate(value_approx = na.approx(value,na.rm = F)/size_of_week ) %>% 
+    fill(value,.direction = "down") %>% fill(location,.direction = "down") %>% 
     mutate( value=rollmean(value,k=size_of_week,fill=NA,align="right") ) %>% 
     mutate( value=value/size_of_week) 
   if (F) {
-    df_out %>%  ggplot(aes(x=date,y=value)) + geom_line()
+    df_out %>%  ggplot(aes(x=date,y=value)) + geom_line() + 
+      geom_line(aes(y=value_approx),col="red") + scale_y_log10()
   } 
   return(df_out)
 }

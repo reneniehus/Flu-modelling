@@ -23,9 +23,12 @@ no_duplication_no_gaps_right_order = function(df_ii){
 check_df_transmission = function(df_transmission){
   Rt_null = is.null(df_transmission$Rt)
   if (Rt_null==T) {pr=paste("df_transmission has no Rt column yet","!!!\n"); cat(red(pr))}
+  
+  date_diffs = df_transmission$date %>% diff() %>% unique()
+  if (date_diffs!=1) {pr=paste("df_transmission is not daily","!!!\n"); cat(red(pr))}
+  
   n_na = is.na(df_transmission$Rt) %>% sum()
   n_all = length(df_transmission$Rt)
-  
   if (Rt_null==F) {pr=paste("df_transmission contains Rt with",n_na,"(",round(n_na/n_all*100),"%)","NA values!!!\n"); cat(green(pr))}
 }
 
