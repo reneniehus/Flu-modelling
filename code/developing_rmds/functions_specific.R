@@ -20,3 +20,21 @@ get_weekly_daygroups = function(df_Rt_value_pop){
   
   return(df_out)
 }
+
+weekly_make_daily = function(df_ii_weekly){
+  size_of_week = 7
+  adding_half_week_at_tail = 3
+  date_range = range(df_ii_weekly$date)
+  daily_v = seq(from=date_range[1],to=date_range[2]+adding_half_week_at_tail,by="day")
+  df_out = tibble(date=daily_v) %>% left_join(df_ii_weekly,by = join_by(date))
+  df_out = df_out %>% 
+    mutate(value_approx = na.approx(value,na.rm = F)/size_of_week ) %>% 
+    fill(value,.direction = "down") %>% fill(location,.direction = "down") %>% 
+    mutate( value=rollmean(value,k=size_of_week,fill=NA,align="right") ) %>% 
+    mutate( value=value/size_of_week) 
+  if (F) {
+    df_out %>%  ggplot(aes(x=date,y=value)) + geom_line() + 
+      geom_line(aes(y=value_approx),col="red") + scale_y_log10()
+  } 
+  return(df_out)
+}

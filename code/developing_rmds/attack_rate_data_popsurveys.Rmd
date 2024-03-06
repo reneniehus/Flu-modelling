@@ -1,19 +1,27 @@
-# Understanding population attack rates from population survey 
+# Understanding population attack rates from population surveys 
 
-Introduction
+## Introduction
+
+-   Getting a close to the true infection incidence/prevalence/attack rate is a crucial ingredient for scenario modelling
+
+-   Population surveys that use randomised testing for a disease are the best data source to understand infection incidence/prevalence/attack rate.
 
 ```{r setup}
 here()
 test_duration = 8
 ```
 
-Modelling Method
+## Modelling Method and data sources
 
--   prevalence (P) of PCR-test-positivity at a given time-point is converted to daily incidence (I) at that point, assuming a typical duration of PCR positivity (T). : I = P/T (caveat: ignoring epidemic growth biases)
+-   Prevalence (P) of PCR-test-positivity at a given time-point is converted to daily incidence (I) at that point, assuming a typical duration of PCR positivity (T). : I = P/T (with caveats). The yearly infection attack rate (AR) is then given through AR = 365\*I
 
--   
+-   We searched the web for things like "countries random testing COVID-19"
 
-Netherlands RIVM
+    -   we identified 3 countries with ongoing or recent population testing for covid: UK, Germany, Netherlands
+
+    -   we identified a review paper from Mid 2021: 37 surveys from 19 countries [[Population‐based prevalence surveys during the Covid‐19 pandemic: A systematic review - PMC (nih.gov)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7883186/)]
+
+### Netherlands RIVM
 
 -   Study details: needs translation
 
@@ -40,19 +48,20 @@ df_nl$date %>% diff() %>% table()
 st = paste("Data set is properly weekly"); cat(green(st))
 
 df_nl = df_nl %>% 
-  mutate( average_value=rollmean(value,k=52,align = "right",fill=NA) ) %>% 
-  mutate( average=rollsum(value,k=52,align = "right",fill=NA)/test_duration ) 
-df_nl$average %>% mean(na.rm = T) # 8%
-df_nl$average_value
+  mutate( average_value=rollmean(value,k=52,align = "right",fill=NA) ) 
+prev_nl = df_nl$average_value %>% mean(na.rm = T) 
+
+ar_nl = df_nl$average_value/8 * 365
+ar_nl %>% quantile(probs=c(0.25,0.5,0.75),na.rm=T)
 
 df_nl %>% filter(date>"2022-10-01",date<"2024-02-03") %>% 
   ggplot(aes(date,value)) + geom_line() + coord_cartesian(ylim=c(0,NA))
 df_nl %>% filter(date>"2022-10-01",date<"2024-02-03") %>% 
-  ggplot(aes(date,average)) + geom_line() + coord_cartesian(ylim=c(0,NA))
+  ggplot(aes(date,average_value)) + geom_line() + coord_cartesian(ylim=c(0,NA))
 
 ```
 
-England ONS\
+### England ONS 
 
 -   Measuring: percent testing positive for SARS-CoV-2 (PCR-test-positivity prevalence)
 
@@ -81,28 +90,109 @@ England ONS\
 # modelled percent into a single sheet ("together")
 
 path_data="../../../Big input data/datadownload_ons.xlsx"
-x=read_xlsx(path_data,sheet = "together")
+x=read_xlsx(path_data,sheet = "together") %>% 
+  mutate(date=ymd(date))
 x %>% ggplot(aes(date,positive,col=region)) + geom_line() 
 x %>% filter(region=="England") %>% pull(date) %>% range()
 
 df_uk = x
 
+prevs = list(); list_i = 1
+location_v = unique(df_uk$region)
+for (location in location_v){
+  df_i = df_uk %>% filter_log(region==location)
+  df_sorted = df_i %>% arrange(desc(date))
+  this_works = T; i = 1
+  while (this_works){
+    recent_date = df_sorted$date[i]
+    date_ayear_ago = recent_date - 365 
+    closest_date_ayear_ago = df_sorted$date[which.min(abs(df_sorted$date - date_ayear_ago) )]
+    day_diff = as.numeric(closest_date_ayear_ago - date_ayear_ago) %>% abs()
+    
+    prev_i = df_sorted %>% filter(date>=closest_date_ayear_ago & 
+                           date<=recent_date) %>% 
+      pull(positive) %>% mean()
+    
+    prevs[[list_i]] = 
+      tibble(location,
+           date_end=recent_date,
+           date_start=closest_date_ayear_ago,
+           prev=prev_i
+           )
+    list_i = list_i + 1
+    i = i + 1
+    if (day_diff>50) this_works = F
+  }
+}
+df_prevs = bind_rows(prevs) 
 
-df_uk = df_uk %>% 
-  group_by(region) %>% 
-  mutate( average=rollsum(positive,k=52,align = "right",fill=NA)/test_duration ) 
-df_uk %>% filter(!is.na(average))
+df_prevs %>% mutate(id=1:n()) %>% 
+  ggplot(aes(y=prev,yend=prev,x=date_start,xend=date_end)) +
+  geom_segment(aes(col=location)) + facet_wrap(~location)
 
-st = paste("Around 20 to 24% attack rate"); cat(green(st))
+attack_rate = (df_prevs$prev)/8 * 365
+attack_rate %>% quantile(probs=c(0.1,0.5,0.9)) %>% round(1)
 
-df_uk %>% filter(date>"2022-10-01",date<"2024-02-03") %>% 
-  ggplot(aes(date,average,col=region)) + geom_line() + coord_cartesian(ylim=c(0,NA))
+df_prevs %>% mutate(ar=prev/8*365) %>% column_stats_ingroups(ar,location) %>% 
+  pivot_wider(names_from = quant,values_from = val)
+
+st = paste("Around 150% to 175% attack rate"); cat(green(st))
+
 
 ```
 
-Germany - Uni Mainz
+### Germany - Uni Mainz 
 
 ```{r}
 # website: https://www.unimedizin-mainz.de/sentisurv/startseite/startseite.html
+# not for download
+# I emailed
+# in the meantime eye-balling
+incidence_7days = 1000/(100*1e3)
+incidence_daily = incidence_7days/7
+attack_rate_mainz = incidence_daily*365
+
+```
+
+```{r}
+# all together
+manual_vals = function(df,vals){
+  df$lower = vals[1]
+  df$point = vals[2]
+  df$upper = vals[3]
+  return(df)
+}
+set_loc_mode = function(df,vals,name) {
+  df$mode = (vals[1])
+  return(df)
+}
+
+
+tibble(mode=0,lower=0,point=0,upper=0) %>% 
+  ggplot( aes(y=mode,xmin=lower,xmax=upper,x=point) ) + 
+  #
+  geom_pointrange(data=.%>%manual_vals( c(151.6, 153.2, 153.3) )%>%
+                    set_loc_mode(0.0,"England - ONS"),col="darkblue" ) + # 
+  geom_pointrange(data=.%>%manual_vals( c(151.9, 152.9, 153.7) )%>%
+                    set_loc_mode(-.1,"Wales - ONS"),col="darkblue" ) + # 
+  geom_pointrange(data=.%>%manual_vals( c(171.6, 173.1, 175.1) )%>%
+                    set_loc_mode(-.2,"Northern Ireland - ONS"),col="darkblue" ) + #
+  geom_pointrange(data=.%>%manual_vals( c(171.6, 173.1, 175.1) )%>%
+                    set_loc_mode(-.3,"Scotland - ONS"),col="darkblue" ) + #
+  geom_pointrange(data=.%>%manual_vals( c(52, 52, 52) )%>%
+                    set_loc_mode(-.4,"Rhineland-Palatinate - UMainz"),col="darkgrey" ) + # 
+  geom_pointrange(data=.%>%manual_vals( c(43.2, 56.3, 78.6) )%>%
+                    set_loc_mode(-.5,"Netherlands - RIVM"),col="orange" ) + # 
+  #
+  geom_vline(xintercept = 100,linetype="dashed") +
+  scale_y_continuous(breaks = c(0.0,-0.1,-0.2,-0.3,-0.4,-0.5),position = "right",
+                     labels = c("England - ONS",
+                                "Wales - ONS",
+                                "Northern Ireland - ONS",
+                                "Scotland - ONS",
+                                "RP - UMainz",
+                                "Netherlands - RIVM") ) +
+  coord_cartesian(xlim=c(0,NA)) + 
+  labs(caption = "Yearly attack rate estimates (with 50% bound)",y="",x="")
 
 ```
