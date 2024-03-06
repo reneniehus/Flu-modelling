@@ -51,7 +51,7 @@ not_too_short_or_long = function(df_Rt_value_pop){
 checking_stan_list = function(stan_list){
   #
   pr=paste("Model will be fit to",stan_list$n_location,"location:\n"); cat(blue(pr))
-  pr=paste(stan_list$location_id_raw$value); cat(white(pr))
+  pr=paste(stan_list$location_id_raw$value,"\n"); cat(white(pr))
   #
   pr=paste("Model will be fit using",stan_list$n,"data points.\n"); cat(blue(pr))
   # priors

@@ -5,7 +5,7 @@ source("code/setup.R")
 
 indicator = "ARI"
 # changed on 5th Mar 2024
-myorigin = c("2024-05-06") # last for ILI: c("2024-02-28")
+myorigin = c("2024-03-06") # last for ILI: c("2024-02-28")
 truth_date_latest = ymd("2024-02-25") # last last for ILI: ymd("2024-02-18")
 mytarget = paste0(indicator," incidence")
 

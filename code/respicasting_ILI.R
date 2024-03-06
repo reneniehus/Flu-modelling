@@ -5,7 +5,7 @@ source("code/setup.R")
 
 indicator = "ILI"
 # changed on 5th Mar 2024
-myorigin = c("2024-05-06") # last for ILI: c("2024-02-28")
+myorigin = c("2024-03-06") # last for ILI: c("2024-02-28")
 truth_date_latest = ymd("2024-02-25") # last last for ILI: ymd("2024-02-18")
 mytarget = paste0(indicator," incidence")
 
@@ -384,7 +384,6 @@ for (i_trans in tranv_v) { # run same model for diff scaling, i_trans = tranv_v[
     respicast_df_unfiltered = respicast_df
     respicast_df = respicast_df %>% filter(horizon %in%c(1:4)) %>% select(-horizon)
   }
-  
   if (mytransformation=="log") write_csv( respicast_df , file=paste0(
     submission_path,"ECDC-norrsken_green/",myorigin,"-ECDC-norrsken_green",indicator,".csv") )
   if (mytransformation=="sqrt") write_csv( respicast_df , file=paste0(

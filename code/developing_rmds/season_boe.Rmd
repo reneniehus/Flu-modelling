@@ -22,9 +22,9 @@ editor_options:
 
 ## Method assumptions in very brief
 
--   Infection-intensity indicator is *proportional* to the true infection incidence (clearly NOT true with reported cases)
+-   Infection-intensity indicator is proportional to the true infection incidence (clearly NOT true with reported cases)
 
--   Viral transmission is *only* driven through seasonality, immunity accumulation and waning (and new variants)
+-   Viral transmission is only driven through seasonality, immunity accumulation and waning (and new variants)
 
     -   Thus, at a similar time of the year, a similar Rt value implies a similar level of prevailing population-immunity (assuming no impact of variants)
 
@@ -64,7 +64,6 @@ compute_Rt_without_immunity = function( par,
                                         for_optim=F,
                                         p,days_to_week) {
   # df_Rt_value_pop must be daily
-  # par = c(25, -4.1, 0.6, -18)
   
   ## recasting parameters (needed due to optim use)
   p$ar_and_re = exp(par[1])
@@ -75,6 +74,7 @@ compute_Rt_without_immunity = function( par,
   # wane_imm_fract_weekly_3_log = par[4]
   # Imm_3_partial
   df_all  = df_Rt_value_pop
+  df_all = df_all[1:days_to_week$n_full_weeks,]
   # weeks and days
   nweeks = days_to_week$nweeks
   weekly_daygroups_t = days_to_week$weekly_daygroups_t
@@ -142,8 +142,8 @@ compute_Rt_without_immunity = function( par,
       # apply changes to Immunity compartments
       df_i$Imm_1[t_days] = df_i$Imm_1[tlast_days[1]] - waning_1 + new_Imm
       df_i$Imm_2[t_days] = df_i$Imm_2[tlast_days[1]] - waning_2 + waning_1
-      if (df_i$Imm_1[t]<0) print("warning1")
-      if (df_i$Imm_2[t]<0) print("warning2")
+      if (any(df_i$Imm_1[t_days]<0)) print("warning1")
+      if (any(df_i$Imm_2[t_days]<0)) print("warning2")
       # recompute combined "effective" immunity
       df_i$Imm[t_days] = df_i$Imm_1[t_days] + df_i$Imm_2[t_days]*Imm_2_partial
       # compute new Rt without immunity (Rt AS IF immunity would have vanished)
@@ -167,7 +167,7 @@ compute_Rt_without_immunity = function( par,
     
     ## "target" allows multiple constraints
     # regularize: immunity last year ~ immunity 1 year later
-    Imm_diff = df_i$Imm[df_i$Rt_at_zero==1] - df_i$Imm[df_i$Rt_at_zero==2]
+    Imm_diff = df_i$Imm[df_i$Rt_at_one==1] - df_i$Imm[df_i$Rt_at_one==2]
     target_Imm_diff = -dnorm(x=Imm_diff,mean = 0,sd=0.05, log = T)
     target_Imm_diff_min = -dnorm(x=0,mean = 0,sd=0.05, log = T)
     # regularize: R0 based on Rt and R0
@@ -273,14 +273,14 @@ df_transmission %>% filter(date>"2022-10-01",date<"2024-02-03") %>% ggplot()+
 
 ```{r echo=TRUE}
 # add poplation sizes
-df_all = df_transmission %>% left_join(aux$pops,by = join_by(location)) %>% filter(date>"2022-10-01",date<"2024-02-03")
+df_all = df_transmission %>% left_join(aux$pops %>% select(location,location_name,population),by = join_by(location)) 
 transmission_focus_dates = (df_all$date) %>% range()
 
-df_all$Rt_at_zero = 0
-df_all$Rt_at_zero[df_all$date == Rt_one_1] = 1
-df_all$Rt_at_zero[df_all$date == Rt_one_2] = 2
+df_all$Rt_at_one = 0
+df_all$Rt_at_one[df_all$date == Rt_one_1] = 1
+df_all$Rt_at_one[df_all$date == Rt_one_2] = 2
 
-df_all$date[df_all$Rt_at_zero!=0]
+df_all$date[df_all$Rt_at_one!=0]
 # df should start when Rt ~ 1
 df_Rt_value_pop = df_all %>% filter_log(date>=Rt_one_1)
 not_too_short_or_long(df_Rt_value_pop)
@@ -289,7 +289,6 @@ not_too_short_or_long(df_Rt_value_pop)
 ```{r optimising_boe_parameters}
 # optimising immunity_boe function
 days_to_week=get_weekly_daygroups(df_Rt_value_pop)
-
 
 f = function(...) compute_Rt_without_immunity(...,
                                               df_Rt_value_pop,
@@ -349,7 +348,7 @@ df_Rt_without_imm = compute_Rt_without_immunity(par=c(df_min$NE_and_dark_factor,
   df_min$Imm_2_partial,
   df_min$wane_imm_fract_weekly_2_log) %>% dput() %>% round(2) ) 
 
-# 23.22  -3.32   0.98 -18.00
+# 3.22  -3.32   0.98 -18.00
 
 
 ```
@@ -358,12 +357,13 @@ df_Rt_without_imm = compute_Rt_without_immunity(par=c(df_min$NE_and_dark_factor,
 res_optim = optim(par=par_min,fn=f)
 
 par_min
-res_optim$par
+res_optim$par %>% round(2)
 
 df_Rt_without_imm = compute_Rt_without_immunity(par=res_optim$par,
                                               df_Rt_value_pop,
                                               for_optim = F,
                                               p=p,days_to_week)
+
 ```
 
 ```{r}
@@ -481,11 +481,32 @@ df_stan %>%
 # simulate forward
 
 # take 1 seasonal Rt curve
-# add this into df_Rt_value_pop
+Rt_seasonal = fit %>% gather_draws(mu[id]) %>% ungroup() %>% 
+  filter(.draw%in%c(1)) %>% 
+  left_join(df_stan , by="id") %>% 
+  select(date,Rt_seasonal=.value,population) %>% 
+  # to simulate, shift the dates by 1 year
+  mutate( date=date+365 )
+
+# get the week-day details
+days_to_week_sim = get_weekly_daygroups(Rt_seasonal)
 
 # run compute_Rt_without_immunity with diff input
 # give counterfactual Rt
 # give intial immunity
+Imm_1_ini = df_Rt_without_imm$Imm_1[df_Rt_without_imm$Rt_at_one==2]
+Imm_2_ini = df_Rt_without_imm$Imm_2[df_Rt_without_imm$Rt_at_one==2]
+
+df_Rt_without_imm = compute_Rt_without_immunity(par=res_optim$par,
+                                                Rt_seasonal,
+                                                for_optim = F,
+                                                p=p,
+                                                days_to_week=days_to_week_sim,
+                                                sim_o = list(
+                                                  inf_ini = 100,
+                                                  Imm_1_ini = Imm_1_ini,
+                                                  Imm_2_ini = Imm_2_ini
+                                                ) )
 
 # function then computes
 # *simulated Rt

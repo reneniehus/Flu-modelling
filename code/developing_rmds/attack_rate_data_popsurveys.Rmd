@@ -4,9 +4,18 @@ Introduction
 
 ```{r setup}
 here()
+test_duration = 8
 ```
 
+Modelling Method
+
+-   prevalence (P) of PCR-test-positivity at a given time-point is converted to daily incidence (I) at that point, assuming a typical duration of PCR positivity (T). : I = P/T (caveat: ignoring epidemic growth biases)
+
+-   
+
 Netherlands RIVM
+
+-   Study details: needs translation
 
 ```{r}
 ### some inspiration
@@ -17,9 +26,6 @@ Netherlands RIVM
 # must translate properly
 # must go through protocol
 
-
-
-dir()
 path_data="../../../Big input data/data_positive_tests.csv"
 x=read.csv(path_data,sep = ";",dec = ",") %>% mutate(WEEK=ymd(WEEK))
 x = x %>% select(date=WEEK,
@@ -27,7 +33,76 @@ x = x %>% select(date=WEEK,
   mutate(location="NL")
 df_ii = x
 ###########################
-
-df_ii %>% filter(date>"2022-10-01",date<"2024-02-03") %>% ggplot(aes(date,value)) + geom_line() # 
 # date, value, location
+df_nl = x
+
+df_nl$date %>% diff() %>% table()
+st = paste("Data set is properly weekly"); cat(green(st))
+
+df_nl = df_nl %>% 
+  mutate( average_value=rollmean(value,k=52,align = "right",fill=NA) ) %>% 
+  mutate( average=rollsum(value,k=52,align = "right",fill=NA)/test_duration ) 
+df_nl$average %>% mean(na.rm = T) # 8%
+df_nl$average_value
+
+df_nl %>% filter(date>"2022-10-01",date<"2024-02-03") %>% 
+  ggplot(aes(date,value)) + geom_line() + coord_cartesian(ylim=c(0,NA))
+df_nl %>% filter(date>"2022-10-01",date<"2024-02-03") %>% 
+  ggplot(aes(date,average)) + geom_line() + coord_cartesian(ylim=c(0,NA))
+
+```
+
+England ONS\
+
+-   Measuring: percent testing positive for SARS-CoV-2 (PCR-test-positivity prevalence)
+
+-   Range is about **1 year**: 16 January 2022 to 31 January 2023
+
+-   Eyeballing/expectation: around **3% prevalence**
+
+-   Final dataset from March 2023, then dicontinued
+
+-   Study details
+
+    -   private housholds in England, Norther Ireland, Wales, Scotland
+
+```{r}
+# notice about discontinuation
+# https://www.ons.gov.uk/peoplepopulationandcommunity/healthandsocialcare/conditionsanddiseases/bulletins/coronaviruscovid19infectionsurveypilot/latest
+
+# on this webstie
+# https://www.ons.gov.uk/peoplepopulationandcommunity/healthandsocialcare/conditionsanddiseases/bulletins/coronaviruscovid19infectionsurveypilot/10february2023#coronavirus-covid-19-infection-survey-data
+
+# in the section: Estimated percentage of the population testing positive for COVID-19 on nose and throat swabs
+# https://www.ons.gov.uk/visualisations/dvc2462/national/datadownload.xlsx
+
+# this excel file is super messy 
+# I combined England, Wales, Nothern Ireland, Scotland 
+# modelled percent into a single sheet ("together")
+
+path_data="../../../Big input data/datadownload_ons.xlsx"
+x=read_xlsx(path_data,sheet = "together")
+x %>% ggplot(aes(date,positive,col=region)) + geom_line() 
+x %>% filter(region=="England") %>% pull(date) %>% range()
+
+df_uk = x
+
+
+df_uk = df_uk %>% 
+  group_by(region) %>% 
+  mutate( average=rollsum(positive,k=52,align = "right",fill=NA)/test_duration ) 
+df_uk %>% filter(!is.na(average))
+
+st = paste("Around 20 to 24% attack rate"); cat(green(st))
+
+df_uk %>% filter(date>"2022-10-01",date<"2024-02-03") %>% 
+  ggplot(aes(date,average,col=region)) + geom_line() + coord_cartesian(ylim=c(0,NA))
+
+```
+
+Germany - Uni Mainz
+
+```{r}
+# website: https://www.unimedizin-mainz.de/sentisurv/startseite/startseite.html
+
 ```
