@@ -38,3 +38,13 @@ weekly_make_daily = function(df_ii_weekly){
   } 
   return(df_out)
 }
+
+unscale_pars = function(scaled_pars){
+  unscaled_pars = scaled_pars
+  n = length(scaled_pars)
+  unscaled_pars[1] = scaled_pars[1] %>% exp()
+  if (n>=2) unscaled_pars[2] = scaled_pars[2] %>% inv_logit()
+  if (n>=3) unscaled_pars[3] = scaled_pars[3] %>% inv_logit()
+  if (n>=4) unscaled_pars[4] = scaled_pars[4] %>% inv_logit()
+  return(unscaled_pars)
+}

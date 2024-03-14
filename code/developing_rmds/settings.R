@@ -11,6 +11,9 @@ p$R0 = 6
 p$si_mean=3.6 #  
 p$si_sd=2.07
 
+p$si_discr_dist = discr_si(seq(from=1,to=20,length.out=20), mu = p$si_mean, sigma = p$si_sd )
+
+
 #
 pop_myexample =120793614
 
@@ -21,5 +24,7 @@ pop_myexample =120793614
 
 # auxiliary data and others
 aux = list()
-aux$pops = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/covid19-forecast-hub-europe/main/data-locations/locations_eu.csv",
-                    show_col_types=F)
+# aux$pops = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/covid19-forecast-hub-europe/main/data-locations/locations_eu.csv",
+#                     show_col_types=F)
+# write_csv(x = aux$pops, file="../Big data/eu_pops.csv")
+aux$pops = read_csv("../../../Big data/eu_pops.csv")
