@@ -15,6 +15,8 @@ editor_options:
 
 # *Season BOE: A Simple COVID-19 Back-of-the-Envelope Model*
 
+This was later moved into the COVID19_modelling repo.
+
 ## *Introduction*
 
 -   *Given that SARS-CoV2 immunity as reached 'equilibrium', can we model viral spread in a very simplified way?*
