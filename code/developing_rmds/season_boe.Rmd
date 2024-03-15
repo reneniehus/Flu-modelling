@@ -1,14 +1,15 @@
 ---
+title: "season_boe"
 output:
   html_document:
     code_folding: show
     toc: true
     toc_float: true
     number_sections: true
-    theme: cosmo
+    theme: flatly
     highlight: tango
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
   chunk_output_highlight: default
 ---
 
@@ -383,13 +384,16 @@ df_grid = list()
 n_grid = 20
 n_grid^4
 ###############
+# the following rule does not really work for me, even low X% leas to faster halving
 # rule of thumb: something that increases with X% each week, takes 72/X weeks to double
+
+# 152.27   0.05   0.17   0.05
 if (T) { # 4 mins
   tic()
-  for (NE_and_dark_factor_i in seq(from=log(20),to=log(200),length.out=30) ) {
-    for ( wane_imm_fract_weekly_1_log_i in seq(from=logit(0.20),to=logit(0.20),length.out=1) ) {
-      for ( Imm_2_partial_i in seq(from=logit(0.1),to=logit(0.5),length.out=40) ) {
-        for ( wane_imm_fract_weekly_2_log_i in seq(from=logit(0.01),to=logit(0.01),length.out=1) ) {
+  for (NE_and_dark_factor_i in seq(from=log(80),to=log(140),length.out=15) ) {
+    for ( wane_imm_fract_weekly_1_log_i in seq(from=logit(0.05),to=logit(0.05),length.out=1) ) {
+      for ( Imm_2_partial_i in seq(from=logit(0.1),to=logit(0.9),length.out=20) ) {
+        for ( wane_imm_fract_weekly_2_log_i in seq(from=logit(0.06),to=logit(0.06),length.out=1) ) {
           
           #######################################
           target_i = f( par=c(NE_and_dark_factor_i,
@@ -523,13 +527,12 @@ df_Rt_without_imm %>%
   geom_hline(yintercept = 1,linetype="dashed") + facet_wrap(~location,scales="free_y") + 
   theme(axis.ticks.y=element_blank()) + labs(subtitle = "Rt as if no past or new immunity")
 
-df_Rt_without_imm$Rt_without_immunity
 
 ```
 
 ### *Fit augmented Rt*
 
-```{r eval=FALSE, fig.height=10, fig.width=10, message=TRUE, include=FALSE}
+```{r fig.height=10, fig.width=10, message=TRUE}
 
 # ---- |-Prepare df for stan ----
 df_stan = df_Rt_without_imm %>% ungroup() %>% 
@@ -554,8 +557,10 @@ stan_list = list(
 checking_stan_list(stan_list)
 
 # ---- |-Create stan list ----
-fit_season=rstan::stan(
-  file="../../stan/season00_start.stan",
+stan_refit = F
+if (stan_refit) {
+  fit_season=rstan::stan(
+  file="stan/season00_start.stan",
   chains=8 ,thin=8,iter=800,# 1200,
   seed=12, cores = getOption("mc.cores", 1L),
   control=list(
@@ -564,16 +569,17 @@ fit_season=rstan::stan(
   ),
   data=stan_list
 ) # 
-save(fit_season,stan_list,file="../../../Big data/fit_season.Rdata")
-load(file="../../../Big data/fit_season.Rdata")
+save(fit_season,stan_list,file="../Big data/fit_season.Rdata")
+}
+
+load(file="../Big data/fit_season.Rdata")
 fit = fit_season
 
 library(rethinking)
 precis(fit,pars=c("season_fold","season_amp"),depth=2) # 40-50% more beta in winter compared to summer
 precis(fit,pars=c("season_fold_log_mu","season_fold_log_sd","y_base","sigma"),depth=2)
 
-mcmc_areas(fit,pars="season_fold[1]") + 
-  coord_cartesian(xlim=c(1,1.75))
+mcmc_areas(fit,pars="season_fold[1]") #+ coord_cartesian(xlim=c(1,1.75))
 
 # ---- |-Predictive checks ----
 df_pp = fit %>% gather_draws(mu[id]) %>% filter(.draw%in%c(1:50)) %>% 
@@ -593,6 +599,7 @@ df_stan %>%
 
 ### *Simulate forward*
 
+We finally simulate 1 year ahead. The season Rt looks reasonable. There is an issue with too much immunity (warning0) and there is an issue with infections disappearing to zero before they can be picked up again by increasing Rt.
 
 ```{r}
 if (F){
@@ -630,7 +637,13 @@ if (F){
                                                     Imm_2_ini = Imm_2_ini,
                                                     si_distribution = p$si_discr_dist
                                                   ) )
+  df_Rt_without_imm %>% g()
+  df_Rt_without_imm$Rt_seasonal %>% plot()
+  df_Rt_without_imm$Rt_eff %>% plot()
+  df_Rt_without_imm$Imm %>% plot()
+  
+  df_Rt_without_imm %>% ggplot(aes(x=date)) +
+    geom_line(aes(y=value))
 }
 
 ```
-

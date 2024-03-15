@@ -171,20 +171,19 @@ compute_Rt_without_immunity = function( par,
       df_i$new_Imm[t_days] = new_Imm/7 # distribute over days
       # new infections also come from partly susceptible Imm compartments
       full_susc = 1 - ( df_i$Imm_1[tlast_days[1]] + df_i$Imm_2[tlast_days[1]] )
-      if (full_susc<0) print("warning0")
+      if (full_susc<0&for_optim==F) {print("warning0")}
       new_Imm_from_Imm_2 = df_i$Imm_2[tlast_days[1]]*Imm_2_partial / 
         ( df_i$Imm_2[tlast_days[1]]*Imm_2_partial + full_susc*1 )
       # apply changes to Immunity compartments
       df_i$Imm_1[t_days] = df_i$Imm_1[tlast_days[1]] - waning_1 + new_Imm
       df_i$Imm_2[t_days] = df_i$Imm_2[tlast_days[1]] - waning_2 + waning_1 - new_Imm_from_Imm_2*new_Imm
-      if (any(df_i$Imm_1[t_days]<0)) print("warning1")
-      if (any(df_i$Imm_2[t_days]<0)) {print("warning2");}
+      if (any(df_i$Imm_1[t_days]<0)&for_optim==F) print("warning1")
+      if (any(df_i$Imm_2[t_days]<0)&for_optim==F) {print("warning2")}
       # recompute combined "effective" immunity
       df_i$Imm[t_days] = df_i$Imm_1[t_days] + df_i$Imm_2[t_days]*Imm_2_partial
       # compute new Rt without immunity (Rt AS IF immunity would have vanished)
       if (!simulate) df_i$Rt_without_immunity[t_days] = df_i$Rt[t_days] * 1/(1-df_i$Imm[t_days])
       if ( simulate) df_i$Rt_eff[t_days] = df_i$Rt_without_immunity[t_days] * (1-df_i$Imm[t_days])
-      
       ## scenarios 
       # 1: just waning shape
       waning_s1_1 = df_i$s1_1[tlast_days[1]]*wane_imm_fract_weekly_1 
