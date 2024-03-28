@@ -4,9 +4,9 @@ source("code/setup.R")
 # clc()
 
 indicator = "ILI"
-# changed on 20th Mar 2024
-myorigin = c("2024-03-20") # last for ILI: c("2024-03-13")
-truth_date_latest = ymd("2024-03-10") # last last for ILI: ymd("2024-03-03")
+# changed on 25th Mar 2024
+myorigin = c("2024-03-27") # last for ILI: c("2024-03-20")
+truth_date_latest = ymd("2024-03-17") # last last for ILI: ymd("2024-03-10")
 mytarget = paste0(indicator," incidence")
 
 ################ part below is the same for ILI/ARI/case/death/hosp
