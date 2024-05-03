@@ -1,19 +1,19 @@
 df_hosp = sim_wave_SIR(NULL)
 
 # ---- |-Plotting: different data subsets ----
-df_hosp$t_v %>% quantile(prob=c(0.25,0.5,0.75))
+df_hosp$t_v[1:300] %>% quantile(prob=c(0.25,0.5,0.75))
 df_hosp %>% ggplot(aes(x=t_v,y=severe_obs)) + geom_point(alpha=0.2) + 
   geom_point(alpha=0.1)+
   geom_line(aes(y=severe_mean),col="blue") +
-  geom_point(data=. %>% filter(t_v<61))
+  geom_point(data=. %>% filter(t_v<75))
 df_hosp %>% ggplot(aes(x=t_v,y=severe_obs)) + geom_point(alpha=0.2) + 
   geom_point(alpha=0.1)+
   geom_line(aes(y=severe_mean),col="blue") +
-  geom_point(data=. %>% filter(t_v<31))
+  geom_point(data=. %>% filter(t_v<140))
 df_hosp %>% ggplot(aes(x=t_v,y=severe_obs)) + geom_point(alpha=0.2) + 
   geom_point(alpha=0.1)+
   geom_line(aes(y=severe_mean),col="blue") +
-  geom_point(data=. %>% filter(t_v<91))
+  geom_point(data=. %>% filter(t_v<200))
 
 # myinitofit <- lapply(1:4, function(id) list( beta_logit=-0.847,
 #                                              prop_hosp_logit=-3.891,
@@ -24,12 +24,12 @@ df_hosp %>% ggplot(aes(x=t_v,y=severe_obs)) + geom_point(alpha=0.2) +
 library(cmdstanr)
 options(mc.cores = detectCores()-1 )
 set_cmdstan_path(path = NULL)
-mod <- cmdstan_model(stan_file='./stan/immu_dyn_00.stan')
+mod <- cmdstan_model(stan_file='c:/cmdstan/immu_dyn_00.stan')
 
 # ---- |-Fits: source of the bias ----
 df_hosp_sel = df_hosp
 stan_list = list(
-  n = nrow(df_hosp_sel),
+  n_week = nrow(df_hosp_sel),
   severe_obs = (df_hosp_sel$severe_obs) %>% replace_na(replace = 0),
   pop=df_hosp_sel$pop[1]
 )
@@ -73,11 +73,12 @@ fit100_perf %>% spread_draws(beta_logit,prop_severe_logit,S_ini_logit) %>%
 
 df_gen_hosp$.value %>% plot()
 (df_hosp_sel$delta_severe*pop) %>% plot()
+
 # ---- |-Fits: to different subsets of the data ----
 # 100% no noise
 df_hosp_sel = df_hosp
 stan_list = list(
-  n = nrow(df_hosp_sel),
+  n_week = nrow(df_hosp_sel),
   severe_obs_log = log(df_hosp_sel$delta_severe*pop),
   pop=df_hosp_sel$pop[1]
 )
@@ -91,7 +92,7 @@ fit100_perf <- mod$sample(
 # 100%
 df_hosp_sel = df_hosp
 stan_list = list(
-  n = nrow(df_hosp_sel),
+  n_week = nrow(df_hosp_sel),
   severe_obs_log = log(df_hosp_sel$severe_obs),
   pop=df_hosp_sel$pop[1]
 )
@@ -102,9 +103,9 @@ fit100 <- mod$sample(
   parallel_chains = 4
 )
 # 75%
-df_hosp_sel = df_hosp %>% filter(t_v<91)
+df_hosp_sel = df_hosp %>% filter(t_v<200)
 stan_list = list(
-  n = nrow(df_hosp_sel),
+  n_week = nrow(df_hosp_sel),
   severe_obs_log = log(df_hosp_sel$severe_obs),
   pop=df_hosp_sel$pop[1]
 )
@@ -115,9 +116,9 @@ fit075 <- mod$sample(
   parallel_chains = 4
 )
 # 50%
-df_hosp_sel = df_hosp %>% filter(t_v<61)
+df_hosp_sel = df_hosp %>% filter(t_v<140)
 stan_list = list(
-  n = nrow(df_hosp_sel),
+  n_week = nrow(df_hosp_sel),
   severe_obs_log = log(df_hosp_sel$severe_obs),
   pop=df_hosp_sel$pop[1]
 )
@@ -128,9 +129,9 @@ fit050 <- mod$sample(
   parallel_chains = 4
 )
 # 25%
-df_hosp_sel = df_hosp %>% filter(t_v<31)
+df_hosp_sel = df_hosp %>% filter(t_v<75)
 stan_list = list(
-  n = nrow(df_hosp_sel),
+  n_week = nrow(df_hosp_sel),
   severe_obs_log = log(df_hosp_sel$severe_obs),
   pop=df_hosp_sel$pop[1]
 )

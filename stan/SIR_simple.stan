@@ -1,7 +1,7 @@
 // A script that fits to previous season, uses the same inition S,I,R values as well as same beta, prop severe, run the model for this year
 data {
-  int n_week_fit; // number of observations, weekly
-  int n_week_project; // number of observations, weekly
+  int n_week_fit; // number of observed values, weekly
+  int n_week_project; // number of projected values, weekly
   array[n_week_fit] int severe_obs_fit; // observed hospitalisations
   real pop; // population size
   real Rnull; // R0
@@ -33,7 +33,7 @@ transformed parameters {
   vector[n_day_fit] severe_mean;
   array[n_week_fit] real<lower=0> severe_mean_weekly;
 
-  // full wave [from which we "learn" the relevant paramters (beta) for the wave in question]
+  // full wave [from which we "learn" the relevant paramters for the wave in question]
   S[1] = SIR_ini[1];
   I[1] = SIR_ini[2];
   R[1] = SIR_ini[3];

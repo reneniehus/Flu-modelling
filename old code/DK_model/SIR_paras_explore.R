@@ -1,5 +1,5 @@
 source("setup01.R")
-source("DK_model/bayesian_functions.R")
+source("old code/DK_model/bayesian_functions.R")
 # I_ini
 wave_settings_SIR$I_ini = 0.0001 * 1/50;  wave_df1 = sim_wave_SIR(wave_settings_SIR,"low" )
 wave_settings_SIR$I_ini = 0.0001 * 1;    wave_df2 = sim_wave_SIR(wave_settings_SIR,"high")
@@ -45,6 +45,7 @@ wave_settings_SIR$beta = 0.2
 bind_rows(wave_df1,wave_df2) %>% ggplot(aes(x=t_v,y=severe_obs,col=sim_name)) + geom_point(alpha=0.2) + 
   geom_point(alpha=0.2)+
   geom_line(aes(y=severe_mean))+ scale_y_log10() + labs(caption="beta and I_ini")
+
 
 # difference between beta effect and S_ini effect
 # achieve different wave sizes with beta

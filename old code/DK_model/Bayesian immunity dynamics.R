@@ -1,5 +1,5 @@
 source("setup01.R")
-source("DK_model/bayesian_functions.R")
+source("old code/DK_model/bayesian_functions.R")
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ### Data ##########
