@@ -25,6 +25,7 @@ transformed parameters {
   real R_init = SIR_ini[3];
   real S_ini_logit = logit(S_init);
   real I_ini_logit = logit(I_init);
+  real Rnull_eff = Rnull*SIR_ini[3];
   // time loop
   array[n_day_fit] real<lower=0, upper=1> S;
   array[n_day_fit] real<lower=0, upper=1> I;
