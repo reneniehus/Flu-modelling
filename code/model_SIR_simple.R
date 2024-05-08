@@ -36,7 +36,7 @@ model_SIR_simple = function( params=NULL, data=NULL, country_short_input, scenar
   # Create an output dataframe
   df_out = fit02 %>% gather_draws(gen_severe_obs_project[t_vw]) %>%
     ungroup() %>%
-    left_join(data_mock %>% select(date) %>% mutate(t_vw = 1:n()), by="t_vw") %>%
+    left_join(data_mock %>% select(date,country_short,agegroup,target) %>% mutate(t_vw = 1:n()), by="t_vw") %>%
     mutate(model = "SIR_simple",
            country_short = country_short,
            agegroup = agegroup,
