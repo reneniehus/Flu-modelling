@@ -1,5 +1,4 @@
-//
-//
+//Stan model to estimate rt seasonal and country variability
 
 // The input data
 data {
