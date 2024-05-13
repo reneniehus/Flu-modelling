@@ -13,7 +13,7 @@ settings = function() {
   # ---- |-Countries ----
   
   # ---- |-Model-specific  settings ----
-  params$models_to_run = c("SIR_simple") # "SIR_simple"
+  params$models_to_run = c("SIR_simple_r0_variation") # "SIR_simple"
   
   # Settings for SIR_simple
   params$SIR_simple$target = "ILIcases"

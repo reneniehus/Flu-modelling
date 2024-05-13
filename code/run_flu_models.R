@@ -16,13 +16,14 @@ run_flu_models = function(params=NULL, data=NULL){
     df_out %<>% bind_rows(df) # Add DK model to the df_out
   }
   
+  
   if ( "SIR_simple_r0_variation" %in% params$models_to_run ){ # Old DK model :)
     
     # prepare for model
     df_collect = list()
     df_i = 1
     scenario_tag = "A"
-    country_short_input_v = unique(data$country_short)
+    country_short_input_v = unique(data$country_short) # country_short_input_v = "AT" # for quick run
     for (country_short_input_i in country_short_input_v) {
       country_short_input = country_short_input_i
       
