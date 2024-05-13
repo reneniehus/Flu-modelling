@@ -46,3 +46,18 @@ boxplot(Rnull ~ season,
 boxplot(Rnull ~ country_short,
   data = rt_df
 )
+
+
+med_and_quantiles <- function(x) {
+  tibble(
+    q1 = quantile(x, .1),
+    q2 = quantile(x, .2),
+    q8 = quantile(x, .8),
+    q9 =  quantile(x, .9)
+  )
+}
+
+# Country relative effect
+med_and_quantiles(extract(fit, "Rnull_relative_country_sim")$Rnull_relative_country_sim)
+# Seasonal relative effect
+med_and_quantiles(extract(fit, "Rnull_relative_season_sim")$Rnull_relative_season_sim)

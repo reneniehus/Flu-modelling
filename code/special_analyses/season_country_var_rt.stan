@@ -39,7 +39,7 @@ generated quantities {
   real Rnull_country_sim;
   real Rnull_season_sim;
   real Rnull_relative_country_sim;
-  real Rnull_relative_season_eff_sim;
+  real Rnull_relative_season_sim;
   
   country_eff = normal_rng(0,sigma_a);
   Rnull_country_sim = exp(mean_val+country_eff);
@@ -47,7 +47,7 @@ generated quantities {
   
   season_eff = normal_rng(0,sigma_b);
   Rnull_season_sim = exp(mean_val+season_eff);
-  Rnull_relative_season_eff_sim = (exp(mean_val+season_eff)/exp(mean_val) - 1);
+  Rnull_relative_season_sim = (exp(mean_val+season_eff)/exp(mean_val) - 1);
 
 }
 
