@@ -23,7 +23,7 @@ models_out = run_flu_models( params, data ) # runs the model scripts
 process_and_save( params, models_out ) # processing the model output, with figures and saves
 
 # ---- |- Run special analyses
-source("code/special analyses/season_country_var_rt.R")
+source("code/special_analyses/season_country_var_rt.R")
 
 # plots for checking
 models_out %>% ggplot(aes(x=date,y=value,group=sample_or_quantile)) +
