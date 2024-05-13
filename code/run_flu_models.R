@@ -22,12 +22,12 @@ run_flu_models = function(params=NULL, data=NULL){
     df_collect = list()
     df_i = 1
     scenario_tag = "A"
-    country_short_input_v = c("AT","BE","FR")
+    country_short_input_v = unique(data$country_short)
     for (country_short_input_i in country_short_input_v) {
       country_short_input = country_short_input_i
       
       start_year = data %>% filter(country_short==country_short_input) %>% pull(date) %>% min() %>% year() %>% as.numeric()
-      while(start_year<=2016) {
+      while(start_year<=2022) {
         season = paste0(start_year,"/",start_year+1)
         start_date = ymd(paste0(start_year,"-10-01"))
         end_date = ymd(paste0(start_year+1,"-05-01"))
@@ -49,9 +49,11 @@ run_flu_models = function(params=NULL, data=NULL){
       }
     }
     
-    df_collect %>% bind_rows()
-    
-    
+    x = df_collect %>% bind_rows()
+    (x$Rnull) %>% min()
+    rnull_mu = x$Rnull %>% median()
+    rnull_quant = x$Rnull %>% quantile(probs=c(0.2,0.8))
+    ((rnull_quant/rnull_mu )-1)*100
   }
   
   if ( "last_year_burden" %in% params$models_to_run ){ # O
