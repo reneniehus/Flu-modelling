@@ -24,11 +24,13 @@ run_flu_models = function(params=NULL, data=NULL){
     df_i = 1
     scenario_tag = "A"
     country_short_input_v = unique(data$country_short) # country_short_input_v = "AT" # for quick run
+    country_short_input_v = "AT"
     for (country_short_input_i in country_short_input_v) {
       country_short_input = country_short_input_i
       
       start_year = data %>% filter(country_short==country_short_input) %>% pull(date) %>% min() %>% year() %>% as.numeric()
       while(start_year<=2022) {
+        # 2019, 2020 # start_year = 2020
         season = paste0(start_year,"/",start_year+1)
         start_date = ymd(paste0(start_year,"-10-01"))
         end_date = ymd(paste0(start_year+1,"-05-01"))
@@ -41,7 +43,7 @@ run_flu_models = function(params=NULL, data=NULL){
                  target == params$SIR_simple$target, 
                  agegroup == params$SIR_simple$agegroup) %>% 
           filter( date%in%date_v_fit ) -> xfit
-        
+        xfit %>% ggplot(aes(date,value))+geom_line() -> p2; p2
         if ( nrow(xfit) < 10 ) next;
         sum_inc = sum(xfit$value) ; if ( sum_inc < 300 ) next;
         pr=paste("> Running:",country_short_input,"| season:",season,"| sum inc:",sum_inc,"\n"); cat(green(pr))
@@ -50,6 +52,7 @@ run_flu_models = function(params=NULL, data=NULL){
       }
     }
     
+    x = read_csv(file="../Big data/Rt_country_season.csv")
     x = df_collect %>% bind_rows()
     (x$Rnull) %>% min()
     rnull_mu = x$Rnull %>% median()

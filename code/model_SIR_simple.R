@@ -108,7 +108,7 @@ model_SIR_simple_r0 = function( params=NULL, data=NULL, country_short_input, dat
   )
   fit02=rstan::stan(
     file='./stan/SIR_simple.stan',
-    chains=8 ,thin=8,iter=1000,
+    chains=8 ,thin=8,iter=5000,
     seed=12, cores = getOption("mc.cores", 1L),
     control=list(
       #adapt_delta=0.9,
