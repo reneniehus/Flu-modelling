@@ -20,7 +20,7 @@ stan_list <- list(
 # run stan model
 fit <- rstan::stan(
   file = "code/special_analyses/season_country_var_rt.stan",
-  chains = 8, thin = 8, iter = 300,
+  chains = 2, thin = 2, iter = 500,
   seed = 12, cores = getOption("mc.cores", 1L),
   control = list(
     # adapt_delta=0.9,
