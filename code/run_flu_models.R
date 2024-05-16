@@ -30,7 +30,7 @@ run_flu_models = function(params=NULL, data=NULL){
       start_year = data %>% filter(country_short==country_short_input) %>% pull(date) %>% min() %>% year() %>% as.numeric()
       while(start_year<=2022) {
         season = paste0(start_year,"/",start_year+1)
-        start_date = ymd(paste0(start_year,"-08-01"))
+        start_date = ymd(paste0(start_year,"-07-01"))
         end_date = ymd(paste0(start_year+1,"-05-01"))
         start_year = start_year +1 
         date_v_fit = seq(from=start_date,to=end_date,by="day")

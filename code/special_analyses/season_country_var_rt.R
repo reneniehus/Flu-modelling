@@ -1,6 +1,7 @@
 # run special analysis for rt seasonal and country variability
 
-rt_df <- read_xlsx("code/special_analyses/rt_season_country.xlsx")
+rt_df <- read_xlsx("code/special_analyses/rt_season_country.xlsx") %>% 
+  mutate(Rnull=as.numeric(Rnull),)
 
 df <- rt_df %>% mutate(
   country = as.numeric(fct_inorder(country_short)),
@@ -20,7 +21,7 @@ stan_list <- list(
 # run stan model
 fit <- rstan::stan(
   file = "code/special_analyses/season_country_var_rt.stan",
-  chains = 2, thin = 2, iter = 500,
+  chains = 4, thin = 4, iter = 1000,
   seed = 12, cores = getOption("mc.cores", 1L),
   control = list(
     # adapt_delta=0.9,
@@ -40,7 +41,7 @@ rt_df %>%
 # boxplot per season
 boxplot(Rnull ~ season,
   data = rt_df
-)
+) # indicated that it makes sense to remove 1 or 2 covid winters
 
 # boxplot per country
 boxplot(Rnull ~ country_short,
@@ -61,3 +62,9 @@ med_and_quantiles <- function(x) {
 med_and_quantiles(extract(fit, "Rnull_relative_country_sim")$Rnull_relative_country_sim)
 # Seasonal relative effect
 med_and_quantiles(extract(fit, "Rnull_relative_season_sim")$Rnull_relative_season_sim)
+
+mcmc_areas(fit,pars=c("Rnull_relative_season_sim") ) + 
+  geom_vline(xintercept = c(-0.10,0.10),linetype="dashed") +
+  coord_cartesian(xlim = c(-0.3,+0.25))+
+  scale_y_discrete(labels=c("Rnull_relative_season_sim"="Between season Rt")) 
+ 
