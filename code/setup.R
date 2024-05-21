@@ -43,6 +43,7 @@ library(cmdstanr)
 library( scoringutils )
 library(crayon)
 library(Hmisc)
+library(eurostat)
 
 # libraries not to include 
 # library(tsibble)
