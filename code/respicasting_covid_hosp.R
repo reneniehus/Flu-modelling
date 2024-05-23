@@ -4,9 +4,9 @@ source("code/setup.R")
 #clc()
 
 indicator = "hosp"
-# changed on 6 May 2024
-myorigin = c("2024-05-06") # last for case: c("2024-04-29") # must be Monday of the week of ensemble creation (happening on Tuesday)
-truth_date_latest = ymd("2024-05-11")# last for case: ymd("2024-05-04") # 1 week ahead: must be Saturday after ensemble creation
+# changed on 22 May 2024
+myorigin = c("2024-05-20") # last for case: c("2024-05-06") # must be Monday of the week of ensemble creation (happening on Tuesday)
+truth_date_latest = ymd("2024-05-25")# last for case: ymd("2024-05-11") # 1 week ahead: must be Saturday after ensemble creation
 mytarget = paste0("wk ahead inc ",indicator)
 
 ################ part below is the same for ILI/ARI/case/death/hosp

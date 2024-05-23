@@ -7,6 +7,7 @@ source("code/settings/settings_version0.R") # changed by the user
 params=settings() # calls the function that creates the params-list
 
 # sourcing other files, models etc
+source("code/flu_functions.R")
 source("code/load_flu_data.R")
 source("code/run_flu_models.R")
 source("code/process_and_save.R")

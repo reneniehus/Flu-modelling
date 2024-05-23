@@ -2,7 +2,7 @@
 ### Big section ##########
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-# ---- |-Subsetion: More details ----
+# ---- |-Subsection: More details ----
 
 # libraries
 start_time <- Sys.time()
@@ -286,6 +286,14 @@ column_stats_ingroups = function( df , mycolumn,mygroup , ... ) {
     reframe( quantile_df( !!mycolumn , ... ), 
              .by = !!mygroup )
   return(mysumm)
+}
+
+df_to_list = function(df){
+  mlist = list()
+  for (i in 1:nrow(df) ){
+    mlist[[ (df$id[i]) ]] = df$data[i][[1]]
+  }
+  return(mlist)
 }
 
 ggsave_as <- function(p,figname,height=10,width=16){

@@ -1,5 +1,6 @@
 model_SIR_simple = function( params=NULL, data=NULL, country_short_input, date_v_fit, scenario_tag){
   
+  # ---- |-Fitting ----
   # prepare data for stan fit
   data_mock = data %>% 
     filter(country_short == country_short_input, 
@@ -14,7 +15,6 @@ model_SIR_simple = function( params=NULL, data=NULL, country_short_input, date_v
   
   options(mc.cores = detectCores()-1 )
   #mod2 <- cmdstan_model(stan_file='./stan/SIR_simple.stan') # This compiles the script
-  
   stan_list = list(
     n_week_fit = nrow(data_mock_fit),
     severe_obs_fit = data_mock_fit$value,
@@ -33,9 +33,12 @@ model_SIR_simple = function( params=NULL, data=NULL, country_short_input, date_v
     ),
     data=stan_list
   ) # X mins
-  #precis(fit02,pars = c("Rnull_eff"))
   
-  # Create an output dataframe
+  
+  # ---- |-Simulations ----
+  #  inputs
+  #- for each axis a list with available IDs
+  # transmission
   df_out = fit02 %>% gather_draws(gen_severe_obs_project[t_vw]) %>%
     ungroup() %>%
     left_join(data_mock %>% select(date,country_short,agegroup,target) %>% mutate(t_vw = 1:n()), by="t_vw") %>%
@@ -45,12 +48,69 @@ model_SIR_simple = function( params=NULL, data=NULL, country_short_input, date_v
            target = target,
            scenario_tag = scenario_tag,
            prediction_type = "sample"
-           ) %>%
+    ) %>%
     rename(value = .value,
            sample_or_quantile = .draw) %>%
     select(-.chain, -.iteration, -.variable, -t_vw) 
+  df_out %>% select(sample_or_quantile,date,value) %>% group_by(sample_or_quantile) %>% 
+    nest() %>% rename(id=sample_or_quantile)  -> df
+  list_transmission = df_to_list(df)
+  list_transmission %>% names()
+  # vaccine uptake
+  list_vaccine_id = list()
+  list_vaccine_id[[1]] = list(
+    vaccine_uptake = c(0),
+    VE_severe = 0.7
+  )
   
+  list_severe_id = list()
+  list_severe_id[[1]] = list(
     
+  )
+  
+  ## select needed IDs within each list & create mapping of the IDs across axes -> axis_ids_simulate
+  axis_ids_simulate = tibble( round_id="2024-01",
+                              transmission_id= c(1:100) ,
+                              vaccine_id = 1,
+                              severe_id = 1)
+  
+  ## loop through axis_ids_simulate, 
+  for (sim_i in 1:nrow(axis_ids_simulate) ) {
+    transmission_id = axis_ids_simulate$transmission_id[sim_i]
+    vaccine_id = axis_ids_simulate$vaccine_id[sim_i]
+    severe_id = axis_ids_simulate$severe_id[sim_i]
+    
+    # prepare transmission
+    transmission_df = list_transmission[[ transmission_id ]]
+    incident_infections = transmission_df %>% select(value)
+    # prepare vaccination ( using list_vaccine_id )
+    vaccine_uptake = list_vaccine_id[[vaccine_id]]$vaccine_uptake
+    VE_severe = list_vaccine_id[[vaccine_id]]$VE_severe
+    vax_sev = vaccine_severity_nowane(vaccine_uptake,VE_severe)
+    # prepare natural severity ( using list_severe_id )
+    severity_options = list_severe_id[[severe_id]]
+    nat_sev = natural_severity(incident_infections,severity_options)
+    severity_baseline = 0.5
+    
+    # run: transmission-to-severity 
+    sev_fact = severity_factor(
+      incident_infections,
+      severity_baseline,
+      vax_sev$severity_factor_vaccines,
+      nat_sev$severity_factor_natural,
+      severity_options
+    )
+    # run: combine all targets -> mysim
+    mysim = combine_all_targets_SIR_simple(sev_fact,
+                                           incident_infections,
+                                           vaccine_uptake)
+    
+    # save
+    axis_ids_simulate$sim[sim_i] = mysim
+  }
+  
+  
+  
   if (F){ # plotting to support debugging
     # create table of parameters
     fit02 %>% gather_draws(SIR_ini[state],
