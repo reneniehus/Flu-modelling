@@ -9,7 +9,7 @@ vaccine_severity_nowane = function(
   severity_factor_vaccines = 1 - ( vaccine_uptake*VE_severe )
   
   list_out = list(
-    severity_factor_vaccines
+    severity_factor_vaccines=severity_factor_vaccines
   )
   return(list_out)
 }
@@ -22,7 +22,7 @@ natural_severity = function(
   severity_factor_natural = (incident_infections*0 + 1)
   
   list_out = list(
-    severity_factor_natural
+    severity_factor_natural=severity_factor_natural
   )
   return(list_out)
 }
@@ -46,9 +46,22 @@ severity_factor = function(
   incident_severe = incident_infections*severity_modulated
   
   list_out = list(
-    severity_factor_combined, # [t,a] combined factors that impact the raw severity
-    severity_modulated, # [t,a] the effective severity after accounting for all severity factors
-    incident_severe # [t,a] the severe indicator
+    severity_factor_combined=severity_factor_combined, # [t,a] combined factors that impact the raw severity
+    severity_modulated=severity_modulated, # [t,a] the effective severity after accounting for all severity factors
+    incident_severe=incident_severe # [t,a] the severe indicator
   )
   return(list_out)
+}
+
+combine_all_targets_SIR_simple = function(date_v,
+                                          incident_infections,
+                                          vaccine_uptake,
+                                          incident_severe) {
+  mout=tibble(
+    date=date_v,
+    inc_infections=incident_infections[,1],
+    inc_doses=vaccine_uptake[,1],
+    inc_death=incident_severe[,1]
+  )
+  return(mout)
 }
