@@ -16,13 +16,13 @@ settings = function() {
   params$models_to_run = c("SIR_simple_r0_variation") # "SIR_simple"
   
   # Settings for SIR_simple
-  params$SIR_simple$target = "ILIcases"
+  params$SIR_simple$target = "ILIconsultationrate"
   params$SIR_simple$agegroup = "age_total"
   # Settings for last_year_burden
-  params$last_year_burden$target = "ILIcases"
+  params$last_year_burden$target = "ILIconsultationrate"
   params$last_year_burden$agegroup = "age_total"
   # Settings for arima simple
-  params$arima_simple$target = "ILIcases"
+  params$arima_simple$target = "ILIconsultationrate"
   params$arima_simple$agegroup = "age_total"
   
   # ---- |-Fitting and uncertainty ----

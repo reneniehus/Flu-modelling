@@ -34,7 +34,6 @@ model_SIR_simple = function( params=NULL, data=NULL, country_short_input, date_v
     data=stan_list
   ) # X mins
   
-  
   # ---- |-Simulations ----
   #  inputs
   #- for each axis a list with available IDs
