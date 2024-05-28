@@ -8,7 +8,10 @@ settings = function() {
   params$path_save_results = "./output/output.fst"
   params$path_save_figures = "./output/figures/"
   
-  # ---- |-Data source ----
+  # ---- |-Data ----
+  params$latest_start_year = 2023 # if the last full season is 2023/24, put 2023
+  params$season_start_monthday = "-07-01"
+  params$season_end_monthday = "-05-01"
   
   # ---- |-Countries ----
   
