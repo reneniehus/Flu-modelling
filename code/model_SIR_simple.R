@@ -17,7 +17,7 @@ model_SIR_simple = function( params=NULL, data=NULL, country_short_input, date_v
   #mod2 <- cmdstan_model(stan_file='./stan/SIR_simple.stan') # This compiles the script
   stan_list = list(
     n_week_fit = nrow(data_mock_fit),
-    severe_obs_fit = data_mock_fit$value,
+    severe_obs_fit = as.integer(data_mock_fit$value),
     n_week_project = nrow(data_mock_project),
     pop = 9e6,
     Rnull = params$Rnull,
