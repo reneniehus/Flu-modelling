@@ -7,7 +7,7 @@ load_flu_data = function(params=NULL){
   # write_csv(data_sentinel_detections,file="./data/erviss_detections_sentinel_snapshot_2024-05-24.csv")
   # data_nonsentinel_detections = read_csv(file="https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/snapshots/2024-05-24_nonSentinelTestsDetections.csv")
   # write_csv(data_nonsentinel_detections,file="./data/erviss_detections_nonsentinel_snapshot_2024-05-24.csv")
-  data2 = read_csv(file="./data/erviss_iliari_snapshot_2024-05-24.csv")
+  data2 = read_csv(file="./data/erviss_iliari_snapshot_2024-05-24.csv",show_col_types = FALSE)
   data2 = data2 %>% 
     mutate(date=ISOweek2date(paste0(yearweek,"-3"))) %>% 
     mutate(age = case_when(
@@ -28,7 +28,7 @@ load_flu_data = function(params=NULL){
     ) 
   
   #
-  data_sentinel_detections = read_csv(file="./data/erviss_detections_sentinel_snapshot_2024-05-24.csv")
+  data_sentinel_detections = read_csv(file="./data/erviss_detections_sentinel_snapshot_2024-05-24.csv",show_col_types = FALSE)
   data_sentinel_detections = data_sentinel_detections %>% 
     mutate(date=ISOweek2date(paste0(yearweek,"-3"))) %>% 
     mutate(age = case_when(
@@ -41,7 +41,7 @@ load_flu_data = function(params=NULL){
     )) %>% 
     mutate(country_short=EU_short(countryname)) 
   #
-  data_nonsentinel_detections = read_csv(file="./data/erviss_detections_nonsentinel_snapshot_2024-05-24.csv")
+  data_nonsentinel_detections = read_csv(file="./data/erviss_detections_nonsentinel_snapshot_2024-05-24.csv",show_col_types = FALSE)
   data_nonsentinel_detections = data_nonsentinel_detections %>% 
     mutate(date=ISOweek2date(paste0(yearweek,"-3"))) %>% 
     mutate(age = case_when(
