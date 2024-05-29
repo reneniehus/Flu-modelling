@@ -82,28 +82,29 @@ data_into_all_season = function(data,params,withforce=F){
       start_year = data$erviss_ili_ari %>% filter(country_short==country_short_input_i) %>% 
         pull(date) %>% min() %>% year() %>% as.numeric()
       while( start_year<=params$latest_start_year ) {
-        season = paste0(start_year,"/",start_year+1)
+        
+        season     = paste0(start_year,"/",start_year+1)
         start_date = ymd(paste0(start_year,params$season_start_monthday))
-        end_date = ymd(paste0(start_year+1,params$season_end_monthday))
+        end_date   = ymd(paste0(start_year+1,params$season_end_monthday))
         date_v_fit = seq(from=start_date,to=end_date,by="day")
         start_year = start_year+1 # do this up here due to next; statements
         
         ## ili
         data$erviss_ili_ari %>% 
-          filter(country_short == country_short_input_i, 
-                 target == params$SIR_simple$target, 
-                 agegroup == params$SIR_simple$agegroup) %>% 
+          filter(country_short == country_short_input_i) %>% 
+          select(-country_short) %>% 
           filter( date%in%date_v_fit ) -> xinc_iliari
         if ( nrow(xinc_iliari) == 0 ) next;
         # fill the date gaps
-        tibble( country_short=country_short_input_i, 
-                date=seq( min(xinc_iliari$date), max(xinc_iliari$date), by="week") ) %>% 
-          left_join(  xinc_iliari,by = join_by(country_short, date) ) %>% 
-          mutate(value=replace_na(value,0)) %>% 
+        crossing(target=c("ILIconsultationrate","ARIconsultationrate"), 
+                 date=seq( min(xinc_iliari$date), max(xinc_iliari$date), by="week"),
+                 agegroup=c("age_00_04", "age_15_64", "age_05_14", "age_65_99", "age_total")
+        ) %>% 
+          left_join(  xinc_iliari,by = join_by(target,date,agegroup) ) %>% 
           fill(c("agegroup", "target"),.direction = "downup") -> xinc_iliari
         
         ## typing_sentinel
-        data$erviss_detect_sent %>% 
+        data$erviss_typing_sentinel %>% 
           filter(country_short == country_short_input_i,date%in%date_v_fit) %>% 
           filter(pathogen=="Influenza",pathogensubtype=="total") %>% 
           select(-country_short,-survtype,-countryname,-pathogen,-age,-yearweek) -> xtyping_sent
@@ -115,7 +116,7 @@ data_into_all_season = function(data,params,withforce=F){
         ntests_sent = xtyping_sent %>% filter(indicator=="tests") %>% summarise(msum=sum(value)) %>% pull(msum)
         
         # typing_nonsentinel
-        data$erviss_detect_nonsent %>% 
+        data$erviss_typing_nonsentinel %>% 
           filter(country_short == country_short_input_i,date%in%date_v_fit) %>%
           filter(pathogen=="Influenza",pathogensubtype=="total") %>% 
           select(-country_short,-survtype,-countryname,-pathogen,-age,-yearweek) -> xtyping_nonsent

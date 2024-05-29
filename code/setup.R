@@ -2,7 +2,8 @@
 ### Big section ##########
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-# ---- |-Subsection: More details ----
+## ---- |-Subsetion: More details ----
+library <- function(...) suppressPackageStartupMessages(base::library(...,quietly=TRUE))
 
 # libraries
 start_time <- Sys.time()
@@ -308,10 +309,25 @@ ggsave_as_png <- function(p,figname,height=10,width=16){
   
 }
 
+# adventures is crossings
 
-
+if (F) {
+  # 1: build a df for a time-varying indicators for 2 countries
+  df_1 = crossing( 
+    location=c("DK","AT"), # will be sorted by FIRST vector
+    t=c(1,2)
+  )
+  # 2: repeating the above for scenarios
+  # these 3 options are identical
+  df_1 %>% crossing( nesting(scenario=c("A","B"),disease_severity=c("high","low")) )
+  df_1 %>% crossing( tibble(scenario=c("A","B"),disease_severity=c("high","low")) )
+  df_1 %>% full_join( crossing(location=c("DK","AT"),nesting(scenario=c("A","B"),disease_severity=c("high","low"))),
+                      relationship = "many-to-many")
+  # 3: use the nest functionality to hide the time-varying part
+  df_1 %>% crossing( nesting(scenario=c("A","B"),disease_severity=c("high","low")) ) %>% 
+    nest(.by=c("scenario","disease_severity"))
+}
 
 # very end: timing
 end_time <- Sys.time()
-cat("Run time setup01.R :", round(end_time - start_time,2) , "sec")
-
+pr=paste("> Setup script run:",round(end_time - start_time,2),"sec \n"); cat(green(pr))

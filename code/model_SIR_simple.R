@@ -144,6 +144,47 @@ model_SIR_simple = function( params=NULL, data=NULL, country_short_input, date_v
   return(axis_ids_simulate)
 }
 
+model_SIR_multiseason = function(params=NULL, data=NULL, country_short_input, scenario_tag ){
+  
+  # ---- |-Fitting ----
+  data$
+  # prepare data for stan fit
+  data_mock = data %>% 
+    filter(country_short == country_short_input, 
+           target == params$SIR_simple$target, 
+           agegroup == params$SIR_simple$agegroup) # 
+  data_mock %<>% filter( date%in%date_v_fit )
+  data_mock %>% ggplot(aes(date,value)) + geom_line()
+  data_mock_fit = data_mock
+  # Projection dates
+  data_mock_project = data_mock
+  data_mock_project$date = data_mock_project$date+365
+  
+  options(mc.cores = detectCores()-1 )
+  #mod2 <- cmdstan_model(stan_file='./stan/SIR_simple.stan') # This compiles the script
+  stan_list = list(
+    n_week_fit = nrow(data_mock_fit),
+    severe_obs_fit = as.integer(data_mock_fit$value),
+    n_week_project = nrow(data_mock_project),
+    pop = 9e6,
+    Rnull = params$Rnull,
+    rate_infectious = params$rate_infectious
+  )
+  fit02=rstan::stan(
+    file='./stan/SIR_simple.stan',
+    chains=8 ,thin=8,iter=300,
+    seed=12, cores = getOption("mc.cores", 1L),
+    control=list(
+      #adapt_delta=0.9,
+      #max_treedepth=14
+    ),
+    data=stan_list
+  ) # X mins
+  
+  return()
+}
+
+
 model_SIR_simple_r0 = function( params=NULL, data=NULL, country_short_input, date_v_fit,season, scenario_tag){
   
   # prepare data for stan fit

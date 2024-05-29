@@ -11,7 +11,7 @@ settings = function() {
   # ---- |-Data ----
   params$latest_start_year = 2023 # if the last full season is 2023/24, put 2023
   params$season_start_monthday = "-07-01"
-  params$season_end_monthday = "-05-01"
+  params$season_end_monthday = "-06-30"
   
   # ---- |-Countries ----
   
@@ -21,6 +21,8 @@ settings = function() {
   # Settings for SIR_simple
   params$SIR_simple$target = "ILIconsultationrate"
   params$SIR_simple$agegroup = "age_total"
+  # Settings for SIR_multiseason
+  params$SIR_multiseason$ili_sum_min = 100
   # Settings for last_year_burden
   params$last_year_burden$target = "ILIconsultationrate"
   params$last_year_burden$agegroup = "age_total"
