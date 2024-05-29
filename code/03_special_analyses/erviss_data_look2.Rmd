@@ -1,7 +1,4 @@
-
-
 ```{r}
 all_season = data_into_all_season(data,params,withforce=F)
 all_season
 ```
-

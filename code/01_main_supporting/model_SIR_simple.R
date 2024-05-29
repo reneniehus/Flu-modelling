@@ -144,10 +144,14 @@ model_SIR_simple = function( params=NULL, data=NULL, country_short_input, date_v
   return(axis_ids_simulate)
 }
 
-model_SIR_multiseason = function(params=NULL, data=NULL, country_short_input, scenario_tag ){
+model_SIR_multiseason = function(params=NULL, all_season=NULL, country_short_input, scenario_tag ){
   
   # ---- |-Fitting ----
-  data$
+  all_season %>% 
+    filter(country_short == country_short_input) %>% 
+    filter(ili_sum>params$SIR_multiseason$ili_sum_min) %>% 
+    unnest(iliari)
+    
   # prepare data for stan fit
   data_mock = data %>% 
     filter(country_short == country_short_input, 

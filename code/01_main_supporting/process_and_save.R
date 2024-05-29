@@ -1,4 +1,8 @@
 process_and_save = function(params=NULL, models_out=NULL){
+  
+  # file naming (https://docs.google.com/document/d/13adcxpPdlDvJM5eiFSkMzlWMTcwsx6lVjY25JA26iS4/edit)
+  # season_cycle_round_id>-<team>-<model>.parquet (Ex. 2024_2025_1_FLU2-ISI-GLEAM.parquet)
+
   write.fst(models_out, path = params$path_save_results)
   
   # Basic plot(s):

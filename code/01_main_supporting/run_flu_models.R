@@ -1,8 +1,11 @@
 run_flu_models = function(params=NULL, data=NULL){
   
-  # Columns in the resulting df_out:
-  # model, country_short, date, agegroup, target, value, scenario_tag
-  # prediction_type (sample or quantile), sample_or_quantile
+  # Columns in the resulting df_out (as per: https://docs.google.com/document/d/13adcxpPdlDvJM5eiFSkMzlWMTcwsx6lVjY25JA26iS4/edit):
+  # model_id
+  # round_id ["2024_2025_1_FLU1"]
+  # scenario_id ["A","B"], target [allowed targets], location ["DE","FR"] 
+  # pop_group ["0-12","13-65"], horizon [week integer], target_end_date [Date string ('YYYY-MM-DD')]
+  # output_type ["sample"], output_type_id [string: "1","2","3",...], value [float limited to 2 decimals]
   
   df_out = list()
   
@@ -21,7 +24,7 @@ run_flu_models = function(params=NULL, data=NULL){
     all_season = data_into_all_season(data,params,withforce=F)
     scenario_tag = "A"
     
-    df = model_SIR_multiseason( params , data=all_season , country_short_input="AT", scenario_tag)
+    df = model_SIR_multiseason( params , all_season=all_season , country_short_input="AT", scenario_tag)
     df_out %<>% bind_rows(df) # Add DK model to the df_out
   }
   
