@@ -13,7 +13,6 @@ model_SIR_simple = function( params=NULL, data=NULL, country_short_input, date_v
   data_mock_project = data_mock
   data_mock_project$date = data_mock_project$date+365
   
-  options(mc.cores = detectCores()-1 )
   #mod2 <- cmdstan_model(stan_file='./stan/SIR_simple.stan') # This compiles the script
   stan_list = list(
     n_week_fit = nrow(data_mock_fit),
@@ -146,36 +145,65 @@ model_SIR_simple = function( params=NULL, data=NULL, country_short_input, date_v
 
 model_SIR_multiseason = function(params=NULL, all_season=NULL, country_short_input, scenario_tag ){
   
-  # ---- |-Fitting ----
+  # ---- |-Filtering ----
   all_season %>% 
     filter(country_short == country_short_input) %>% 
-    filter(ili_sum>params$SIR_multiseason$ili_sum_min) %>% 
-    unnest(iliari)
-    
-  # prepare data for stan fit
-  data_mock = data %>% 
-    filter(country_short == country_short_input, 
-           target == params$SIR_simple$target, 
-           agegroup == params$SIR_simple$agegroup) # 
-  data_mock %<>% filter( date%in%date_v_fit )
-  data_mock %>% ggplot(aes(date,value)) + geom_line()
-  data_mock_fit = data_mock
-  # Projection dates
-  data_mock_project = data_mock
-  data_mock_project$date = data_mock_project$date+365
+    filter_log(ili_sum>params$SIR_multiseason$ili_sum_min) %>% 
+    select(-typing_sentinel,-typing_nonsentinel,-typing_combined) %>% 
+    unnest(inc_iliari) %>% 
+    filter(target==params$SIR_simple$target) -> all_season_filtered
+  # filter:age groups
+  all_season_filtered %>% 
+    filter(agegroup==params$SIR_simple$agegroup) -> all_season_filtered
+  # filter:pandemic seasons
+  all_season_filtered %>% 
+    filter(!season%in%params$SIR_multiseason$seasons_exclude) %>% 
+    select(country_short,season,date,value) -> all_season_fit
   
-  options(mc.cores = detectCores()-1 )
-  #mod2 <- cmdstan_model(stan_file='./stan/SIR_simple.stan') # This compiles the script
+  # ---- |-Project df and weekly to daily ----
+  # project df
+  start_year =year(today())
+  season     = paste0(start_year,"/",start_year+1)
+  start_date = ymd(paste0(start_year,params$season_start_monthday))
+  end_date   = ymd(paste0(start_year+1,params$season_end_monthday))
+  date_v = seq(from=start_date,to=end_date,by="day")
+  date_v_wed = date_v[weekdays(date_v)=="Wednesday"]
+  all_season_project = tibble(country_short=country_short_input,
+                              season=season,
+                              date=date_v_wed,
+                              value=NA)
+  # from weekly, make daily
+  crossing( country_short=country_short_input,
+            nesting(data_w=all_season_fit$date,season=all_season_fit$season), 
+            d_shift=c(-6:0) ) %>% 
+    mutate(date=data_w+d_shift) %>% select(country_short,season,date) %>% 
+    group_by(season) %>%  mutate(h=1:n(),
+                                 season_start=case_when(h==1~1,h==2~2,.default=0) ) %>% 
+    ungroup() %>% select(-h)-> all_season_fit_daily
+  crossing( country_short=country_short_input,
+            nesting(data_w=all_season_project$date,season=all_season_project$season), 
+            d_shift=c(-6:0) ) %>% 
+    mutate(date=data_w+d_shift) %>% select(country_short,season,date) -> all_season_project_daily
+  # plotting
+  all_season_fit %>% ggplot(aes(date,value)) + geom_line() + geom_rug()
+  
+  # ---- |-Stan list----
   stan_list = list(
-    n_week_fit = nrow(data_mock_fit),
-    severe_obs_fit = as.integer(data_mock_fit$value),
-    n_week_project = nrow(data_mock_project),
+    n_season = n_distinct(all_season_fit$season),
+    n_week_fit = nrow(all_season_fit),
+    n_day_fit = nrow(all_season_fit_daily),
+    n_week_project = nrow(all_season_project),
+    severe_obs_fit = as.integer(all_season_fit$value),
+    severe_obs_notna = as.integer(!is.na(all_season_fit$value)),
+    season_start = as.integer(all_season_fit_daily$season_start),
+    season_id = fct_inorder(all_season_fit_daily$season) %>% as.integer(),
+    season_id_raw = fct_inorder(all_season_fit_daily$season) %>% levels() %>% enframe(),
     pop = 9e6,
     Rnull = params$Rnull,
     rate_infectious = params$rate_infectious
   )
-  fit02=rstan::stan(
-    file='./stan/SIR_simple.stan',
+  fit00=rstan::stan(
+    file='./stan/SIR_simple_multiseason.stan',
     chains=8 ,thin=8,iter=300,
     seed=12, cores = getOption("mc.cores", 1L),
     control=list(
@@ -184,6 +212,7 @@ model_SIR_multiseason = function(params=NULL, all_season=NULL, country_short_inp
     ),
     data=stan_list
   ) # X mins
+  
   
   return()
 }
@@ -203,7 +232,6 @@ model_SIR_simple_r0 = function( params=NULL, data=NULL, country_short_input, dat
   data_mock_project = data_mock
   data_mock_project$date = data_mock_project$date+365
   
-  options(mc.cores = detectCores()-1 )
   #mod2 <- cmdstan_model(stan_file='./stan/SIR_simple.stan') # This compiles the script
   
   stan_list = list(

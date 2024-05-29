@@ -66,6 +66,15 @@ combine_all_targets_SIR_simple = function(date_v,
   return(mout)
 }
 
+rep_warning_wed = function(df_rep,ind_name){
+  # reporting warning for the case of reporting on weekdays other than Wednesday
+  if (nrow(df_rep)==0) return(invisible(NULL))
+  shouldbe_wednesday=df_rep$date %>% weekdays() %>% table() %>% names()
+  warn1 = (length(shouldbe_wednesday)>1); warn2 = shouldbe_wednesday[1]!="Wednesday"
+  if (warn1|warn2) {pr=paste("Warning: some",ind_name,"reports on days other than Wed \n"); cat(red(pr))}
+  return(invisible(NULL))
+}
+
 data_into_all_season = function(data,params,withforce=F){
   
   file_doesnot_exist = !file.exists("output/all_season.Rdata")
@@ -86,18 +95,20 @@ data_into_all_season = function(data,params,withforce=F){
         season     = paste0(start_year,"/",start_year+1)
         start_date = ymd(paste0(start_year,params$season_start_monthday))
         end_date   = ymd(paste0(start_year+1,params$season_end_monthday))
-        date_v_fit = seq(from=start_date,to=end_date,by="day")
+        date_v = seq(from=start_date,to=end_date,by="day")
+        date_v_wed = date_v[weekdays(date_v)=="Wednesday"]
         start_year = start_year+1 # do this up here due to next; statements
         
-        ## ili
+        ## ili/ari
         data$erviss_ili_ari %>% 
           filter(country_short == country_short_input_i) %>% 
           select(-country_short) %>% 
-          filter( date%in%date_v_fit ) -> xinc_iliari
+          filter( date%in%date_v ) -> xinc_iliari; rep_warning_wed(xinc_iliari,"ili/ari")
+        
         if ( nrow(xinc_iliari) == 0 ) next;
         # fill the date gaps
         crossing(target=c("ILIconsultationrate","ARIconsultationrate"), 
-                 date=seq( min(xinc_iliari$date), max(xinc_iliari$date), by="week"),
+                 date=date_v_wed,
                  agegroup=c("age_00_04", "age_15_64", "age_05_14", "age_65_99", "age_total")
         ) %>% 
           left_join(  xinc_iliari,by = join_by(target,date,agegroup) ) %>% 
@@ -105,23 +116,22 @@ data_into_all_season = function(data,params,withforce=F){
         
         ## typing_sentinel
         data$erviss_typing_sentinel %>% 
-          filter(country_short == country_short_input_i,date%in%date_v_fit) %>% 
+          filter(country_short == country_short_input_i,date%in%date_v) %>% 
           filter(pathogen=="Influenza",pathogensubtype=="total") %>% 
           select(-country_short,-survtype,-countryname,-pathogen,-age,-yearweek) -> xtyping_sent
         # fill the date gaps
-        if (nrow(xtyping_sent)>=1) crossing( date=seq( min(xtyping_sent$date), max(xtyping_sent$date), by="week"),
+        if (nrow(xtyping_sent)>=1) crossing( date=date_v_wed,
                                              indicator=c("detections","positivity","tests"  ) ) %>% 
           left_join( xtyping_sent, by = join_by(date,indicator) ) %>% 
-          fill( c("pathogentype", "pathogensubtype"),.direction = "downup" ) -> xtyping_sent
-        ntests_sent = xtyping_sent %>% filter(indicator=="tests") %>% summarise(msum=sum(value)) %>% pull(msum)
+          fill( c("pathogentype", "pathogensubtype"),.direction = "downup" ) -> xtyping_sent; rep_warning_wed(xtyping_sent,"sent_typing")
         
         # typing_nonsentinel
         data$erviss_typing_nonsentinel %>% 
-          filter(country_short == country_short_input_i,date%in%date_v_fit) %>%
+          filter(country_short == country_short_input_i,date%in%date_v) %>%
           filter(pathogen=="Influenza",pathogensubtype=="total") %>% 
           select(-country_short,-survtype,-countryname,-pathogen,-age,-yearweek) -> xtyping_nonsent
         # fill the date gaps
-        if (nrow(xtyping_nonsent)>=1) crossing( date=seq( min(xtyping_nonsent$date), max(xtyping_nonsent$date), by="week"),
+        if (nrow(xtyping_nonsent)>=1) crossing( date=date_v_wed,
                                                 indicator=c("detections","positivity","tests"  ) ) %>% 
           left_join( xtyping_nonsent, by = join_by(date,indicator) ) %>% 
           fill( c("pathogentype", "pathogensubtype"),.direction = "downup" ) -> xtyping_nonsent
@@ -129,15 +139,29 @@ data_into_all_season = function(data,params,withforce=F){
           value=ifelse(indicator=="positivity",
                        value[indicator=="detections"]/value[indicator=="tests"],
                        value)
-        ) %>% ungroup() -> xtyping_nonsent
-        ntests_nonsent = xtyping_nonsent%>% filter(indicator=="tests")%>% summarise(msum=sum(value)) %>% pull(msum)
+        ) %>% ungroup() -> xtyping_nonsent; rep_warning_wed(xtyping_nonsent,"nonsent_typing")
+        
+        ## combine sentinel and non-sentinel
+        xtyping_sent    %>% rename(value_sent=value)   -> x1
+        xtyping_nonsent %>% rename(value_nonsent=value)-> x2
+        xtyping_combined=left_join(x1,x2,by = join_by(date, indicator, pathogentype,pathogensubtype)) %>%
+          mutate(value_add_narm=replace_na(value_sent,0)+replace_na(value_nonsent,0)  ) %>% 
+          group_by(date) %>%  mutate(
+            value_add_narm=ifelse(indicator=="positivity",
+                                  value_add_narm[indicator=="detections"]/value_add_narm[indicator=="tests"],
+                                  value_add_narm)
+          ) %>% ungroup()
         
         ## data quality measures
-        ili_quality = mean(xinc_iliari > 0) %>% round(2)
-        tests_sentinel_quality = xtyping_sent %>% filter(indicator=="tests") %>% summarise(x=mean(value>5)) %>% pull(x)
-        tests_nonsentinel_quality = xtyping_nonsent %>% filter(indicator=="tests") %>% summarise(x=mean(value>5)) %>% pull(x)
-        sum_inc = sum(xinc_iliari$value) 
+        ili_sum=xinc_iliari %>% filter(target=="ILIconsultationrate") %>% summarise(x=sum(value,na.rm=T)) %>% pull(x)
+        ili_quality=xinc_iliari %>% filter(target=="ILIconsultationrate") %>% mutate(v_q= !is.na(value)&(value>0) ) %>% summarise(x=mean( v_q )) %>% pull(x)
+        ari_sum=xinc_iliari %>% filter(target=="ARIconsultationrate") %>% summarise(x=sum(value,na.rm=T)) %>% pull(x)
+        ari_quality=xinc_iliari %>% filter(target=="ARIconsultationrate") %>% mutate(v_q= !is.na(value)&(value>0) ) %>% summarise(x=mean( v_q )) %>% pull(x)
         
+        ntests_sent = xtyping_sent %>% filter(indicator=="tests") %>% summarise(msum=sum(value,na.rm=T)) %>% pull(msum)
+        tests_sentinel_quality = xtyping_sent %>% filter(indicator=="tests") %>% summarise(x=mean(value>5,na.rm=T)) %>% pull(x)
+        ntests_nonsent = xtyping_nonsent%>% filter(indicator=="tests")%>% summarise(msum=sum(value,na.rm=T)) %>% pull(msum)
+        tests_nonsentinel_quality = xtyping_nonsent %>% filter(indicator=="tests") %>% summarise(x=mean(value>5,na.rm=T)) %>% pull(x)
         
         ## plotting
         xinc_iliari %>% ggplot(aes(date,value))+geom_line()
@@ -149,10 +173,10 @@ data_into_all_season = function(data,params,withforce=F){
         # if ( sum_inc < 300 ) next;
         
         ## printing
-        pr=paste("> Running:",country_short_input_i,"| season:",season,
-                 "| ili:",sum_inc,
-                 "| test_sent:",ntests_sent,
-                 "| test_nonsent:",ntests_nonsent,
+        pr=paste0("> Run: ",country_short_input_i," | ",season,
+                 " | ili/ari: ",my_comma(ili_sum),"/",my_comma(ari_sum),
+                 " | tests-sent/nonsent/combined:",
+                 my_comma(ntests_sent),"/",my_comma(ntests_nonsent),"/",my_comma(ntests_sent+ntests_nonsent),
                  "\n"); cat(green(pr))
         
         # put data together
@@ -160,8 +184,10 @@ data_into_all_season = function(data,params,withforce=F){
           country_short=country_short_input_i,
           season=season,
           #
-          ili_sum=sum_inc,
+          ili_sum=ili_sum,
           ili_quality=ili_quality,
+          ari_sum=ari_sum,
+          ari_quality=ari_quality,
           tests_sentinel=ntests_sent,
           tests_sentinel_quality=tests_sentinel_quality,
           tests_nonsentinel=ntests_nonsent,
@@ -169,10 +195,10 @@ data_into_all_season = function(data,params,withforce=F){
           # nested dataframes
           nest(xinc_iliari) %>% rename(inc_iliari=data),
           nest(xtyping_sent) %>% rename(typing_sentinel=data),
-          nest(xtyping_nonsent) %>% rename(typing_nonsentinel=data)
+          nest(xtyping_nonsent) %>% rename(typing_nonsentinel=data),
+          nest(xtyping_combined) %>% rename(typing_combined=data)
         )
         df_i = df_i + 1
-        
       } # season loop
     } # country loop
     all_season = bind_rows(df_collect)

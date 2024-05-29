@@ -27,7 +27,6 @@ process_and_save( params, models_out ) # processing the model output, with figur
 source("code/03_special_analyses/season_country_var_rt.R")
 source("code/03_special_analyses/erviss_data_look.R")
 source("code/03_special_analyses/exploring_SIR/SIR_paras_explore.R") # explore what SIR paras do
-
 if (F) source("code/03_special_analyses/forecasting/norrsken.R") # forecasting modelling
 
 # plots for checking

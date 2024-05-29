@@ -84,6 +84,7 @@ mstand <- function(v){
   mout <- v/sum(v)
   return(mout)
 }
+my_comma <- scales::label_comma(accuracy = 1, big.mark = ",", decimal.mark = ".")
 # return the last element(s) of a vector
 mlast <- function(v , n=1 ){
   mout = v[length(v)]

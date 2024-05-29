@@ -9,7 +9,7 @@ run_flu_models = function(params=NULL, data=NULL){
   
   df_out = list()
   
-  if ( "SIR_simple" %in% params$models_to_run ){ # Old DK model :)
+  if ( "SIR_simple" %in% params$models_to_run ){ 
     # prepare for model
     country_short_input = "AT"
     scenario_tag = "A"
@@ -21,7 +21,7 @@ run_flu_models = function(params=NULL, data=NULL){
   
   if ( "SIR_simple_multi_season" %in% params$models_to_run ){
     # prepare data
-    all_season = data_into_all_season(data,params,withforce=F)
+    all_season = data_into_all_season(data,params,withforce=T)
     scenario_tag = "A"
     
     df = model_SIR_multiseason( params , all_season=all_season , country_short_input="AT", scenario_tag)
