@@ -21,7 +21,7 @@ run_flu_models = function(params=NULL, data=NULL){
   
   if ( "SIR_simple_multi_season" %in% params$models_to_run ){
     # prepare data
-    all_season = data_into_all_season(data,params,withforce=T)
+    all_season = data_into_all_season(data,params,withforce=F)
     scenario_tag = "A"
     
     df = model_SIR_multiseason( params , all_season=all_season , country_short_input="AT", scenario_tag)

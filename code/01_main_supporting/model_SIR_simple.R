@@ -159,6 +159,7 @@ model_SIR_multiseason = function(params=NULL, all_season=NULL, country_short_inp
   all_season_filtered %>% 
     filter(!season%in%params$SIR_multiseason$seasons_exclude) %>% 
     select(country_short,season,date,value) -> all_season_fit
+  #all_season_fit = all_season_fit %>% filter(season=="2016/2017")
   
   # ---- |-Project df and weekly to daily ----
   # project df
@@ -193,7 +194,7 @@ model_SIR_multiseason = function(params=NULL, all_season=NULL, country_short_inp
     n_week_fit = nrow(all_season_fit),
     n_day_fit = nrow(all_season_fit_daily),
     n_week_project = nrow(all_season_project),
-    severe_obs_fit = as.integer(all_season_fit$value),
+    severe_obs_fit = as.integer( all_season_fit$value %>% replace_na(0) ),
     severe_obs_notna = as.integer(!is.na(all_season_fit$value)),
     season_start = as.integer(all_season_fit_daily$season_start),
     season_id = fct_inorder(all_season_fit_daily$season) %>% as.integer(),
@@ -204,7 +205,7 @@ model_SIR_multiseason = function(params=NULL, all_season=NULL, country_short_inp
   )
   fit00=rstan::stan(
     file='./stan/SIR_simple_multiseason.stan',
-    chains=8 ,thin=8,iter=300,
+    chains=1 ,thin=1,iter=400,
     seed=12, cores = getOption("mc.cores", 1L),
     control=list(
       #adapt_delta=0.9,
@@ -212,7 +213,6 @@ model_SIR_multiseason = function(params=NULL, all_season=NULL, country_short_inp
     ),
     data=stan_list
   ) # X mins
-  
   
   return()
 }

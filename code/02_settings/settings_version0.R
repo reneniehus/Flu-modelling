@@ -16,7 +16,7 @@ settings = function() {
   # ---- |-Countries ----
   
   # ---- |-Model-specific  settings ----
-  params$models_to_run = c("SIR_simple_r0_variation") # "SIR_simple"
+  params$models_to_run = c("SIR_simple_multi_season") # "SIR_simple","SIR_simple_r0_variation","SIR_simple_multi_season
   
   # Settings for SIR_simple
   params$SIR_simple$target = "ILIconsultationrate"
