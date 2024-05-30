@@ -92,10 +92,10 @@ model {
     if (severe_obs_notna[t]==1) severe_obs_fit[t] ~ poisson( severe_mean_weekly[t] ) ;
   }
   // 
-  logit(prop_severe[]) ~ normal( logit(prop_severe_mu) , sigma_prop_severe );
+  logit(prop_severe[])~ normal( logit(prop_severe_mu) , sigma_prop_severe );
   logit(SIR_ini[1][]) ~ normal( logit(SIR_ini_mu[1]) , sigma_s );
   logit(SIR_ini[2][]) ~ normal( logit(SIR_ini_mu[2]) , sigma_i );
-  sigma_prop_severe ~ exponential(1);
+  sigma_prop_severe   ~ exponential(1);
   sigma_s ~ exponential(1);
   sigma_i ~ exponential(1);
 }
@@ -122,7 +122,6 @@ generated quantities {
   beta_j = beta; // Here uncertainty can be added
   
   for (t in 1:n_day_fit) {
-    real delta_E;
     real delta_S;
     real delta_I;
     real delta_R;
