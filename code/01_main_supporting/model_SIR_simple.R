@@ -158,7 +158,8 @@ model_SIR_multiseason = function(params=NULL, all_season=NULL, country_short_inp
   # filter:pandemic seasons
   all_season_filtered %>% 
     filter(!season%in%params$SIR_multiseason$seasons_exclude) %>% 
-    select(country_short,season,date,value) -> all_season_fit
+    select(country_short,season,date,value) %>% 
+    mutate(n=1:n()) -> all_season_fit
   #all_season_fit = all_season_fit %>% filter(season=="2016/2017")
   
   # ---- |-Project df and weekly to daily ----
@@ -188,7 +189,8 @@ model_SIR_multiseason = function(params=NULL, all_season=NULL, country_short_inp
   # plotting
   all_season_fit %>% ggplot(aes(date,value)) + geom_line() + geom_rug()
   
-  # ---- |-Stan list----
+  
+  # ---- |-Stan list and fit----
   stan_list = list(
     n_season = n_distinct(all_season_fit$season),
     n_week_fit = nrow(all_season_fit),
@@ -205,7 +207,7 @@ model_SIR_multiseason = function(params=NULL, all_season=NULL, country_short_inp
   )
   fit00=rstan::stan(
     file='./stan/SIR_simple_multiseason.stan',
-    chains=1 ,thin=1,iter=400,
+    chains=1 ,thin=1,iter=1000,
     seed=12, cores = getOption("mc.cores", 1L),
     control=list(
       #adapt_delta=0.9,
@@ -213,8 +215,28 @@ model_SIR_multiseason = function(params=NULL, all_season=NULL, country_short_inp
     ),
     data=stan_list
   ) # X mins
+  fit00@model_pars
+  precis(fit00,pars=c("Rnull_eff"),depth = 2)
+  precis(fit00,pars=c("prop_severe"),depth = 2)
+  precis(fit00,pars=c("sigma_s"),depth = 2) # 3.66
+  precis(fit00,pars=c("SIR_ini"),depth = 3)
   
-  return()
+  
+  p = fit00 %>% gather_draws(severe_mean_weekly[n]) %>% 
+    filter(.draw%in%c(1:20)) %>% select(-.chain,-.iteration) %>% ungroup() %>% 
+    right_join(all_season_fit) %>% 
+    ggplot(aes(date,value)) + 
+    geom_line(aes(y=.value,group=.draw),col="lightblue") +geom_line() + coord_cartesian(ylim=c(0,10000))
+  
+  # output
+  modl = 
+    list(
+      fit = fit00,
+      stan_list = stan_list,
+      p = p
+    )
+  
+  return(modl)
 }
 
 

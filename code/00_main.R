@@ -29,6 +29,5 @@ source("code/03_special_analyses/erviss_data_look.R")
 source("code/03_special_analyses/exploring_SIR/SIR_paras_explore.R") # explore what SIR paras do
 if (F) source("code/03_special_analyses/forecasting/norrsken.R") # forecasting modelling
 
-# plots for checking
-models_out %>% ggplot(aes(x=date,y=value,group=sample_or_quantile)) +
-  geom_line(alpha=0.2) + coord_cartesian(ylim=c(0,5000))
+# temporary code for quick checking
+models_out$multiseason$p

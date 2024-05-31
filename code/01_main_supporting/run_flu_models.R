@@ -24,7 +24,8 @@ run_flu_models = function(params=NULL, data=NULL){
     all_season = data_into_all_season(data,params,withforce=F)
     scenario_tag = "A"
     
-    df = model_SIR_multiseason( params , all_season=all_season , country_short_input="AT", scenario_tag)
+    modl = model_SIR_multiseason( params , all_season=all_season , country_short_input="AT", scenario_tag)
+    df = NULL
     df_out %<>% bind_rows(df) # Add DK model to the df_out
   }
   
@@ -91,5 +92,10 @@ run_flu_models = function(params=NULL, data=NULL){
     df_out %<>% bind_rows(df) # Add DK model to the df_out
   }
   
-  return(df_out)
+  mout = list(
+    df_out,
+    multiseason=modl
+  )
+  
+  return(mout)
 }
