@@ -22,7 +22,7 @@ settings = function() {
   params$SIR_simple$target = "ILIconsultationrate"
   params$SIR_simple$agegroup = "age_total"
   # Settings for SIR_multiseason
-  params$SIR_multiseason$ili_sum_min = 100
+  # params$SIR_multiseason$ili_sum_min = 100 # for multiseason fit, a poor quality season has less impact
   params$SIR_multiseason$seasons_exclude = c("2020/2021","2021/2022")
   # Settings for last_year_burden
   params$last_year_burden$target = "ILIconsultationrate"

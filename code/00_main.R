@@ -30,4 +30,12 @@ source("code/03_special_analyses/exploring_SIR/SIR_paras_explore.R") # explore w
 if (F) source("code/03_special_analyses/forecasting/norrsken.R") # forecasting modelling
 
 # temporary code for quick checking
+# ask Leah/Nick about overlap of sent and nonsent typing data [Asked Leah]
+# fit ALL 25 countries: ILI
+# fit ALL 25 countries: ILI*sent_typing
+# eyeballing method: identify good and poor data/fits
+# unless all fits look amazing: fit ALL 25 countries: ILI*nonsent_typing
+# -> compare fitted parameters  ILI*sent_typing versus ILI*nonsent_typing
+
+# fit all poor-fit countries: ILI*nonsent_typic (or combination of sent&nonsent)
 models_out$multiseason$p

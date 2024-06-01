@@ -148,7 +148,6 @@ model_SIR_multiseason = function(params=NULL, all_season=NULL, country_short_inp
   # ---- |-Filtering ----
   all_season %>% 
     filter(country_short == country_short_input) %>% 
-    filter_log(ili_sum>params$SIR_multiseason$ili_sum_min) %>% 
     select(-typing_sentinel,-typing_nonsentinel,-typing_combined) %>% 
     unnest(inc_iliari) %>% 
     filter(target==params$SIR_simple$target) -> all_season_filtered
@@ -187,11 +186,12 @@ model_SIR_multiseason = function(params=NULL, all_season=NULL, country_short_inp
             d_shift=c(-6:0) ) %>% 
     mutate(date=data_w+d_shift) %>% select(country_short,season,date) -> all_season_project_daily
   # plotting
-  all_season_fit %>% ggplot(aes(date,value)) + geom_line() + geom_rug()
-  
+  p1 = all_season_fit %>% ggplot(aes(date,value)) + geom_line() + geom_rug()
   
   # ---- |-Stan list and fit----
   stan_list = list(
+    all_season_fit=all_season_fit,
+    all_season_project=all_season_project,
     n_season = n_distinct(all_season_fit$season),
     n_week_fit = nrow(all_season_fit),
     n_day_fit = nrow(all_season_fit_daily),
@@ -207,7 +207,7 @@ model_SIR_multiseason = function(params=NULL, all_season=NULL, country_short_inp
   )
   fit00=rstan::stan(
     file='./stan/SIR_simple_multiseason.stan',
-    chains=1 ,thin=1,iter=1000,
+    chains=1 ,thin=1,iter=500,
     seed=12, cores = getOption("mc.cores", 1L),
     control=list(
       #adapt_delta=0.9,
@@ -222,18 +222,19 @@ model_SIR_multiseason = function(params=NULL, all_season=NULL, country_short_inp
   precis(fit00,pars=c("SIR_ini"),depth = 3)
   
   
-  p = fit00 %>% gather_draws(severe_mean_weekly[n]) %>% 
+  p2 = fit00 %>% gather_draws(severe_mean_weekly[n]) %>% 
     filter(.draw%in%c(1:20)) %>% select(-.chain,-.iteration) %>% ungroup() %>% 
     right_join(all_season_fit) %>% 
     ggplot(aes(date,value)) + 
-    geom_line(aes(y=.value,group=.draw),col="lightblue") +geom_line() + coord_cartesian(ylim=c(0,10000))
+    geom_line(aes(y=.value,group=.draw),col="lightblue") +geom_line() 
   
   # output
   modl = 
     list(
       fit = fit00,
       stan_list = stan_list,
-      p = p
+      pdata = p1,
+      pfit = p2
     )
   
   return(modl)
