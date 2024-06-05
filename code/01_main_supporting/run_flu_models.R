@@ -22,13 +22,24 @@ run_flu_models = function(params=NULL, data=NULL){
   if ( "SIR_simple_multi_season" %in% params$models_to_run ){
     # prepare data
     all_season = data_into_all_season(data,params,withforce=F)
+    
     modl = list()
     scenario_tag = "A"
+    target_input_v = c("ili","ili_typing_sentinel","ili_typing_all")
     country_short_input_v = all_season %>% filter_log(ili_sum>0) %>% pull(country_short) %>% unique()
-    #country_short_input_v = country_short_input_v[1:3]
-    for (country_short_input in country_short_input_v ) {
-      modl[[country_short_input]] = model_SIR_multiseason( params , all_season=all_season , country_short_input, scenario_tag)
+    for (target_input in target_input_v) {
+      for (country_short_input in country_short_input_v ) {
+        modl[[target_input]][[country_short_input]] = model_SIR_multiseason( params , all_season=all_season , target_input, country_short_input, scenario_tag)
+      }
     }
+    save(modl,file = "../Big data/modl.Rdata")
+    
+    
+    mcountry ="AT"
+    p1=modl[["ili"]][[mcountry]]$pdata
+    p2=modl[["ili_typing_sentinel"]][[mcountry]]$pdata
+    p3=modl[["ili_typing_all"]][[mcountry]]$pdata
+    p1/p2/p3
     
     df = NULL
     df_out %<>% bind_rows(df) # Add DK model to the df_out

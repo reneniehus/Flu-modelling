@@ -30,7 +30,7 @@ source("code/03_special_analyses/exploring_SIR/SIR_paras_explore.R") # explore w
 if (F) source("code/03_special_analyses/forecasting/norrsken.R") # forecasting modelling
 
 # temporary code for quick checking
-# ask Leah/Nick about overlap of sent and nonsent typing data [Asked Leah]
+# ask Leah/Nick about overlap of sent and nonsent typing data [Asked Leah]: very likely no overlap
 # fit ALL 25 countries: ILI
 # fit ALL 25 countries: ILI*sent_typing
 # eyeballing method: identify good and poor data/fits

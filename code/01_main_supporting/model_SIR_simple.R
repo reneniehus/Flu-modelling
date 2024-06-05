@@ -24,7 +24,7 @@ model_SIR_simple = function( params=NULL, data=NULL, country_short_input, date_v
   )
   fit02=rstan::stan(
     file='./stan/SIR_simple.stan',
-    chains=8 ,thin=8,iter=300,
+    chains=8 ,thin=8,iter=400,
     seed=12, cores = getOption("mc.cores", 1L),
     control=list(
       #adapt_delta=0.9,
@@ -143,8 +143,8 @@ model_SIR_simple = function( params=NULL, data=NULL, country_short_input, date_v
   return(axis_ids_simulate)
 }
 
-model_SIR_multiseason = function(params=NULL, all_season=NULL, country_short_input, scenario_tag ){
-  
+model_SIR_multiseason = function(params=NULL, all_season=NULL, target_input=NULL, country_short_input, scenario_tag ){
+  print(target_input)
   # ---- |-Filtering ----
   all_season %>% 
     filter(country_short == country_short_input) %>% 
@@ -159,7 +159,25 @@ model_SIR_multiseason = function(params=NULL, all_season=NULL, country_short_inp
     filter(!season%in%params$SIR_multiseason$seasons_exclude) %>% 
     select(country_short,season,date,value) %>% 
     mutate(n=1:n()) -> all_season_fit
-  #all_season_fit = all_season_fit %>% filter(season=="2016/2017")
+  
+  if (target_input=="ili_typing_sentinel") {
+    xtyping = all_season %>% filter(country_short==country_short_input) %>% 
+      unnest(c(typing_sentinel)) %>% filter(indicator=="positivity") %>% 
+      filter(!season%in%params$SIR_multiseason$seasons_exclude) %>% 
+      select(date,value_typing=value)
+    all_season_fit = all_season_fit %>% left_join(xtyping,by="date") %>% 
+      mutate(value=value*(value_typing/100)) %>% select(-value_typing)
+  }
+  if (target_input=="ili_typing_all") {
+    xtyping = all_season %>% filter(country_short==country_short_input) %>% 
+      unnest(c(typing_combined)) %>% filter(indicator=="positivity") %>% 
+      filter(!season%in%params$SIR_multiseason$seasons_exclude) %>% 
+      select(date,value_typing=value_add_narm) %>% 
+      mutate(value_typing=ifelse(is.nan(value_typing),NA,value_typing ) )
+    all_season_fit = all_season_fit %>% left_join(xtyping,by="date") %>% 
+      mutate(value=value*(value_typing)) %>% select(-value_typing)
+  }
+  
   
   # ---- |-Project df and weekly to daily ----
   # project df
@@ -205,28 +223,35 @@ model_SIR_multiseason = function(params=NULL, all_season=NULL, country_short_inp
     Rnull = params$Rnull,
     rate_infectious = params$rate_infectious
   )
-  fit00=rstan::stan(
-    file='./stan/SIR_simple_multiseason.stan',
-    chains=1 ,thin=1,iter=500,
-    seed=12, cores = getOption("mc.cores", 1L),
-    control=list(
-      #adapt_delta=0.9,
-      #max_treedepth=14
-    ),
-    data=stan_list
-  ) # X mins
-  fit00@model_pars
-  precis(fit00,pars=c("Rnull_eff"),depth = 2)
-  precis(fit00,pars=c("prop_severe"),depth = 2)
-  precis(fit00,pars=c("sigma_s"),depth = 2) # 3.66
-  precis(fit00,pars=c("SIR_ini"),depth = 3)
+  p2 = NULL
+  if (T) {
+    fit00=rstan::stan(
+      file='./stan/SIR_simple_multiseason.stan',
+      chains=5 ,thin=5,iter=400,
+      seed=12, cores = getOption("mc.cores", 1L),
+      control=list(
+        #adapt_delta=0.9,
+        #max_treedepth=14
+      ),
+      data=stan_list
+    ) # 2.3 mins
+    fit00@model_pars
+    
+    precis(fit00,pars=c("SIR_ini_mu"),depth = 2)
+    precis(fit00,pars=c("Rnull_eff"),depth = 2)
+    precis(fit00,pars=c("prop_severe"),depth = 2)
+    precis(fit00,pars=c("sigma_s"),depth = 2) # 3.66
+    precis(fit00,pars=c("SIR_ini"),depth = 3)
+    
+    p2 = fit00 %>% gather_draws(severe_mean_weekly[n]) %>% 
+      filter(.draw%in%c(1:20)) %>% select(-.chain,-.iteration) %>% ungroup() %>% 
+      right_join(all_season_fit) %>% 
+      ggplot(aes(date,value)) + 
+      geom_line(aes(y=.value,group=.draw),col="lightblue") +geom_line() 
+  }
   
   
-  p2 = fit00 %>% gather_draws(severe_mean_weekly[n]) %>% 
-    filter(.draw%in%c(1:20)) %>% select(-.chain,-.iteration) %>% ungroup() %>% 
-    right_join(all_season_fit) %>% 
-    ggplot(aes(date,value)) + 
-    geom_line(aes(y=.value,group=.draw),col="lightblue") +geom_line() 
+  print(paste(target_input,"done"))
   
   # output
   modl = 

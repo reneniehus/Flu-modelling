@@ -1,4 +1,7 @@
 ```{r}
 all_season = data_into_all_season(data,params,withforce=F)
 all_season
+
+# number of tests has increased about 5 fold
+all_season %>% filter(ili_sum>1) %>% filter((replace_na(tests_sentinel,0)+replace_na(tests_nonsentinel,0))>0) %>% group_by(season) %>% summarise(x=sum((replace_na(tests_sentinel,0)+replace_na(tests_nonsentinel,0)))) %>% arrange(x) %>% print(n=28)
 ```
