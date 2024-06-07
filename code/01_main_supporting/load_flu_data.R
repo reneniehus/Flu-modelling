@@ -1,7 +1,13 @@
-load_flu_data = function( params=NULL,withforce=F, new_from_online=T ){
+# 1: defining functions that load each data stream
+# 2: define a mother function that calls each data stream function
+
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+### Defining data-loading functions for each data stream ##########
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+load_flu_data_epi = function(data=data, params=NULL , new_from_online=T , regenerate=T ){
   
-  file_doesnot_exist = !file.exists("output/data_erviss.Rdata")
-  if ( file_doesnot_exist|withforce==T ) {
+  file_doesnot_exist = !file.exists("output/epi.Rdata")
+  if ( file_doesnot_exist|regenerate==T ) {
     
     if (new_from_online==T) {
       # load data freshly from the internet
@@ -60,16 +66,108 @@ load_flu_data = function( params=NULL,withforce=F, new_from_online=T ){
       )) %>% 
       mutate(country_short=EU_short(countryname)) 
     
-    data_erviss=list(
+    epi = list(
       date_list_created = today(),
       erviss_ili_ari = erviss_ili_ari,
       erviss_typing_sentinel = data_sentinel_detections,
       erviss_typing_nonsentinel = data_nonsentinel_detections
     )
-    save(data_erviss,file="output/data_erviss.Rdata")
-  } else { load(file="output/data_erviss.Rdata") }
+    save(epi,file="output/epi.Rdata")
+    
+  } else { load(file="output/epi.Rdata") }
   
-  return(data_erviss)
+  # adding to data 
+  data$epi = epi
+  
+  return(data)
 }
 
+load_flu_data_vax = function(data=data, params=NULL , new_from_online=T , regenerate=T ){
+  file_doesnot_exist = !file.exists("output/vax.Rdata")
+  if ( file_doesnot_exist|regenerate==T ) {
+    
+    if (new_from_online==T) {
+      # load data freshly from the internet
+    }
+    if (new_from_online==F) {
+      # load data from local storage
+    }
+    
+    vax = list(
+    )
+    save(vax,file="output/vax.Rdata")
+    
+  } else { load(file="output/vax.Rdata") }
+  
+  # adding to data 
+  data$vax = vax
+  
+  return(data)
+}
+
+load_flu_data_contact = function(data=data, params=NULL , new_from_online=T , regenerate=T ){
+  file_doesnot_exist = !file.exists("output/contact.Rdata")
+  if ( file_doesnot_exist|regenerate==T ) {
+    
+    if (new_from_online==T) {
+      # load data freshly from the internet
+    }
+    if (new_from_online==F) {
+      # load data from local storage
+    }
+    
+    dat_contact = list(
+    )
+    save(dat_contact,file="output/contact.Rdata")
+    
+  } else { load(file="output/contact.Rdata") }
+  
+  # adding to data 
+  data$contact = dat_contact
+  
+  return(data)
+}
+
+load_flu_data_demography = function(data=data, params=NULL , new_from_online=F , regenerate=T ){
+  file_doesnot_exist = !file.exists("output/demography.Rdata")
+  if ( file_doesnot_exist|regenerate==T ) {
+    
+    if (new_from_online==T) {
+      # load data freshly from the internet
+    }
+    if (new_from_online==F) {
+      # load data from local storage
+      mdat = read_fst(path="data/population_pyramid.fst") %>% as_tibble()
+    }
+    
+    dat_demography = list(
+      population_pyramid = mdat
+    )
+    save(dat_demography,file="output/demography.Rdata")
+    
+  } else { load(file="output/demography.Rdata") }
+  
+  # adding to data 
+  data$demography = dat_demography
+  
+  return(data)
+}
+
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+### Mother function: calling the data-loading functions for each data stream ##########
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+load_flu_data = function( params=NULL , new_from_online=T, regenerate=F ){
+  
+  data = list() # reset data list
+  
+  data = load_flu_data_epi( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
+  
+  data = load_flu_data_vax( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
+  
+  data = load_flu_data_contact( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
+  
+  data = load_flu_data_demography( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
+  
+  return(data)
+}
 

@@ -1,8 +1,10 @@
-model_SIR_simple = function( params=NULL, data=NULL, country_short_input, date_v_fit, scenario_tag){
+model_SIR_simple = function( params=NULL, dat=NULL, country_short_input, date_v_fit ){
+  
+  scenario_tag = "A"
   
   # ---- |-Fitting ----
   # prepare data for stan fit
-  data_mock = data %>% 
+  data_mock = dat %>% 
     filter(country_short == country_short_input, 
            target == params$SIR_simple$target, 
            agegroup == params$SIR_simple$agegroup) # 
@@ -58,8 +60,7 @@ model_SIR_simple = function( params=NULL, data=NULL, country_short_input, date_v
   ## vaccine uptake
   list_vaccine_id = list()
   list_vaccine_id[[1]] = list(
-    vaccine_uptake = structure(c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-                                 0, 0, 0), dim = c(20L, 1L), dimnames = list(NULL, "value")),
+    vaccine_uptake = matrix(0*list_transmission[[1]]$value,ncol=1),
     VE_severe = 0.7
   )
   ## severity
@@ -77,10 +78,12 @@ model_SIR_simple = function( params=NULL, data=NULL, country_short_input, date_v
   
   ## loop through axis_ids_simulate 
   for (sim_i in 1:nrow(axis_ids_simulate) ) {
+    ## ---- |-Get axis IDs ----
     transmission_id = axis_ids_simulate$transmission_id[sim_i]
     vaccine_id = axis_ids_simulate$vaccine_id[sim_i]
     severe_id = axis_ids_simulate$severe_id[sim_i]
     
+    ## ---- |-Prepare the details for each axis ----
     # prepare transmission
     transmission_df = list_transmission[[ transmission_id ]]
     incident_infections = transmission_df %>% select(value) %>% as.matrix() # format: [t,a]
@@ -97,8 +100,8 @@ model_SIR_simple = function( params=NULL, data=NULL, country_short_input, date_v
     sev_fact = severity_factor(
       incident_infections,
       severity_baseline,
-      vax_sev$severity_factor_vaccines,
-      nat_sev$severity_factor_natural,
+      severity_factor_vaccines=vax_sev$severity_factor_vaccines,
+      severity_factor_natural=nat_sev$severity_factor_natural,
       severity_options
     )
     # run: combine all targets -> mysim
@@ -107,6 +110,31 @@ model_SIR_simple = function( params=NULL, data=NULL, country_short_input, date_v
                                            vaccine_uptake,
                                            incident_severe=sev_fact$incident_severe)
     axis_ids_simulate$sim[sim_i] = nest(mysim)[[1,1]]
+    
+    
+    # Columns in the resulting df_out (as per: https://docs.google.com/document/d/13adcxpPdlDvJM5eiFSkMzlWMTcwsx6lVjY25JA26iS4/edit):
+    # model_id
+    # round_id ["2024_2025_1_FLU1"]
+    # scenario_id ["A","B"], target [allowed targets], location ["DE","FR"] 
+    # pop_group ["0-12","13-65"], horizon [week integer], target_end_date [Date string ('YYYY-MM-DD')]
+    # output_type ["sample"], output_type_id [string: "1","2","3",...], value [float limited to 2 decimals]
+    
+    # making up a fictive result as placeholder
+    mdf = tibble(
+      model_id = "ECDC_lefluflu",
+      round_id = params$scenario_round_id,
+      scenario_id = scenario_tag,
+      target = "inc infection",
+      location = country_short_input,
+      pop_group = params$SIR_simple$agegroup,
+      horizon = c(1,2,3,4),
+      target_end_date = today()+(c(1,2,3,4)-1)*7,
+      output_type = "sample",
+      output_type_id = 1,
+      value = c(12,25,12,12)
+    )
+    
+    return(mdf)
   }
   
   
@@ -143,7 +171,7 @@ model_SIR_simple = function( params=NULL, data=NULL, country_short_input, date_v
   return(axis_ids_simulate)
 }
 
-model_SIR_multiseason = function(params=NULL, all_season=NULL, target_input=NULL, country_short_input, scenario_tag ){
+model_SIR_multiseason = function(params=NULL, all_season=NULL, target_input=NULL, country_short_input ){
   print(target_input)
   # ---- |-Filtering ----
   all_season %>% 
@@ -265,11 +293,10 @@ model_SIR_multiseason = function(params=NULL, all_season=NULL, target_input=NULL
   return(modl)
 }
 
-
-model_SIR_simple_r0 = function( params=NULL, data=NULL, country_short_input, date_v_fit,season, scenario_tag){
+model_SIR_simple_r0 = function( params=NULL, dat=NULL,pop_country, country_short_input, date_v_fit,season){
   
   # prepare data for stan fit
-  data_mock = data %>% 
+  data_mock = dat %>% 
     filter(country_short == country_short_input, 
            target == params$SIR_simple$target, 
            agegroup == params$SIR_simple$agegroup) # 
@@ -284,9 +311,9 @@ model_SIR_simple_r0 = function( params=NULL, data=NULL, country_short_input, dat
   
   stan_list = list(
     n_week_fit = nrow(data_mock_fit),
-    severe_obs_fit = data_mock_fit$value,
+    severe_obs_fit = as.integer(data_mock_fit$value),
     n_week_project = nrow(data_mock_project),
-    pop = 9e6,
+    pop = pop_country,
     Rnull = params$Rnull,
     rate_infectious = params$rate_infectious
   )

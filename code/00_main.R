@@ -1,10 +1,11 @@
-# script that outlines the work flow for BOTH flu forecasting and scenario modelling
+# main script that outlines the work flow for BOTH flu forecasting and scenario modelling
+
 # ---- |-Set up ----
 source("code/01_main_supporting/setup.R")
 
 # ---- |-load task specific settings ----
-source("code/02_settings/settings_version0.R") # changed by the user
-params=settings() # calls the function that creates the params-list
+source("code/02_settings/settings_version0.R") # this script is what is changed by a high-level user
+params=settings() # creates the params-list
 
 # sourcing other files, models etc
 source("code/01_main_supporting/flu_functions.R")
@@ -24,18 +25,11 @@ models_out = run_flu_models( params, data ) # runs the model scripts
 process_and_save( params, models_out ) # processing the model output, with figures and saves
 
 # ---- |- Run special analyses
-source("code/03_special_analyses/season_country_var_rt.R")
-source("code/03_special_analyses/erviss_data_look.R")
-source("code/03_special_analyses/exploring_SIR/SIR_paras_explore.R") # explore what SIR paras do
+if (F) source("code/03_special_analyses/season_country_var_rt.R")
+if (F) source("code/03_special_analyses/erviss_data_look.R")
+if (F) source("code/03_special_analyses/exploring_SIR/SIR_paras_explore.R") # explore what SIR paras do
 if (F) source("code/03_special_analyses/forecasting/norrsken.R") # forecasting modelling
 
-# temporary code for quick checking
-# ask Leah/Nick about overlap of sent and nonsent typing data [Asked Leah]: very likely no overlap
-# fit ALL 25 countries: ILI
-# fit ALL 25 countries: ILI*sent_typing
-# eyeballing method: identify good and poor data/fits
-# unless all fits look amazing: fit ALL 25 countries: ILI*nonsent_typing
-# -> compare fitted parameters  ILI*sent_typing versus ILI*nonsent_typing
+# (temporary code for any quick checking)
 
-# fit all poor-fit countries: ILI*nonsent_typic (or combination of sent&nonsent)
-models_out$multiseason$p
+
