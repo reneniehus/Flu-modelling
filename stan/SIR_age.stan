@@ -1,11 +1,13 @@
 // A script that fits to previous season, uses the same inition S,I,R values as well as same beta, prop severe, run the model for this year
 data {
+  // n_scenarios
+  // how do you want delta to change +/- 10%
   int n_week_fit; // number of observed values, weekly
   int n_week_project; // number of projected values, weekly
   int n_age_groups; // number of age
   int severe_obs_fit[n_week_fit, n_age_groups]; // observed hospitalisations
   real pop; // population size
-  row_vector[n_age_groups] pop_age_group; // population size per age group 
+  matrix[n_age_groups,1] pop_age_group; // population size per age group 
   matrix[n_age_groups, n_age_groups] contact_matrix; //contact matrix
   real Rnull; // R0
   real rate_infectious; // infectious rate, such that beta = Rnull*rate_infectious
@@ -23,12 +25,12 @@ parameters {
   real<lower=0, upper=1> reciprocal_phi; // overdipersion parameter for severe obs fit
 }
 transformed parameters {
-  vector[3] SIR_ini[n_age_groups]; 
+  matrix<lower=0, upper=1>[3,n_age_groups] SIR_ini; 
   // S I R initial values age dist corrected
   for(a in 1:n_age_groups){
-    SIR_ini[1,a] = SIR_init[1,a] * pop_age_group[a] / pop;
-    SIR_ini[2,a] = SIR_init[1,a] * pop_age_group[a] / pop;
-    SIR_ini[3,a] = SIR_init[1,a] * pop_age_group[a] / pop;
+    SIR_ini[1,a] = SIR_init[a,1] * pop_age_group[a,1] / pop;
+    SIR_ini[2,a] = SIR_init[a,2] * pop_age_group[a,1] / pop;
+    SIR_ini[3,a] = SIR_init[a,3] * pop_age_group[a,1] / pop;
   }
   
   // time loop
@@ -64,7 +66,7 @@ transformed parameters {
     R[t,a] = R[t-1,a] + delta_R;
     //
     delta_severe[t,a] = delta_infective_exposures * prop_severe[a]; 
-    severe_mean[t,a] = delta_severe[t,a] * pop_age_group[a];
+    severe_mean[t,a] = delta_severe[t,a] * pop_age_group[a,1];
     }
   }
   // fill first position in other vectors
@@ -98,8 +100,8 @@ generated quantities {
   matrix<lower=0,upper=1>[n_day_project, n_age_groups] gen_S;
   matrix<lower=0,upper=1>[n_day_project, n_age_groups] gen_I;
   matrix<lower=0,upper=1>[n_day_project, n_age_groups] gen_R;
-  matrix<lower=0,upper=1>[n_day_project, n_age_groups] gen_delta_severe;
-  matrix<lower=0,upper=1>[n_day_project, n_age_groups] gen_severe_mean;
+  matrix<lower=0>[n_day_project, n_age_groups] gen_delta_severe;
+  matrix<lower=0>[n_day_project, n_age_groups] gen_severe_mean;
   array[n_week_project, n_age_groups] int<lower=0> gen_severe_obs_project;
   array[n_week_project, n_age_groups] int<lower=0> gen_severe_obs_fit;
   array[n_week_project, n_age_groups] real gen_severe_mean_weekly;
@@ -115,7 +117,7 @@ generated quantities {
       real delta_S;
       real delta_I;
       real delta_R;
-      real delta_infective_exposures;
+      real delta_infective_exposures; // to do: make into a matrix (dim per scenario)
       //
       if (t==1) { // set initial conditions
         gen_S[t,a] = SIR_ini[1,a];
@@ -132,7 +134,7 @@ generated quantities {
         gen_R[t,a] = gen_R[t-1,a] + delta_R;
         //
         gen_delta_severe[t,a] = delta_infective_exposures * prop_severe[a]; 
-        gen_severe_mean[t,a] = gen_delta_severe[t,a] * pop_age_group[a] ;
+        gen_severe_mean[t,a] = gen_delta_severe[t,a] * pop_age_group[a,1] ;
         //
       if (t==2) { // also impute the first position
          gen_severe_mean[1,a] = gen_severe_mean[2,a];
