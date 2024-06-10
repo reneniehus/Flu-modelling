@@ -105,12 +105,19 @@ model {
     if (severe_obs_notna[t]==1) severe_obs_fit[t] ~ neg_binomial_2( severe_mean_weekly[t], phi ) ;
   }
   
+  logit(prop_severe_mu ) ~ normal(0,1.5);
+  logit(SIR_ini_mu[1] ) ~ normal(0,1.5);
+  logit(SIR_ini_mu[3] ) ~ normal(0,1.5);
+  logit(reciprocal_phi) ~ normal(0,1.5);
+  
   logit(prop_severe[]) ~ normal( logit(prop_severe_mu ) , sigma_prop_severe );
   logit( SIR_ini[,1] ) ~ normal( logit(SIR_ini_mu[1] ) , sigma_s );
   logit( SIR_ini[,2] ) ~ normal( logit(SIR_ini_mu[2] ) , sigma_i );
   sigma_prop_severe    ~ exponential(5);
   sigma_s ~ exponential(5);
   sigma_i ~ exponential(1);
+  
+  
 }
 
 generated quantities {

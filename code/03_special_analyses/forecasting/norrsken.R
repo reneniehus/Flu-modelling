@@ -1,5 +1,6 @@
 
 
+source("code/01_main_supporting/setup.R")
 
 # ---- |-Respicasting: Norrsken ----
 # starting a forecasting script for RespiCast
@@ -15,12 +16,12 @@ aux = list()
 aux$pops = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/covid19-forecast-hub-europe/main/data-locations/locations_eu.csv",
                     show_col_types=F)
 
-source("./code/respicasting_ILI.R")
-source("./code/respicasting_ARI.R")
+source("./code/03_special_analyses/forecasting/respicasting_ILI.R")
+source("./code/03_special_analyses/forecasting/respicasting_ARI.R")
 # covid
-source("./code/respicasting_covid_cases.R")
-source("./code/respicasting_covid_death.R")
-source("./code/respicasting_covid_hosp.R")
+source("./code/03_special_analyses/forecasting/respicasting_covid_cases.R")
+source("./code/03_special_analyses/forecasting/respicasting_covid_death.R")
+source("./code/03_special_analyses/forecasting/respicasting_covid_hosp.R")
 # merge: case,death,hosp
 if (T){
   # forecast_date
