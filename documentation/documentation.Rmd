@@ -1,30 +1,51 @@
 ---
-title: "SIR flu model documentation"
+title: "Flu model documentation"
 output: html_document
 date: "2024-06-10"
-author: "Fanny Bergstrom"
+author: "Fanny Bergström"
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Introduction
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+This document describes an age and vaccination dissaggregated SIR model.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+## SIR
 
-```{r cars}
-summary(cars)
-```
+We consider a population consisting of $N$ individuals.  The population is divided into three compartments: the susceptible, infectious and removed compartments. Their sizes, at any time $t$ for an age class $a$, are denoted by $S^{(a)}(t)$, $I^{(a)}(t)$ and $R^{(a)}(t)$ respectively. We also use a community contact rate $\beta$. We let the rate of recovery be denoted $\gamma$.
 
-## Including Plots
+We use a contact matrix $C$, with elements $C_{a',a}$ being the average number of contacts an individual in age group $a'$ has with individuals in age group $a$ within 24h. 
 
-You can also embed plots, for example:
+We let $vacc(t)$ be the fraction of new people being vaccinated on day $t$. Subscript $u$ and $v$ are used to distinguish between the unvaccinated and vaccinated groups with one or two doses. We further let $ve_{inf}$, $ve_{susc}$ and $ve_{severe}$ be the vaccine efficacy in terms of infectiousness, susceptibility and mortality. 
 
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
+The SIR model is specified as follows
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+\begin{aligned}
+S_u^{(a)}(t) & = S_u^{(a)}(t-1) - vacc^{(a)}(t-1) \frac{S_u^{(a)}(t-1) }{S_u^{(a)}(t-1) +R_u^{(a)}(t-1) }\\
+   & -\beta\sum_{a'} C_{a',a}  \big(I_u^{(a')}(t-1)+ (1-ve_{inf}) (I_{v}^{(a')}(t-1)\big) S_u^{(a)}(t-1) \\
+   \\
+ S_{v}^{(a)}(t) & = S_{v}^{(a)}(t-1) + vacc^{(a)}(t-1) \frac{S_u^{(a)}(t-1) }{S_u^{(a)}(t-1)  +R_u^{(a)}(t-1) }\\
+  &-\beta\sum_{a'} C_{a',a}  \big(I_u^{(a')}(t-1)+ (1-ve_{inf}) (I_{v}^{(a')}(t-1)\big)     S_{v}^{(a)(t-1)}(1-ve_{susc}) \\
+\\
+I_u^{(a)}(t) & = I_u^{(a)}(t-1)+ \beta\sum_{a'} C_{a',a}  \big(I_u^{(a')}(t-1)+ (1-ve_{inf}) (I_{v}^{(a')}(t-1)\big) S_u^{(a)}(t-1) - \gamma I_u^{(a)}(t - 1)  \\
+                \\
+I_{v}^{(a)}(t) & = I_{v}^{(a)}(t-1) + \beta\sum_{a'} C_{a',a}  \big(I_u^{(a')}(t-1)+ (1-ve_{inf}) (I_{v}^{(a')}(t-1)\big) S_{v}^{(a)}(t-1) - \gamma I_{v}^{(a)}(t - 1)  \\
+                \\                
+R_u^{(a)}(t) & = R_u^{(a)}(t-1) + \gamma I_u^{(a)}(t - 1) - vacc^{(a)}(t-1) \frac{R_u^{(a)}(t-1) }{S_u^{(a)}(t-1) + R_u^{(a)}(t-1) } \\ 
+
+R_{v}^{(a)}(t) & = R_{v}^{(a)}(t-1) + \gamma I_{v}^{(a)}(t - 1) + vacc^{(a)}(t-1) \frac{R_u^{(a)}(t-1) }{S_u^{(a)}(t-1) + R_u^{(a)}(t-1) }.
+
+\end{aligned}
+
+
+We let both susceptible and recovered be vaccinated proportional to their size at time $t$, assuming that you will not get vaccinated during the time of being infectious.
+
+
+## Data
+
+For the contact matrix $C$, we use estimated from the study ["Projecting social contact matrices in 152 countries using contact surveys and demographic data" (Prem et al, 2017)](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1005697). This study provides model based estimates of the expected number of contacts of an individual in age-group $a'$ with individuals from age-group $a$ within 24h.
+
+
