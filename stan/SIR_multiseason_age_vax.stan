@@ -1,11 +1,11 @@
 // A script that fits to previous season, uses the same inition S,I,R values as well as same beta, prop severe, run the model for this year
 data {
   // n_scenarios;// eg delta change +/- 10%
-  int n_season;
-  int n_week_fit; // number of observable values, weekly
-  int n_day_fit; // number of obervatble values, daily
-  int n_week_project; // number of projected values, weekly
-  int n_age_groups; // number of age groups
+  int n_season;      // number of seasons
+  int n_week_fit;    // number of observable values, weekly
+  int n_day_fit;     // number of obervatble values, daily
+  int n_week_project;// number of projected values, weekly
+  int n_age_groups;  // number of age groups
   int severe_obs_fit[n_week_fit, n_age_groups]; // observed hospitalisations
   array[n_week_fit]int<lower=0,upper=1> severe_obs_notna; // indicating non-missing data with 1, otherwise 0
   array[n_day_fit] int<lower=0,upper=2> season_start; // indicating first week of a season with 1, the second week with 2, otherwise 0
@@ -28,8 +28,8 @@ transformed data {
 }
 
 parameters {
-  simplex[3] SIR_ini[n_season, n_age_groups]; // S I R
-  simplex[3] SIR_ini_mu[n_age_groups];// overall mean over season
+  simplex[3] SIR_ini[n_season, n_age_groups]; // S I R initial values per season
+  simplex[3] SIR_ini_mu[n_age_groups]; // overall season mean 
   
   real<lower=0, upper=1> prop_severe[n_season, n_age_groups]; // proportion of infections that are severe (aka ILIs)
   real<lower=0, upper=1> prop_severe_mu[n_age_groups]; // overall mean over season 
@@ -45,10 +45,10 @@ transformed parameters {
   
   // daily stuff
   // SIR compartments unvaccinated and vaccinated
-  matrix<lower=0, upper=1>[n_day_fit,n_age_groups] S_u;
+  matrix<lower=0, upper=1>[n_day_fit,n_age_groups] S_u; // unvaccinated
   matrix<lower=0, upper=1>[n_day_fit,n_age_groups] I_u;
   matrix<lower=0, upper=1>[n_day_fit,n_age_groups] R_u;
-  matrix<lower=0, upper=1>[n_day_fit,n_age_groups] S_v;
+  matrix<lower=0, upper=1>[n_day_fit,n_age_groups] S_v; // vaccinated
   matrix<lower=0, upper=1>[n_day_fit,n_age_groups] I_v;
   matrix<lower=0, upper=1>[n_day_fit,n_age_groups] R_v;
   array[n_day_fit,n_age_groups] real<lower=0, upper=1> delta_severe;
@@ -77,15 +77,14 @@ transformed parameters {
       // initiate the compartments based on current season\
       // S I R initial values age dist corrected
       for(a in 1:n_age_groups){
-        S_u[t,a] = SIR_ini[season_id[t], a,1] * pop_age_group[a,1] / pop; // rescaled
-        I_u[t,a] = SIR_ini[season_id[t], a,2] * pop_age_group[a,1] / pop;
-        R_u[t,a] = SIR_ini[season_id[t], a,3] * pop_age_group[a,1] / pop;
-        S_v[t,a] = 0;  // Adding a small number to avoid dividing by 0
-        I_v[t,a] = 0;  // Adding a small number to avoid dividing by 0
-        R_v[t,a] = 0;  // Adding a small number to avoid dividing by 0
+        S_u[t,a] = SIR_ini[season_id[t], a, 1] * pop_age_group[a, 1] / pop; // rescaled
+        I_u[t,a] = SIR_ini[season_id[t], a, 2] * pop_age_group[a, 1] / pop;
+        R_u[t,a] = SIR_ini[season_id[t], a, 3] * pop_age_group[a, 1] / pop;
+        S_v[t,a] = 0;  // initaillay noone is vaccinated
+        I_v[t,a] = 0; 
+        R_v[t,a] = 0; 
         
       }
-      
       
     } else {
       for(a in 1:n_age_groups){  
@@ -99,7 +98,6 @@ transformed parameters {
         delta_R_u = I_u[t-1,a]*rate_infectious; 
         delta_R_v = I_v[t-1,a]*rate_infectious; 
         
-        //
         S_u[t,a] = S_u[t-1,a] + delta_S_u - delta_vax[t-1,a] * S_u[t-1,a] / (S_u[t-1,a] + R_u[t-1,a]);
         S_v[t,a] = S_v[t-1,a] + delta_S_v + delta_vax[t-1,a] * S_u[t-1,a] / (S_u[t-1,a] + R_u[t-1,a]);
         I_u[t,a] = I_u[t-1,a] + delta_I_u;
