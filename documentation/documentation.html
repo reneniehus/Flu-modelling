@@ -360,58 +360,65 @@ display: none;
 <div id="introduction" class="section level2">
 <h2>Introduction</h2>
 <p>This document describes an age and vaccination dissaggregated SIR
-model.</p>
+model. We are fitting the model to weekly ILI incidence multiplied by
+flu-positivity in that same week.</p>
 </div>
 <div id="sir" class="section level2">
 <h2>SIR</h2>
 <p>We consider a population consisting of <span class="math inline">\(N\)</span> individuals. The population is divided
 into three compartments: the susceptible, infectious and removed
-compartments. Their sizes, at any time <span class="math inline">\(t\)</span> for an age class <span class="math inline">\(a\)</span>, are denoted by <span class="math inline">\(S^{(a)}(t)\)</span>, <span class="math inline">\(I^{(a)}(t)\)</span> and <span class="math inline">\(R^{(a)}(t)\)</span> respectively. We also use a
+compartments. Their sizes, at any time <span class="math inline">\(t\)</span> for an age class <span class="math inline">\(j\)</span>, are denoted by <span class="math inline">\(S^{(j)}(t)\)</span>, <span class="math inline">\(I^{(j)}(t)\)</span> and <span class="math inline">\(R^{(j)}(t)\)</span> respectively. We also use a
 community contact rate <span class="math inline">\(\beta\)</span>. We
 let the rate of recovery be denoted <span class="math inline">\(\gamma\)</span>.</p>
 <p>We use a contact matrix <span class="math inline">\(C\)</span>, with
-elements <span class="math inline">\(C_{a&#39;,a}\)</span> being the
-average number of contacts an individual in age group <span class="math inline">\(a&#39;\)</span> has with individuals in age group
-<span class="math inline">\(a\)</span> within 24h.</p>
-<p>We let <span class="math inline">\(vacc(t)\)</span> be the fraction
-of new people being vaccinated on day <span class="math inline">\(t\)</span>. Subscript <span class="math inline">\(u\)</span> and <span class="math inline">\(v\)</span> are used to distinguish between the
-unvaccinated and vaccinated groups with one or two doses. We further let
-<span class="math inline">\(ve_{inf}\)</span>, <span class="math inline">\(ve_{susc}\)</span> and <span class="math inline">\(ve_{severe}\)</span> be the vaccine efficacy in
-terms of infectiousness, susceptibility and mortality.</p>
+elements <span class="math inline">\(C_{i,j}\)</span> being the average
+number of contacts an individual in age group <span class="math inline">\(i\)</span> has with individuals in age group <span class="math inline">\(j\)</span> within 24h.</p>
+<p>We let <span class="math inline">\(vax(t)\)</span> be the fraction of
+new people being vaccinated on day <span class="math inline">\(t\)</span>. Subscript <span class="math inline">\(u\)</span> and <span class="math inline">\(v\)</span> are used to distinguish between the
+unvaccinated and vaccinated groups. We further let <span class="math inline">\(ve_{inf}\)</span>, <span class="math inline">\(ve_{susc}\)</span> and <span class="math inline">\(ve_{severe}\)</span> be the vaccine efficacy in
+terms of infectiousness, susceptibility and severe disease.</p>
 <p>The SIR model is specified as follows</p>
 <span class="math display">\[\begin{aligned}
-S_u^{(a)}(t) &amp; = S_u^{(a)}(t-1) - vacc^{(a)}(t-1)
-\frac{S_u^{(a)}(t-1) }{S_u^{(a)}(t-1) +R_u^{(a)}(t-1) }\\
-   &amp; -\beta\sum_{a&#39;} C_{a&#39;,a}  \big(I_u^{(a&#39;)}(t-1)+
-(1-ve_{inf}) (I_{v}^{(a&#39;)}(t-1)\big) S_u^{(a)}(t-1) \\
+S_u^{(j)}(t) &amp; = S_u^{(j)}(t-1) - vax^{(j)}(t-1)
+\frac{S_u^{(j)}(t-1) }{S_u^{(j)}(t-1) +R_u^{(j)}(t-1) }\\
+   &amp; -\beta\sum_{i} C_{i,j}  \big(I_u^{(i)}(t-1)+ (1-ve_{inf})
+(I_{v}^{(i)}(t-1)\big) S_u^{(j)}(t-1) \\
    \\
-S_{v}^{(a)}(t) &amp; = S_{v}^{(a)}(t-1) + vacc^{(a)}(t-1)
-\frac{S_u^{(a)}(t-1) }{S_u^{(a)}(t-1)  +R_u^{(a)}(t-1) }\\
-  &amp;-\beta\sum_{a&#39;} C_{a&#39;,a}  \big(I_u^{(a&#39;)}(t-1)+
-(1-ve_{inf})
-(I_{v}^{(a&#39;)}(t-1)\big)     S_{v}^{(a)(t-1)}(1-ve_{susc}) \\
+S_{v}^{(j)}(t) &amp; = S_{v}^{(j)}(t-1) + vax^{(j)}(t-1)
+\frac{S_u^{(j)}(t-1) }{S_u^{(j)}(t-1)  +R_u^{(j)}(t-1) }\\
+  &amp;-\beta\sum_{i} C_{i,j}  \big(I_u^{(i)}(t-1)+ (1-ve_{inf})
+(I_{v}^{(i)}(t-1)\big)     S_{v}^{(j)(t-1)}(1-ve_{susc}) \\
 \\
-I_u^{(a)}(t) &amp; = I_u^{(a)}(t-1)+ \beta\sum_{a&#39;}
-C_{a&#39;,a}  \big(I_u^{(a&#39;)}(t-1)+ (1-ve_{inf})
-(I_{v}^{(a&#39;)}(t-1)\big) S_u^{(a)}(t-1) - \gamma I_u^{(a)}(t - 1)  \\
+I_u^{(j)}(t) &amp; = I_u^{(j)}(t-1)+ \beta\sum_{i}
+C_{i,j}  \big(I_u^{(i)}(t-1)+ (1-ve_{inf}) (I_{v}^{(i)}(t-1)\big)
+S_u^{(j)}(t-1) - \gamma I_u^{(j)}(t - 1)  \\
                 \\
-I_{v}^{(a)}(t) &amp; = I_{v}^{(a)}(t-1) + \beta\sum_{a&#39;}
-C_{a&#39;,a}  \big(I_u^{(a&#39;)}(t-1)+ (1-ve_{inf})
-(I_{v}^{(a&#39;)}(t-1)\big) S_{v}^{(a)}(t-1) - \gamma I_{v}^{(a)}(t -
-1)  \\
+I_{v}^{(j)}(t) &amp; = I_{v}^{(j)}(t-1) + \beta\sum_{i}
+C_{i,j}  \big(I_u^{(i)}(t-1)+ (1-ve_{inf}) (I_{v}^{(i)}(t-1)\big)
+S_{v}^{(j)}(t-1) - \gamma I_{v}^{(j)}(t - 1)  \\
                 \\                
-R_u^{(a)}(t) &amp; = R_u^{(a)}(t-1) + \gamma I_u^{(a)}(t - 1) -
-vacc^{(a)}(t-1) \frac{R_u^{(a)}(t-1) }{S_u^{(a)}(t-1) + R_u^{(a)}(t-1) }
+R_u^{(j)}(t) &amp; = R_u^{(j)}(t-1) + \gamma I_u^{(j)}(t - 1) -
+vax^{(j)}(t-1) \frac{R_u^{(j)}(t-1) }{S_u^{(j)}(t-1) + R_u^{(j)}(t-1) }
 \\
 
-R_{v}^{(a)}(t) &amp; = R_{v}^{(a)}(t-1) + \gamma I_{v}^{(a)}(t - 1) +
-vacc^{(a)}(t-1) \frac{R_u^{(a)}(t-1) }{S_u^{(a)}(t-1) + R_u^{(a)}(t-1)
-}.
+R_{v}^{(j)}(t) &amp; = R_{v}^{(j)}(t-1) + \gamma I_{v}^{(j)}(t - 1) +
+vax^{(j)}(t-1) \frac{R_u^{(j)}(t-1) }{S_u^{(j)}(t-1) + R_u^{(j)}(t-1) }.
 
 \end{aligned}\]</span>
 <p>We let both susceptible and recovered be vaccinated proportional to
 their size at time <span class="math inline">\(t\)</span>, assuming that
 you will not get vaccinated during the time of being infectious.</p>
+</div>
+<div id="statistical-inference" class="section level2">
+<h2>Statistical inference</h2>
+<p>We assume an Negative Binomial distribution for the weekly ILI
+incidence multiplied by the flu positivity for that week.</p>
+<p>The SIR model is fitted on a daily scale and then</p>
+<p><span class="math display">\[
+\text{weekly ILI for age group } i \text{ at time } t\sim \text{NegBin}(
+\mu(t)^i, \phi ),
+\]</span> where <span class="math inline">\(\mu(t)^i\)</span> is the
+mean of the severe outcomes for age group <span class="math inline">\(i\)</span> for week <span class="math inline">\(t\)</span> and <span class="math inline">\(\phi\)</span> is the overdispersion parameter.</p>
 </div>
 <div id="data" class="section level2">
 <h2>Data</h2>
@@ -420,8 +427,8 @@ estimated from the study <a href="https://journals.plos.org/ploscompbiol/article
 social contact matrices in 152 countries using contact surveys and
 demographic data” (Prem et al, 2017)</a>. This study provides model
 based estimates of the expected number of contacts of an individual in
-age-group <span class="math inline">\(a&#39;\)</span> with individuals
-from age-group <span class="math inline">\(a\)</span> within 24h.</p>
+age-group <span class="math inline">\(i\)</span> with individuals from
+age-group <span class="math inline">\(j\)</span> within 24h.</p>
 </div>
 
 
