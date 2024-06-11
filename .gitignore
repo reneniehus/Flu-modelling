@@ -4,3 +4,4 @@
 .Ruserdata
 stan/SIR_simple.rds
 *.csv
+.RDataTmp

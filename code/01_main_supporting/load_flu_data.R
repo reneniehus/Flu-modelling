@@ -134,6 +134,44 @@ load_flu_data_demography = function(data=data, params=NULL , new_from_online=F ,
     
     if (new_from_online==T) {
       # load data freshly from the internet
+      # required libraries
+      source('db/logger.R')
+      source('db/sql_utils.R')
+      # Logger is needed for running SQL utils
+      logger <- forge_logger()(logLevel = 'INFO')
+      # This is where the SQL Profiles are stored (always needed)
+      dbDir <- 'db/'
+      # This is where the SQL templates are stored (needed only if you're using them)
+      SQLTemplatePath <- 'db/templates/sql/'
+      ## Querying simple data ----
+      pop_data <- read_data(table = 'out.DM_Population_ByCountryEU',
+                            connInfo = 'pop')
+      pop_data %>% as_tibble() %>% 
+        filter(ReportYear==2024,CountryCode%in%countries_short) %>% 
+        filter(AgeGroup %in% c("Age00_04",
+                               "Age05_09",
+                               "Age10_14",
+                               "Age15_19", # up to 16 years, single age brackets exist, too
+                               "Age20_24",
+                               "Age25_29",
+                               "Age30_34",
+                               "Age35_39",
+                               "Age40_44",
+                               "Age45_49",
+                               "Age50_54",
+                               "Age55_59",
+                               "Age60_64",
+                               "Age65_69",
+                               "Age70_74",
+                               "Age75_79",
+                               "Age80_84",
+                               "Age85_89",
+                               "Age90_94",
+                               "Age95+") ) %>% 
+        group_by(country=CountryCode,age_group=AgeGroup) %>% 
+        mutate(Population=as.numeric(Population)) %>% 
+        summarise(population=sum(Population)) %>% ungroup() -> mdat
+      write_fst(mdat,path="data/population_pyramid.fst")
     }
     if (new_from_online==F) {
       # load data from local storage
