@@ -238,9 +238,10 @@ c$matrix.per.capita %*% diag(c$demography$population)
 
 c$matrix.per.capita %*% diag() 
 
-path_core_functions <- "./"
+
 
 obtain_demography = function( country, ten_year_brackets = FALSE ){
+  path_core_functions <- "./"
   if ( ten_year_brackets ){
     if ( country == "Australia" ){
       #Source:  

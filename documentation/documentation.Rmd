@@ -6,7 +6,10 @@ author: "Fanny Bergström"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = F)
+library(readxl)
+library(tidyverse)
+library(fst)
 ```
 
 ## Introduction
@@ -55,8 +58,257 @@ $$
 $$
 where $\mu(t)^i$ is the mean of the severe outcomes for age group $i$ for week $t$ and $\phi$ is the overdispersion parameter.
 
-## Data
+## Contact matrix
 
-For the contact matrix $C$, we use estimated from the study ["Projecting social contact matrices in 152 countries using contact surveys and demographic data" (Prem et al, 2017)](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1005697). This study provides model based estimates of the expected number of contacts of an individual in age-group $i$ with individuals from age-group $j$ within 24h.
+For the contact matrix $C$, we use country specific estimates from the study ["Projecting social contact matrices in 152 countries using contact surveys and demographic data" (Prem et al, 2017)](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1005697). This study provides model based estimates of the expected number of contacts of an individual in age-group $i$ with individuals from age-group $j$ within 24h.
+
+The contact frequencies are provided in sixteen 5-year age-groups from age 0-4 until age 75-79.  
+
+Below is the contact matrix for Albania.
+
+```{r}
+# Using Albania as an example
+dat <- read_excel(here::here("./data/MUestimates_all_locations_1.xlsx"))
+
+dat_long = dat %>% 
+  mutate(age_group=factor(paste0(5*0:15, "-", 5*1:16-1),
+                          levels = paste0(5*0:15, "-", 5*1:16-1))) %>%
+  pivot_longer(cols=starts_with("X"), 
+               names_to = "contact_age",
+               values_to = "number_contacts") %>%
+  mutate(contact_age=factor(contact_age, levels = paste0("X", 1:16),
+                            labels = paste0(5*0:15, "-", 5*1:16-1)))
+dat_long %>% ggplot() +
+  geom_tile(aes(x=age_group, y=contact_age, fill = number_contacts)) +
+  scale_fill_gradient2(low = "white", mid="orange", high="darkred", 
+                        midpoint = 7, limits = c(0,15.1)) +
+  xlab("Age group") +
+  ylab("Contact age")
+```
+
+To specify new age groups we need to make some specific assumptions: 
+
+- The contact behavior within each 5-year age group is the same for all ages. Every member of an age-group $i$, e.g. 15-19 year old, has the same expected number of contacts with other age-groups.
+
+- The contacts of an individual with age-group $i$ to individual with age (in years) $k$ from age-group $j$ occur with a expected frequency corresponding to the share of individuals with age $k$ years in age-group $j$. 
+
+Based on these assumptions and in combination with the age distribution of each country, we can derive a contact matrix with 1-year resolution in the age-range 0-79 years.
+
+After obtaining this fine-grained contact matrix we can derive contact frequencies for arbitrary age-groups. For an individual of age $k$ years we can sum over all the expected contacts in each of the new age-groups $j$. To derive the expected number of contacts in a new age group $i$ with the age-group $j$ we calculate the weighted average of expected contacts for all individuals with age $k$ years in age-group $i$ where the weights correspond to the population share of individuals of age $k$ years within age-group $i$.
+
+Polymod only contains only information on contact frequencies for age-groups up to group 75-79. To obtain contact frequencies also for older individuals, we assume that individuals older than 79 show the same contact behavior to younger individuals than 79 year old. To derive expected number of contacts of young individuals with old individuals we assume that the share of individuals with age $k>79$ that one individual with age $l\leq79$ meets is the same as the share of individuals with age $k=79$. E.g., we assume that the expected number of contacts for an individual with age $l$ to an individual with age $k$ is $c_{l,k}=\frac{c_{l, 79}}{n_{79}} \times n_{k},\; k>79$, where $n_i$ is the number of individuals of age $i$ years.
+
+```{r}
+# code for demography
+obtain_demography = function( country, ten_year_brackets = FALSE ){
+  path_core_functions <- "./"
+  if ( ten_year_brackets ){
+    if ( country == "Australia" ){
+      #Source:  
+      #https://www.abs.gov.au/statistics/people/population/regional-population-age-and-sex/2021#data-download
+      #For 5 year age brackets, 0-4yr, 5-9yr, ..., 80-84yr, 85+yr
+      agegroup_sizes <- c(1509959, 
+                          1616774,
+                          1623892,
+                          1479632,	
+                          1623384,	
+                          1822031,	
+                          1899620,	
+                          1867387,	
+                          1654500,	
+                          1650035,	
+                          1611554,	
+                          1550507,	
+                          1465025,	
+                          1280143,
+                          1146773,	
+                          807195,	
+                          545408,	
+                          534260 )
+      agegroup_sizes <- c( "0-09yr"= sum( agegroup_sizes[ 1:2 ] ),
+                           "10-19yr"= sum( agegroup_sizes[ 3:4 ] ),
+                           "20-29yr"= sum( agegroup_sizes[ 5:6 ] ),
+                           "30-39yr"= sum( agegroup_sizes[ 7:8 ] ),
+                           "40-49yr"= sum( agegroup_sizes[ 9:10 ] ),
+                           "50-59yr"= sum( agegroup_sizes[ 11:12 ] ),
+                           "60-69yr"= sum( agegroup_sizes[ 13:14 ] ),
+                           "70-79yr"= sum( agegroup_sizes[ 15:16 ] ),
+                           "80+yr"= sum( agegroup_sizes[ 17:18 ] ) )
+    } else {
+      
+      suppressMessages(
+        df_demography <- read_excel( paste0( path_core_functions, "data/eurostat_demography_data_5year_brackets.xlsx" ), sheet=3 )
+      )
+      colnames( df_demography )[1] <- "A"
+      df_demography %<>% filter( grepl( "Prop", A ) | grepl( "GEO", A ) )
+      df_demography <- df_demography[ , which( !is.na( df_demography[1,] ) ) ]
+      colnames( df_demography )[1] <- "agegroup"
+      colnames( df_demography )[2:ncol(df_demography)] <- df_demography[1,2:ncol(df_demography)]
+      df_demography <- df_demography[2:nrow(df_demography),]
+      colnames( df_demography )[grepl( "Kosovo", colnames( df_demography ) )] <- "Kosovo"
+      colnames( df_demography )[grepl( "Germany", colnames( df_demography ) )] <- "Germany"
+      colnames( df_demography )[grepl( "European Union", colnames( df_demography ) )] <- "EU"
+      #5-9 years row is in the wrong place, reorder rows:
+      df_demography <- bind_rows( df_demography[1,], df_demography[12,], df_demography[2:11,], df_demography[13:17,] )
+      df_demography$agegroup <- str_remove(df_demography$agegroup, "Proportion of population aged ")
+      df_demography$agegroup <- str_replace(df_demography$agegroup, " years", "yr")
+      df_demography$agegroup[ df_demography$agegroup=="80yr and more"] <- "80+yr"
+      agegroup_distribution <- as.numeric( df_demography[[country]] )
+      agegroup_distribution <- c( "0-09yr"=sum( agegroup_distribution[ 1:2 ] ),
+                                  "10-19yr"=sum( agegroup_distribution[ 3:4 ] ),
+                                  "20-29yr"=sum( agegroup_distribution[ 5:6 ] ),
+                                  "30-39yr"=sum( agegroup_distribution[ 7:8 ] ),
+                                  "40-49yr"=sum( agegroup_distribution[ 9:10 ] ),
+                                  "50-59yr"=sum( agegroup_distribution[ 11:12 ] ),
+                                  "60-69yr"=sum( agegroup_distribution[ 13:14 ] ),
+                                  "70-79yr"=sum( agegroup_distribution[ 15:16 ] ),
+                                  "80+yr"= agegroup_distribution[ 17 ] )
+      agegroup_distribution <- agegroup_distribution/sum(agegroup_distribution)
+    }
+  }else{
+    #df_demography <- read_excel( paste0( path_core_functions, "data/eurostat_demography_data.xlsx" ), sheet=3 )
+    df_demography <- read_fst( paste0( path_core_functions, "data/eurostat_demography_data.fst" ) )
+    colnames( df_demography )[1] <- "A"
+    df_demography %<>% filter( grepl( "Prop", A ) | grepl( "GEO", A ) )
+    df_demography <- df_demography[ , which( !is.na( df_demography[1,] ) ) ]
+    colnames( df_demography )[1] <- "agegroup"
+    colnames( df_demography )[2:ncol(df_demography)] <- df_demography[1,2:ncol(df_demography)]
+    df_demography <- df_demography[2:nrow(df_demography),]
+    colnames( df_demography )[grepl( "Kosovo", colnames( df_demography ) )] <- "Kosovo"
+    colnames( df_demography )[grepl( "Germany", colnames( df_demography ) )] <- "Germany"
+    colnames( df_demography )[grepl( "European Union", colnames( df_demography ) )] <- "EU"
+    #5-9 years row is in the wrong place, reorder rows:
+    df_demography <- bind_rows( df_demography[1,], df_demography[8,], df_demography[2:7,], df_demography[9:13,] )
+    
+    df_demography$agegroup <- str_remove(df_demography$agegroup, "Proportion of population aged ")
+    df_demography$agegroup <- str_replace(df_demography$agegroup, " years", "yr")
+    df_demography$agegroup[ df_demography$agegroup=="80yr and more"] <- "80+yr"
+    agegroup_distribution <- as.numeric( df_demography[[country]] )
+    agegroup_distribution <- c( "0-04yr"=agegroup_distribution[ 1 ],
+                                "05-09yr"=agegroup_distribution[ 2 ],
+                                "10-14yr"=agegroup_distribution[ 3 ],
+                                "15-17yr"=agegroup_distribution[ 4 ]*3/5, #"15-17yr" is approximately 3/5*"15-19yr"
+                                "18-24yr"=agegroup_distribution[ 4 ]*2/5 + agegroup_distribution[ 5 ], #"19-24yr" is approximately 2/5*"15-19yr"+"20-24yr" 
+                                "25-49yr"=agegroup_distribution[ 6 ],
+                                "50-59yr"=agegroup_distribution[ 7 ] + agegroup_distribution[ 8 ],
+                                "60-69yr"=agegroup_distribution[ 9 ] + agegroup_distribution[ 10 ],
+                                "70-79yr"=agegroup_distribution[ 11 ] + agegroup_distribution[ 12 ],
+                                "80+yr"=agegroup_distribution[ 13 ] )/100
+  }
+  if ( country != "Australia" ){
+    #df_population <- read_excel(  paste0( path_core_functions, "data/eurostat_population.xlsx" ), sheet=3 )
+    df_population <- read_fst( paste0( path_core_functions, "data/eurostat_population.fst" ) )
+    df_population[ 18, 1 ] <- "Germany" 
+    country_row <- which( country == df_population[ ,1 ] )
+    country_population <- as.numeric( df_population[ country_row,24 ] )
+    agegroup_sizes <- country_population*agegroup_distribution
+  }
+  return( agegroup_sizes )
+}
+```
+
+
+
+```{r echo=TRUE}
+# Obs this code does not work yet but should follow what is written above. 
+# age_str should contain population for each year of age
+
+#age_str = obtain_demography("Albania")
+# 
+# age_str = age_str %>% group_by(age) %>%
+#   mutate(#pop = 
+#         #age=as.numeric((gsub("\\+", "", gsub("s", "", gsub(" year", "", age))))),
+#          age_group = cut(age, right=FALSE, breaks = c(seq(0,80, by=5), 101)))
+# 
+# age_str = age_str %>% mutate(age_group = as.character(age_group),
+#                    age_group = gsub(")", "", age_group),
+#                    age_group = gsub("\\[", "", age_group))
+# 
+# age_str = age_str %>% 
+#   mutate(lwr = as.numeric(sapply(age_str$age_group, 
+#                                  function(x) str_split(x, ",")[[1]][1])),
+#          upr = as.numeric(sapply(age_str$age_group, 
+#                                  function(x) str_split(x, ",")[[1]][2]))-1,
+#          age_group = paste0(lwr, "-", upr)) %>%
+#   select(age, pop, age_group) %>%
+#   arrange(age)
+# 
+# age_str = age_str %>% group_by(age_group) %>%
+#   mutate(share_age_group=pop/sum(pop)) %>% ungroup()
+```
+
+```{r echo=TRUE}
+# cont_yearly = expand_grid(age = unique(age_str$age), 
+#                           age_contact = unique(age_str$age))
+# cont_yearly = cont_yearly %>% left_join(age_str %>% 
+#                                           select(age, age_group, pop))
+# cont_yearly = cont_yearly %>% 
+#   left_join(age_str %>% 
+#               select(age_contact=age, 
+#                      age_group_contact = age_group,
+#                      share_age_group_contact = share_age_group,
+#                      pop_contact = pop))
+# 
+# cont_yearly = cont_yearly %>% 
+#   left_join(dat_long %>% rename(age_group_contact = contact_age))
+# 
+# cont_yearly = cont_yearly %>% 
+#   mutate(number_contacts = number_contacts*share_age_group_contact)
+# 
+# cont_yearly_80 = cont_yearly %>% filter(age>=80)
+# cont_yearly_0_79 = cont_yearly %>% filter(age<80)
+# 
+# # 80+ meet have same number of contacts with different age-groups as 79
+# cont_yearly_80 = cont_yearly_80 %>% select(-number_contacts) %>%
+#   left_join(cont_yearly_0_79 %>% filter(age==79) %>% 
+#               select(age_contact, number_contacts))
+# 
+# cont_yearly = rbind(cont_yearly_0_79, cont_yearly_80)
+# 
+# cont_yearly_cont_80 = cont_yearly %>% filter(age_contact >= 80)
+# cont_yearly_cont_0_79 = cont_yearly %>% filter(age_contact < 80)
+# 
+# cont_rate_to79 = cont_yearly_cont_0_79 %>% filter(age_contact==79) %>% 
+#   mutate(cont_79_div_pop_79 = number_contacts/pop_contact) %>% 
+#   select(age, cont_79_div_pop_79)
+# 
+# cont_yearly_cont_80 = cont_yearly_cont_80 %>% left_join(cont_rate_to79) %>% 
+#   mutate(number_contacts = pop_contact*cont_79_div_pop_79) %>%
+#   select(-cont_79_div_pop_79)
+# 
+# cont_yearly = rbind(cont_yearly_cont_0_79, cont_yearly_cont_80) %>%
+#   arrange(age, age_contact)
+```
+
+We can check the implementation of our *algorithm* by reproducing the original Polymod contact matrix from derived year-specific contact frequencies (using assumptions 1. and 2.).
+The results should be identical to the original Polymod contact matrix.
+
+
+```{r echo=TRUE}
+# cont_yearly = cont_yearly %>% 
+#   mutate(age_group_5 = cut(age, right=FALSE, breaks = c(seq(0,80, by=5))),
+#          age_group_cont_5 = cut(age_contact, right=FALSE, breaks = c(seq(0,80, by=5))),
+#          age_group_vac = cut(age, right=FALSE, 
+#                              breaks = c(0,12,16,18,30,40,50,60,70,80,90,101)),
+#          age_group_cont_vac = cut(age_contact, right=FALSE, 
+#                              breaks = c(0,12,16,18,30,40,50,60,70,80,90,101)))
+# 
+# cont_old = cont_yearly %>% 
+#   filter(age<80, age_contact<80) %>%
+#   group_by(age, age_group_cont_5) %>%
+#   summarise(age_group_5 = age_group_5[1],
+#             pop = pop[1], 
+#             number_contacts = sum(number_contacts)) %>%
+#   ungroup() %>%
+#   group_by(age_group_5, age_group_cont_5) %>%
+#   summarise(number_contacts = sum(pop*number_contacts)/sum(pop)) %>%
+#   ungroup()
+# 
+# cont_old %>% ggplot() +
+#   geom_tile(aes(x=age_group_5, y=age_group_cont_5, fill = number_contacts)) +
+#   scale_fill_gradient2(low = "white", mid="orange", high="darkred", 
+#                        midpoint = 7, limits = c(0,15.1))
+
+```
 
 
