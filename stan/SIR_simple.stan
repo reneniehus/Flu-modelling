@@ -17,6 +17,7 @@ transformed data {
 parameters {
   simplex[3] SIR_ini; // S I R
   real<lower=0, upper=1> prop_severe; // proportion of infections that are severe (aka ILIs?)
+  real<lower=0, upper=1> reciprocal_phi; // overdipersion parameter for severe obs fit
 }
 transformed parameters {
   real<lower=0, upper=1> pop_infect;
@@ -33,7 +34,8 @@ transformed parameters {
   array[n_day_fit] real<lower=0, upper=1> delta_severe;
   vector[n_day_fit] severe_mean;
   array[n_week_fit] real<lower=0> severe_mean_weekly;
-
+  real phi;
+  
   // full wave [from which we "learn" the relevant paramters for the wave in question]
   S[1] = SIR_ini[1];
   I[1] = SIR_ini[2];
@@ -69,13 +71,14 @@ transformed parameters {
     int day_end = day_start+6;
     severe_mean_weekly[i] = sum( severe_mean[day_start:day_end] );
   }
-  
+  // Overdispersion
+  phi = 1 / reciprocal_phi;
   
 }
 model {
   // starting wave, through scenarios
   for (t in 1:n_week_fit) {
-    severe_obs_fit[t] ~ poisson( severe_mean_weekly[t] ) ;
+    severe_obs_fit[t] ~ neg_binomial_2( severe_mean_weekly[t], phi ) ;
   }
 }
 generated quantities {
@@ -100,26 +103,26 @@ generated quantities {
     real delta_infective_exposures;
     //
     if (t==1) { // set initial conditions
-      gen_S[t] = SIR_ini[1];
-      gen_I[t] = SIR_ini[2];
-      gen_R[t] = 1 - (gen_S[t] + gen_I[t]);
+    gen_S[t] = SIR_ini[1];
+    gen_I[t] = SIR_ini[2];
+    gen_R[t] = 1 - (gen_S[t] + gen_I[t]);
     } else { // or update
-      delta_infective_exposures = beta_j*gen_S[t-1] *gen_I[t-1];
-      delta_S = -delta_infective_exposures;
-      delta_I = delta_infective_exposures - gen_I[t-1]*rate_infectious; 
-      delta_R = gen_I[t-1]*rate_infectious; 
-      //
-      gen_S[t] = gen_S[t-1] + delta_S;
-      gen_I[t] = gen_I[t-1] + delta_I;
-      gen_R[t] = gen_R[t-1] + delta_R;
-      //
-      gen_delta_severe[t] = delta_infective_exposures * prop_severe; 
-      gen_severe_mean[t] = gen_delta_severe[t]*pop ;
-      //
-      if (t==2) { // also impute the first position
-        gen_severe_mean[1] = gen_severe_mean[2];
-        gen_delta_severe[1] = gen_delta_severe[2];
-      }
+    delta_infective_exposures = beta_j*gen_S[t-1] *gen_I[t-1];
+    delta_S = -delta_infective_exposures;
+    delta_I = delta_infective_exposures - gen_I[t-1]*rate_infectious; 
+    delta_R = gen_I[t-1]*rate_infectious; 
+    //
+    gen_S[t] = gen_S[t-1] + delta_S;
+    gen_I[t] = gen_I[t-1] + delta_I;
+    gen_R[t] = gen_R[t-1] + delta_R;
+    //
+    gen_delta_severe[t] = delta_infective_exposures * prop_severe; 
+    gen_severe_mean[t] = gen_delta_severe[t]*pop ;
+    //
+    if (t==2) { // also impute the first position
+    gen_severe_mean[1] = gen_severe_mean[2];
+    gen_delta_severe[1] = gen_delta_severe[2];
+    }
     }
   }
   

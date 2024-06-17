@@ -110,8 +110,10 @@ run_flu_models = function( params=NULL , data=NULL ){
     start_time <- Sys.time()
     for (country_short_input_i in country_short_input_v) {
       
+      country_short_input_i_new = country_short_input_i
+      if (country_short_input_i=="GR") country_short_input_i_new = "EL"
       pop_country = data$demography$population_pyramid %>% 
-        filter(country==country_short_input_i,sex=="T") %>% pull(value) %>% sum()
+        filter(country==country_short_input_i_new) %>% pull(population) %>% sum()
       
       start_year = dat %>% filter(country_short==country_short_input_i) %>% pull(date) %>% min() %>% year() %>% as.numeric()
       while(start_year<=2022) {
@@ -135,21 +137,22 @@ run_flu_models = function( params=NULL , data=NULL ){
         df_i = df_i + 1
         
       } # season loop
-    } # country loop
+    } # country loop # Running: GR | season: 2014/2015 | sum inc: 17861.2
     end_time <- Sys.time()
     (end_time - start_time)
     
     
-    if (F){
+    if (T){
       df_collect %>% bind_rows -> x
-      write_csv(x,file="../Big data/Rt_country_season.csv")
+      write_csv(x,file="code/03_special_analyses/rt_season_country.csv")
     }
     x = read_csv(file="../Big data/Rt_country_season.csv")
+    x = read_csv(file="code/03_special_analyses/rt_season_country.xlsx")
     x = df_collect %>% bind_rows()
     (x$Rnull) %>% min()
     rnull_mu = x$Rnull %>% median()
     rnull_quant = x$Rnull %>% quantile(probs=c(0.2,0.8))
-    ((rnull_quant/rnull_mu )-1)*100
+    ((rnull_quant/rnull_mu )-1)*100 # -7.260273  8.877262 
   }
   
   if ( "last_year_burden" %in% params$models_to_run ){ # 

@@ -1,27 +1,28 @@
 # run special analysis for rt seasonal and country variability
 
-rt_df <- read_xlsx("code/special_analyses/rt_season_country.xlsx") %>% 
-  mutate(Rnull=as.numeric(Rnull),)
+rt_df = read_csv(file="../Big data/Rt_country_season.csv")
+rt_df = read_csv(file="code/03_special_analyses/rt_season_country.csv")
 
-df <- rt_df %>% mutate(
-  country = as.numeric(fct_inorder(country_short)),
-  season = as.numeric(fct_inorder(season))
-)
+# filter out pandemic seasons
+rt_df = rt_df %>% filter(!season%in%c("2019/2020","2020/2021","2021/2022"))
+df = rt_df
+
+((df$Rnull)/median(df$Rnull) )%>% quantile(probs = c(0.1,0.5,0.9))
 
 # prep data list
 stan_list <- list(
   N = nrow(df),
-  N_seasons = max(df$season),
-  N_countries = max(df$country),
-  country = df$country,
-  season = df$season,
+  N_seasons = n_distinct(df$season),
+  N_countries = n_distinct(df$country_short),
+  country = (df$country_short) %>% fct_inorder() %>% as.numeric(),
+  season = (df$season) %>% fct_inorder() %>% as.numeric(),
   Rnull = df$Rnull
 )
 
 # run stan model
 fit <- rstan::stan(
-  file = "code/special_analyses/season_country_var_rt.stan",
-  chains = 4, thin = 4, iter = 1000,
+  file = "code/03_special_analyses/season_country_var_rt.stan",
+  chains = 4, thin = 4, iter = 2500,
   seed = 12, cores = getOption("mc.cores", 1L),
   control = list(
     # adapt_delta=0.9,
@@ -63,8 +64,18 @@ med_and_quantiles(extract(fit, "Rnull_relative_country_sim")$Rnull_relative_coun
 # Seasonal relative effect
 med_and_quantiles(extract(fit, "Rnull_relative_season_sim")$Rnull_relative_season_sim)
 
+
+
+Rnull_var = gather_draws(fit,Rnull_relative_season_sim) 
+write_csv(Rnull_var,file="../Big data/Rnull_relative_season_sim.csv")
+
+Rnull_var$.value %>% 
+  quantile(prob=c(0.1,0.2,0.5,0.8,0.9))
+
+precis(fit,pars="Rnull_relative_season_sim")
+
 mcmc_areas(fit,pars=c("Rnull_relative_season_sim") ) + 
-  geom_vline(xintercept = c(-0.10,0.10),linetype="dashed") +
+  geom_vline(xintercept = c(0.2,-0.15,-0.10,-0.05,0.05,0.10,0.15,0.20),linetype="dashed") +
   coord_cartesian(xlim = c(-0.3,+0.25))+
   scale_y_discrete(labels=c("Rnull_relative_season_sim"="Between season Rt")) 
  
