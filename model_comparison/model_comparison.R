@@ -15,7 +15,7 @@ source("code/model_last_year_burden.R")
 
 # ---- |-load flu data ----
 data = load_flu_data( params ) # loads the data
-data_mock = data$erviss_ili_ari %>% 
+data_mock = data$epi$erviss_ili_ari %>% 
   filter(country_short == country_short_input, 
          target == params$SIR_simple$target, 
          agegroup == params$SIR_simple$agegroup) # 

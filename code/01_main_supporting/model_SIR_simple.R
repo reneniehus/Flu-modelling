@@ -172,7 +172,7 @@ model_SIR_simple = function( params=NULL, dat=NULL, country_short_input, date_v_
 }
 
 model_SIR_multiseason = function(params=NULL, all_season=NULL, target_input=NULL, country_short_input ){
-  print(target_input)
+  
   # ---- |-Filtering ----
   all_season %>% 
     filter(country_short == country_short_input) %>% 
@@ -293,33 +293,62 @@ model_SIR_multiseason = function(params=NULL, all_season=NULL, target_input=NULL
   return(modl)
 }
 
-model_SIR_simple_r0 = function( params=NULL, dat=NULL,pop_country, country_short_input, date_v_fit,season){
+model_SIR_simple_r0 = function( params=NULL, all_season=NULL, target_input=NULL,pop_country, country_short_input, date_v_fit,season){
+  
+  # ---- |-Filtering ----
+  all_season %>% 
+    filter(country_short == country_short_input) %>% 
+    select(-typing_sentinel,-typing_nonsentinel,-typing_combined) %>% 
+    unnest(inc_iliari) %>% 
+    filter(target==params$SIR_simple$target) -> all_season_filtered
+  # filter:age groups
+  all_season_filtered %>% 
+    filter(agegroup==params$SIR_simple$agegroup) -> all_season_filtered
+  # filter:time
+  all_season_filtered %>% 
+    filter( date%in%date_v_fit ) %>% 
+    select(country_short,season,date,value) %>% 
+    mutate(n=1:n()) -> all_season_fit
+  
+  if (target_input=="ili_typing_sentinel") {
+    xtyping = all_season %>% filter(country_short==country_short_input) %>% 
+      unnest(c(typing_sentinel)) %>% filter(indicator=="positivity") %>% 
+      filter( date%in%date_v_fit ) %>% 
+      select(date,value_typing=value)
+    all_season_fit = all_season_fit %>% left_join(xtyping,by="date") %>% 
+      mutate(value=value*(value_typing/100)) %>% select(-value_typing)
+  }
+  if (target_input=="ili_typing_all") {
+    xtyping = all_season %>% filter(country_short==country_short_input) %>% 
+      unnest(c(typing_combined)) %>% filter(indicator=="positivity") %>% 
+      filter( date%in%date_v_fit ) %>% 
+      select(date,value_typing=value_add_narm) %>% 
+      mutate(value_typing=ifelse(is.nan(value_typing),NA,value_typing ) )
+    all_season_fit = all_season_fit %>% left_join(xtyping,by="date") %>% 
+      mutate(value=value*(value_typing)) %>% select(-value_typing)
+  }
   
   # prepare data for stan fit
-  data_mock = dat %>% 
-    filter(country_short == country_short_input, 
-           target == params$SIR_simple$target, 
-           agegroup == params$SIR_simple$agegroup) # 
-  data_mock %<>% filter( date%in%date_v_fit )
-  data_mock %>% ggplot(aes(date,value)) + geom_line()
-  data_mock_fit = data_mock
+  all_season_fit %>% ggplot(aes(date,value)) + geom_line()
+  data_mock_fit = all_season_fit
   # Projection dates
-  data_mock_project = data_mock
+  data_mock_project = all_season_fit
   data_mock_project$date = data_mock_project$date+365
   
   #mod2 <- cmdstan_model(stan_file='./stan/SIR_simple.stan') # This compiles the script
-  
   stan_list = list(
     n_week_fit = nrow(data_mock_fit),
-    severe_obs_fit = as.integer(data_mock_fit$value),
+    severe_obs_fit = as.integer(replace_na(data_mock_fit$value,0)),
+    severe_obs_notna = as.integer(!is.na(data_mock_fit$value)),
     n_week_project = nrow(data_mock_project),
     pop = pop_country,
     Rnull = params$Rnull,
     rate_infectious = params$rate_infectious
   )
   fit02=rstan::stan(
-    file='./stan/SIR_simple.stan',
-    chains=6 ,thin=6,iter=1000,
+    file='./stan/SIR_simple_nas.stan',
+    #chains=1 ,thin=1,iter=300,
+    chains=6 ,thin=6,iter=1500,
     seed=12, cores = getOption("mc.cores", 1L),
     control=list(
       #adapt_delta=0.9,
@@ -335,21 +364,6 @@ model_SIR_simple_r0 = function( params=NULL, dat=NULL,pop_country, country_short
     Rnull = est_Rnull$result[1],
     Rnull_Rhat = est_Rnull$result[6]
   )
-  
-  # Create an output dataframe
-  df_out = fit02 %>% gather_draws(gen_severe_obs_project[t_vw]) %>%
-    ungroup() %>%
-    left_join(data_mock %>% select(date,country_short,agegroup,target) %>% mutate(t_vw = 1:n()), by="t_vw") %>%
-    mutate(model = "SIR_simple",
-           country_short = country_short,
-           agegroup = agegroup,
-           target = target,
-           scenario_tag = scenario_tag,
-           prediction_type = "sample"
-    ) %>%
-    rename(value = .value,
-           sample_or_quantile = .draw) %>%
-    select(-.chain, -.iteration, -.variable, -t_vw) 
   
   
   if (F){ # plotting to support debugging

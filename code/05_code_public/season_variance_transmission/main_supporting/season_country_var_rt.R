@@ -1,26 +1,28 @@
-# run special analysis for rt seasonal and country variability
+# run special analysis to example seasonal and country variability of flu transmission potential
 
-rt_df = read_csv(file="../Big data/Rt_country_season.csv")
-
+# ---- |-Load the data ----
+rt_df = read_csv(file="output/rt_season_country.csv")
 # filter out pandemic seasons
 rt_df = rt_df %>% filter(!season%in%c("2019/2020","2020/2021","2021/2022"))
 df = rt_df
 
+# ---- |-Quick look ----
 # brief look at variability
 ((df$Rnull)/median(df$Rnull) )%>% quantile(probs = c(0.1,0.5,0.9)) # 0.9115603 1.0000000 1.1262625
 # Mean per country
-rt_df %>%
+df %>%
   group_by(country_short) %>%
   summarise(mean = mean(Rnull))
 # boxplot per season
 boxplot(Rnull ~ season,
-        data = rt_df
+        data = df
 ) # indicated that it makes sense to remove 1 or 2 covid winters
 # boxplot per country
 boxplot(Rnull ~ country_short,
-        data = rt_df
+        data = df
 )
 
+# ---- |-Prepare for stan and fit ----
 # prep data list
 stan_list <- list(
   N = nrow(df),
@@ -30,41 +32,41 @@ stan_list <- list(
   season = (df$season) %>% fct_inorder() %>% as.numeric(),
   Rnull = df$Rnull
 )
-
 # run stan model
-fit <- rstan::stan(
-  file = "code/03_special_analyses/season_country_var_rt.stan",
-  chains = 4, thin = 4, iter = 2500,
-  seed = 12, cores = getOption("mc.cores", 1L),
-  control = list(
-    # adapt_delta=0.9,
-    # max_treedepth=14
-  ),
-  data = stan_list
-)
-# extract(fit, "a")$a %>% median()
-# extract(fit, "b")$b %>% median()
+file_fit = "output/season_country_var_rt_fit.Rdata"
+if ( params$debug==T&file.exists(file_fit) ){
+  load(file=file_fit)
+} else {
+  fit <- rstan::stan(
+    file = "stan/season_country_var_rt.stan",
+    chains = 4, thin = 4, iter = 2500,
+    seed = 12, cores = getOption("mc.cores", 1L),
+    control = list(
+      # adapt_delta=0.9,
+      # max_treedepth=14
+    ),
+    data = stan_list
+  )
+  save(fit,file=file_fit)
+}
 
 
-
-
+# ---- |-Look at model estimates ----
 med_and_quantiles <- function(x) {
   tibble(
     q1 = quantile(x, .1),
     q2 = quantile(x, .2),
     q8 = quantile(x, .8),
-    q9 =  quantile(x, .9)
+    q9 = quantile(x, .9)
   )
 }
-
 # Country relative effect
 med_and_quantiles(extract(fit, "Rnull_relative_country_sim")$Rnull_relative_country_sim)
 # Seasonal relative effect
 med_and_quantiles(extract(fit, "Rnull_relative_season_sim")$Rnull_relative_season_sim)
 
-
 Rnull_var = gather_draws(fit,Rnull_relative_season_sim) 
-write_csv(Rnull_var,file="../Big data/Rnull_relative_season_sim.csv")
+write_csv(Rnull_var,file="output/Rnull_relative_season_sim.csv")
 
 Rnull_var$.value %>% 
   quantile(prob=c(0.1,0.2,0.5,0.8,0.9))

@@ -100,20 +100,22 @@ run_flu_models = function( params=NULL , data=NULL ){
   
   if ( "SIR_simple_r0_variation" %in% params$models_to_run ){ 
     
+    # data
+    all_season = data_into_all_season(data,params,withforce=F)
+    
     # prepare model input
     df_collect = list()
     df_i = 1
     scenario_tag = "A"
-    dat = data$epi$erviss_ili_ari
+    target_input = "ili_typing_sentinel"
     
     country_short_input_v = unique(dat$country_short) # country_short_input_v = "AT" # for quick run
     start_time <- Sys.time()
     for (country_short_input_i in country_short_input_v) {
       
-      country_short_input_i_new = country_short_input_i
-      if (country_short_input_i=="GR") country_short_input_i_new = "EL"
       pop_country = data$demography$population_pyramid %>% 
-        filter(country==country_short_input_i_new) %>% pull(population) %>% sum()
+        filter(country==country_short_input_i) %>% pull(population) %>% sum()
+      if (country_short_input_i=="GR") pop_country = 10.43*1e6
       
       start_year = dat %>% filter(country_short==country_short_input_i) %>% pull(date) %>% min() %>% year() %>% as.numeric()
       while(start_year<=2022) {
@@ -133,26 +135,25 @@ run_flu_models = function( params=NULL , data=NULL ){
         if ( nrow(xinc_iliari) < 10 ) next;
         sum_inc = sum(xinc_iliari$value) ; if ( sum_inc < 300 ) next;
         pr=paste("> Running:",country_short_input_i,"| season:",season,"| sum inc:",sum_inc,"\n"); cat(green(pr))
-        df_collect[[df_i]] = model_SIR_simple_r0( params, dat=dat, pop_country, country_short_input=country_short_input_i, date_v_fit,season )
+        df_collect[[df_i]] = model_SIR_simple_r0( params, all_season=all_season , target_input, pop_country, country_short_input=country_short_input_i, date_v_fit,season )
         df_i = df_i + 1
         
       } # season loop
-    } # country loop # Running: GR | season: 2014/2015 | sum inc: 17861.2
+    } # 
     end_time <- Sys.time()
-    (end_time - start_time)
+    (end_time - start_time) # 1.6 hours
     
     
     if (T){
       df_collect %>% bind_rows -> x
       write_csv(x,file="code/03_special_analyses/rt_season_country.csv")
     }
-    x = read_csv(file="../Big data/Rt_country_season.csv")
-    x = read_csv(file="code/03_special_analyses/rt_season_country.xlsx")
+    x = read_csv(file="code/03_special_analyses/rt_season_country.csv")
     x = df_collect %>% bind_rows()
     (x$Rnull) %>% min()
     rnull_mu = x$Rnull %>% median()
     rnull_quant = x$Rnull %>% quantile(probs=c(0.2,0.8))
-    ((rnull_quant/rnull_mu )-1)*100 # -7.260273  8.877262 
+    ((rnull_quant/rnull_mu )-1)*100 # -11.960425   9.747009 
   }
   
   if ( "last_year_burden" %in% params$models_to_run ){ # 
