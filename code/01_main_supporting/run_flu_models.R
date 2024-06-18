@@ -1,5 +1,9 @@
 run_flu_models = function( params=NULL , data=NULL ){
   
+  # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  ### Notes on output requirements ##########
+  # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  
   # Required columns in df_for_submission (as per: https://docs.google.com/document/d/13adcxpPdlDvJM5eiFSkMzlWMTcwsx6lVjY25JA26iS4/edit):
   # model_id
   # round_id ["2024_2025_1_FLU1"]
@@ -7,12 +11,18 @@ run_flu_models = function( params=NULL , data=NULL ){
   # pop_group ["0-12","13-65"], horizon [week integer], target_end_date [Date string ('YYYY-MM-DD')]
   # output_type ["sample"], output_type_id [string: "1","2","3",...], value [float limited to 2 decimals]
   
-  # initiating desired output list
+  # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  ### Initiating desired output list ##########
+  # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   df_out = list(
     time_of_execution = now(),    # time-stamp
     df_for_submission = NULL,     # for each model a clean dataframe following submission format (see above)
     output_other = NULL           # for each model additional output 
   )
+  
+  # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  ### Running selected models ##########
+  # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   
   if ( "SIR_simple" %in% params$models_to_run ){ 
     # prepare for model
@@ -28,24 +38,36 @@ run_flu_models = function( params=NULL , data=NULL ){
   }
   
   if ( "SIR_simple_multi_season" %in% params$models_to_run ){
-    # prepare data
+    
+    # ---- |-Data ----
     all_season = data_into_all_season(data,params,withforce=F)
+    country_short_input_v = all_season %>% filter_log(ili_sum>0) %>% pull(country_short) %>% unique()
+    target_input_v = params$SIR_simple_multi_season$target
+    scenario_tag = "A"
     
     modl = list()
     start_time <- Sys.time()
-    scenario_tag = "A"
-    target_input_v = c("ili","ili_typing_sentinel","ili_typing_all")
-    country_short_input_v = all_season %>% filter_log(ili_sum>0) %>% pull(country_short) %>% unique()
+    
+    # ---- |-Run model ----
     for (target_input in target_input_v) {
       for (country_short_input in country_short_input_v ) {
-        modl[[target_input]][[country_short_input]] = model_SIR_multiseason( params , all_season=all_season , target_input, country_short_input )
+        # population
+        pop_country = data$demography$population_pyramid %>% 
+          filter(country==country_short_input) %>% pull(population) %>% sum()
+        if (country_short_input=="GR") pop_country = 10.43*1e6
+        # run model
+        modl[[target_input]][[country_short_input]] = model_SIR_multiseason( params , 
+                                                                             all_season=all_season , 
+                                                                             target_input, 
+                                                                             country_short_input,
+                                                                             pop_country)
       }
     }
     end_time <- Sys.time() # 5 hrs
     pr=paste("> Method run:",round(end_time - start_time,2),"sec \n"); cat(green(pr))
     save(modl,file = "../Big data/modl.Rdata")
     
-    #
+    # ---- |-Analyse model output ----
     mdf_all = NULL
     for (target_input in target_input_v)
     for (country_short_input in country_short_input_v){
@@ -86,7 +108,6 @@ run_flu_models = function( params=NULL , data=NULL ){
     
     mdf_all %>% 
       ggplot(aes(target,(reciprocal_phi))) + geom_boxplot()
-    
     
     mcountry ="AT"
     p1=modl[["ili"]][[mcountry]]$pdata

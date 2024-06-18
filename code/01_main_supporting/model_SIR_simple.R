@@ -171,7 +171,11 @@ model_SIR_simple = function( params=NULL, dat=NULL, country_short_input, date_v_
   return(axis_ids_simulate)
 }
 
-model_SIR_multiseason = function(params=NULL, all_season=NULL, target_input=NULL, country_short_input ){
+model_SIR_multiseason = function( params=NULL, 
+                                  all_season=NULL, 
+                                  target_input=NULL, 
+                                  country_short_input , 
+                                  pop_country ){
   
   # ---- |-Filtering ----
   all_season %>% 
@@ -205,7 +209,6 @@ model_SIR_multiseason = function(params=NULL, all_season=NULL, target_input=NULL
     all_season_fit = all_season_fit %>% left_join(xtyping,by="date") %>% 
       mutate(value=value*(value_typing)) %>% select(-value_typing)
   }
-  
   
   # ---- |-Project df and weekly to daily ----
   # project df
@@ -247,7 +250,7 @@ model_SIR_multiseason = function(params=NULL, all_season=NULL, target_input=NULL
     season_start = as.integer(all_season_fit_daily$season_start),
     season_id = fct_inorder(all_season_fit_daily$season) %>% as.integer(),
     season_id_raw = fct_inorder(all_season_fit_daily$season) %>% levels() %>% enframe(),
-    pop = 9e6,
+    pop = pop_country,
     Rnull = params$Rnull,
     rate_infectious = params$rate_infectious
   )

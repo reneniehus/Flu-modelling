@@ -16,14 +16,14 @@ settings = function() {
   # ---- |-Countries ----
   
   # ---- |-Model-specific  settings ----
-  params$models_to_run = c("SIR_simple") # "SIR_simple","SIR_simple_r0_variation","SIR_simple_multi_season
+  params$models_to_run = c("SIR_simple_multi_season") # "SIR_simple","SIR_simple_r0_variation","SIR_simple_multi_season
   
   # Settings for SIR_simple
   params$SIR_simple$target = "ILIconsultationrate"
   params$SIR_simple$agegroup = "age_total"
   # Settings for SIR_multiseason
-  # params$SIR_multiseason$ili_sum_min = 100 # for multiseason fit, a poor quality season has less impact
-  params$SIR_multiseason$seasons_exclude = c("2020/2021","2021/2022")
+  params$SIR_simple_multi_season$target = c("ili_typing_sentinel") # c("ili","ili_typing_sentinel","ili_typing_all")
+  params$SIR_multiseason$seasons_exclude = c("2019/2020","2020/2021","2021/2022") # those impacted by COVID-19 acute phase
   # Settings for last_year_burden
   params$last_year_burden$target = "ILIconsultationrate"
   params$last_year_burden$agegroup = "age_total"
