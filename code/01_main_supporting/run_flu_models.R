@@ -39,6 +39,8 @@ run_flu_models = function( params=NULL , data=NULL ){
   
   if ( "SIR_simple_multi_season" %in% params$models_to_run ){
     
+    pr=paste("Initiating SIR_simple_multi_season \n"); cat(green(pr))
+    
     # ---- |-Data ----
     all_season = data_into_all_season(data,params,withforce=F)
     country_short_input_v = all_season %>% filter_log(ili_sum>0) %>% pull(country_short) %>% unique()
@@ -49,7 +51,7 @@ run_flu_models = function( params=NULL , data=NULL ){
     start_time <- Sys.time()
     
     # ---- |-Run model ----
-    for (target_input in target_input_v) {
+    for ( target_input in target_input_v ) {
       for (country_short_input in country_short_input_v ) {
         # population
         pop_country = data$demography$population_pyramid %>% 
@@ -171,9 +173,9 @@ run_flu_models = function( params=NULL , data=NULL ){
     }
     x = read_csv(file="code/03_special_analyses/rt_season_country.csv")
     x = df_collect %>% bind_rows()
-    (x$Rnull) %>% min()
-    rnull_mu = x$Rnull %>% median()
-    rnull_quant = x$Rnull %>% quantile(probs=c(0.2,0.8))
+    (x$Rnull_eff) %>% min()
+    rnull_mu = x$Rnull_eff %>% median()
+    rnull_quant = x$Rnull_eff %>% quantile(probs=c(0.2,0.8))
     ((rnull_quant/rnull_mu )-1)*100 # -11.960425   9.747009 
   }
   

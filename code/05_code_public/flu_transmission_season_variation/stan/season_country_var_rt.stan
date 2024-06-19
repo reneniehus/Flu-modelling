@@ -7,7 +7,7 @@ data {
   int<lower=0> N;
   int country[N];
   int season[N];
-  vector[N] Rnull;
+  vector[N] Rnull_eff;
   int N_baseline_seasons ; 
   int<lower=1,upper=N_seasons> baseline_seasons[N_baseline_seasons];
 }
@@ -30,7 +30,7 @@ model {
   b ~ normal(0, sigma_b);
    
   for(i in 1:N){
-    log(Rnull[i])  ~  normal(mean_val + a[country[i]] + b[season[i]], sigma);
+    log(Rnull_eff[i])  ~  normal(mean_val + a[country[i]] + b[season[i]], sigma);
   }
   
 }
@@ -38,26 +38,26 @@ model {
 generated quantities {
   real country_eff;
   real season_eff;
-  real Rnull_country_sim;
-  real Rnull_season_sim;
-  real Rnull_relative_country_sim;
-  real Rnull_relative_season_sim;
+  real Rnull_eff_country_sim;
+  real Rnull_eff_season_sim;
+  real Rnull_eff_relative_country_sim;
+  real Rnull_eff_relative_season_sim;
   vector[N_baseline_seasons] seasonbaseline;
   real mean_seasonbaseline; 
-  real Rnull_relative_seasonbaseline_sim;
+  real Rnull_eff_relative_seasonbaseline_sim;
   
   // country variability
   country_eff = normal_rng(0,sigma_a);
-  Rnull_country_sim = exp(mean_val+country_eff);
-  Rnull_relative_country_sim = (exp(mean_val+country_eff)/exp(mean_val) - 1);
+  Rnull_eff_country_sim = exp(mean_val+country_eff);
+  Rnull_eff_relative_country_sim = (exp(mean_val+country_eff)/exp(mean_val) - 1);
   // season variability
   season_eff = normal_rng(0,sigma_b);
-  Rnull_season_sim = exp(mean_val+season_eff);
-  Rnull_relative_season_sim = (exp(mean_val+season_eff)/exp(mean_val) - 1);
+  Rnull_eff_season_sim = exp(mean_val+season_eff);
+  Rnull_eff_relative_season_sim = (exp(mean_val+season_eff)/exp(mean_val) - 1);
   // season variability relative to 3-season-baseline
   seasonbaseline = mean_val+b[baseline_seasons];
   mean_seasonbaseline = mean(seasonbaseline);
-  Rnull_relative_seasonbaseline_sim = (exp(mean_val+season_eff)/exp(mean_seasonbaseline) - 1);
+  Rnull_eff_relative_seasonbaseline_sim = (exp(mean_val+season_eff)/exp(mean_seasonbaseline) - 1);
 
 }
 

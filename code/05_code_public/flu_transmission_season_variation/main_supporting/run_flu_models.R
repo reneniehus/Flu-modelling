@@ -23,7 +23,7 @@ run_flu_models = function( params=NULL , data=NULL ){
     
     start_time <- Sys.time()
     
-    for (country_short_input_i in country_short_input_v) {
+    for (country_short_input_i in country_short_input_v) { # country_short_input_i = country_short_input_v[1]
       
       pop_country = data$demography$population_pyramid %>% 
         filter(country==country_short_input_i) %>% pull(population) %>% sum()

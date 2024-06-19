@@ -11,11 +11,13 @@ load_flu_data_epi = function(data=data, params=NULL , new_from_online=T , regene
     
     if (new_from_online==T) {
       # load data freshly from the internet
+      pr=paste("Loading epi data from github ... \n"); cat(green(pr))
       erviss_ili_ari = read_csv(file="https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/snapshots/2024-05-24_ILIARIRates.csv",show_col_types = FALSE)
       data_sentinel_detections = read_csv(file="https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/snapshots/2024-05-24_sentinelTestsDetectionsPositivity.csv",show_col_types = FALSE)
       data_nonsentinel_detections = read_csv(file="https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/snapshots/2024-05-24_nonSentinelTestsDetections.csv",show_col_types = FALSE)
     }
     if (new_from_online==F) {
+      pr=paste("Loading epi data from disk ... \n"); cat(green(pr))
       # load data from local storage
       erviss_ili_ari = read_csv(file="./data/erviss_iliari_snapshot_2024-05-24.csv",show_col_types = FALSE)
       data_sentinel_detections = read_csv(file="./data/erviss_detections_sentinel_snapshot_2024-05-24.csv",show_col_types = FALSE)
@@ -135,6 +137,7 @@ load_flu_data_demography = function(data=data, params=NULL , new_from_online=F ,
     if (new_from_online==T) {
       # load data freshly from the internet
       # required libraries
+      pr=paste("Loading demography data from database ... \n"); cat(green(pr))
       source('db/logger.R')
       source('db/sql_utils.R')
       # Logger is needed for running SQL utils
@@ -175,6 +178,7 @@ load_flu_data_demography = function(data=data, params=NULL , new_from_online=F ,
     }
     if (new_from_online==F) {
       # load data from local storage
+      pr=paste("Loading demography data from disk ... \n"); cat(green(pr))
       mdat = read_fst(path="data/population_pyramid.fst") %>% as_tibble()
     }
     

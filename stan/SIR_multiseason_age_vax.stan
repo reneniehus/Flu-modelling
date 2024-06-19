@@ -16,9 +16,9 @@ data {
   matrix[n_day_fit, n_age_groups] delta_vax; // daily fraction of newly vaccinated individuals per age group
   real Rnull; // R0
   real rate_infectious; // infectious rate, such that beta = Rnull*rate_infectious
-  real ve_inf; // vaccine efficacy on infectiousness
-  real ve_susc; // vaccine efficacy on susceptability
-  real ve_severe; // vaccine efficacy on infectiousness
+  real ve_inf; // vaccine effectiveness on infectiousness
+  real ve_susc; // vaccine effectiveness on susceptability
+  real ve_severe; // vaccine effectiveness on severity, given infection
 }
 
 transformed data {
@@ -88,8 +88,8 @@ transformed parameters {
       
     } else {
       for(a in 1:n_age_groups){  
-        delta_infective_exposures_u = beta * S_u[t-1,a]  * sum(contact_matrix[ : , a]' .* (I_u[t-1,] + I_v[t-1,]*(1-ve_inf)));
-        delta_infective_exposures_v = beta * S_v[t-1,a]  * sum(contact_matrix[ : , a]' .* (I_u[t-1,] + I_v[t-1,]*(1-ve_inf))) * (1 - ve_susc);
+        delta_infective_exposures_u = beta * S_u[t-1,a]  * sum(contact_matrix[ : , a]' .* ( I_u[t-1,]*1 + I_v[t-1,]*(1-ve_inf)) );
+        delta_infective_exposures_v = beta * S_v[t-1,a]  * sum(contact_matrix[ : , a]' .* ( I_u[t-1,]*1 + I_v[t-1,]*(1-ve_inf)) ) * (1 - ve_susc);
 
         delta_S_u = -delta_infective_exposures_u;
         delta_S_v = -delta_infective_exposures_v;
@@ -106,7 +106,7 @@ transformed parameters {
         R_v[t,a] = R_v[t-1,a] + delta_R_v + delta_vax[t-1,a] * R_u[t-1,a] / (S_u[t-1,a] + R_u[t-1,a]);
 
         //
-        delta_severe[t,a] = (delta_infective_exposures_u + delta_infective_exposures_v * (1-ve_severe)) * prop_severe[season_id[t], a] ; 
+        delta_severe[t,a] = (delta_infective_exposures_u * 1 + delta_infective_exposures_v * (1-ve_severe) ) * prop_severe[season_id[t], a] ; 
         severe_mean[t,a] = delta_severe[t,a] * pop_age_group[a,1];
         
         if (season_start[t]==2){

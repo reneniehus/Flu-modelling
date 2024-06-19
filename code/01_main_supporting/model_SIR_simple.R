@@ -177,7 +177,7 @@ model_SIR_multiseason = function( params=NULL,
                                   country_short_input , 
                                   pop_country ){
   
-  # ---- |-Filtering ----
+  # ---- |-Filtering and computing compound indicators ----
   all_season %>% 
     filter(country_short == country_short_input) %>% 
     select(-typing_sentinel,-typing_nonsentinel,-typing_combined) %>% 
@@ -239,26 +239,43 @@ model_SIR_multiseason = function( params=NULL,
   
   # ---- |-Stan list and fit----
   stan_list = list(
+    ## extra stuff good to carry forward
     all_season_fit=all_season_fit,
     all_season_project=all_season_project,
+    season_id_raw = fct_inorder(all_season_fit_daily$season) %>% levels() %>% enframe(),
+    ## below required for stan model
     n_season = n_distinct(all_season_fit$season),
     n_week_fit = nrow(all_season_fit),
     n_day_fit = nrow(all_season_fit_daily),
     n_week_project = nrow(all_season_project),
-    severe_obs_fit = as.integer( all_season_fit$value %>% replace_na(0) ),
+    #
+    n_age_groups = 1,
+    #
+    severe_obs_fit = ( all_season_fit %>% select(value) %>% 
+                         mutate(value=replace_na(value,0) %>% as.integer()) ),
     severe_obs_notna = as.integer(!is.na(all_season_fit$value)),
     season_start = as.integer(all_season_fit_daily$season_start),
     season_id = fct_inorder(all_season_fit_daily$season) %>% as.integer(),
-    season_id_raw = fct_inorder(all_season_fit_daily$season) %>% levels() %>% enframe(),
+    #
     pop = pop_country,
+    #
+    pop_age_group=matrix(pop_country,nrow=1,ncol=1),
+    contact_matrix=matrix(data=1,nrow=1,ncol=1),
+    delta_vax=tibble( value=rep(0,nrow(all_season_fit_daily)) ),
+    # 
     Rnull = params$Rnull,
-    rate_infectious = params$rate_infectious
+    rate_infectious = params$rate_infectious,
+    ve_inf = params$ve_inf,
+    ve_susc = params$ve_susc,
+    ve_severe = params$ve_severe
   )
   p2 = NULL
-  if (T) {
+  path_fit = paste0("../Big data/multiseason_age_vax",target_input,country_short_input,".Rdata")
+  if (params$debug==F) {
+    pr=paste("> Fitting:",target_input,"for",country_short_input,"... \n"); cat(green(pr))
     fit00=rstan::stan(
-      file='./stan/SIR_simple_multiseason.stan',
-      chains=5 ,thin=5,iter=400,
+      file='./stan/SIR_multiseason_age_vax.stan',
+      chains=1 ,thin=1,iter=200,
       seed=12, cores = getOption("mc.cores", 1L),
       control=list(
         #adapt_delta=0.9,
@@ -266,25 +283,30 @@ model_SIR_multiseason = function( params=NULL,
       ),
       data=stan_list
     ) # 2.3 mins
-    fit00@model_pars
+    pr=paste("> Running:",target_input,"for",country_short_input,"... \n"); cat(green(pr))
     
-    precis(fit00,pars=c("SIR_ini_mu"),depth = 2)
-    precis(fit00,pars=c("Rnull_eff"),depth = 2)
-    precis(fit00,pars=c("prop_severe"),depth = 2)
-    precis(fit00,pars=c("sigma_s"),depth = 2) # 3.66
-    precis(fit00,pars=c("SIR_ini"),depth = 3)
-    
-    p2 = fit00 %>% gather_draws(severe_mean_weekly[n]) %>% 
-      filter(.draw%in%c(1:20)) %>% select(-.chain,-.iteration) %>% ungroup() %>% 
-      right_join(all_season_fit) %>% 
-      ggplot(aes(date,value)) + 
-      geom_line(aes(y=.value,group=.draw),col="lightblue") +geom_line() 
+    save(fit00,path_fit)
+  } else {
+    load(path_fit)
   }
   
+  # ---- |-Extract parameters and plot ----
+  precis(fit00,pars=c("SIR_ini_mu"),depth = 2)
+  precis(fit00,pars=c("Rnull_eff"),depth = 2)
+  precis(fit00,pars=c("prop_severe"),depth = 2)
+  precis(fit00,pars=c("sigma_s"),depth = 2) # 3.66
+  precis(fit00,pars=c("SIR_ini"),depth = 3)
+  p2 = fit00 %>% gather_draws(severe_mean_weekly[n]) %>% 
+    filter(.draw%in%c(1:20)) %>% select(-.chain,-.iteration) %>% ungroup() %>% 
+    right_join(all_season_fit) %>% 
+    ggplot(aes(date,value)) + 
+    geom_line(aes(y=.value,group=.draw),col="lightblue") + geom_line() 
+  
+  pr=paste("> Running:",target_input,"for",country_short_input,"done \n"); cat(green(pr))
   
   print(paste(target_input,"done"))
   
-  # output
+  # ---- |-Compile output ----
   modl = 
     list(
       fit = fit00,

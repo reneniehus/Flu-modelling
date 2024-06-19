@@ -7,17 +7,17 @@ rt_df = rt_df %>% filter(!season%in%c("2019/2020","2020/2021","2021/2022"))
 df = rt_df
 
 # brief look at variability
-((df$Rnull)/median(df$Rnull) )%>% quantile(probs = c(0.1,0.5,0.9)) # 0.9115603 1.0000000 1.1262625
+((df$Rnull_eff)/median(df$Rnull_eff) )%>% quantile(probs = c(0.1,0.5,0.9)) # 0.9115603 1.0000000 1.1262625
 # Mean per country
 rt_df %>%
   group_by(country_short) %>%
-  summarise(mean = mean(Rnull))
+  summarise(mean = mean(Rnull_eff))
 # boxplot per season
-boxplot(Rnull ~ season,
+boxplot(Rnull_eff ~ season,
         data = rt_df
 ) # indicated that it makes sense to remove 1 or 2 covid winters
 # boxplot per country
-boxplot(Rnull ~ country_short,
+boxplot(Rnull_eff ~ country_short,
         data = rt_df
 )
 
@@ -28,7 +28,7 @@ stan_list <- list(
   N_countries = n_distinct(df$country_short),
   country = (df$country_short) %>% fct_inorder() %>% as.numeric(),
   season = (df$season) %>% fct_inorder() %>% as.numeric(),
-  Rnull = df$Rnull
+  Rnull_eff = df$Rnull_eff
 )
 
 # run stan model

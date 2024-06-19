@@ -48,9 +48,11 @@ model_SIR_simple_r0 = function( params=NULL, all_season=NULL, target_input=NULL,
     severe_obs_notna = as.integer(!is.na(data_mock_fit$value)),
     n_week_project = nrow(data_mock_project),
     pop = pop_country,
-    Rnull = params$Rnull,
+    Rnull_mu = params$Rnull,
+    Rnull =  params$Rnull,
     rate_infectious = params$rate_infectious
   )
+  
   if (params$debug==T) {
     est_Rnull = new("precis", .Data = list(c(1.12, 0.08, 
                                  1.00, 1.24, 323.0, 1.0
@@ -58,25 +60,24 @@ model_SIR_simple_r0 = function( params=NULL, all_season=NULL, target_input=NULL,
                                                     "5.5%", "94.5%", "n_eff", "Rhat"), .S3Class = "data.frame")
   } else { 
     fit02=rstan::stan(
-      file='stan/SIR_simple_nas.stan',
-      #chains=1 ,thin=1,iter=300,
-      chains=6 ,thin=6,iter=2000,
+      file="stan/SIR_simple_nas_freebeta.stan",
+      #chains=1 ,thin=1,iter=300, # good for testing model
+      chains=14 ,thin=7,iter=560,
       seed=12, cores = getOption("mc.cores", 1L),
       control=list(
         #adapt_delta=0.9,
         #max_treedepth=14
       ),
       data=stan_list
-    ) # X mins
-    est_Rnull = precis(fit02,pars = c("Rnull_eff"))
+    ) # 46 sec
+    est_Rnull_eff = precis(fit02,pars = c("Rnull_eff"))
   }
-  
   # prepared the returned dataframe
   mout = tibble(
     country_short = country_short_input,
     season = season,
-    Rnull = est_Rnull$result[1],
-    Rnull_Rhat = est_Rnull$result[6]
+    Rnull_eff = est_Rnull_eff$result[1],
+    Rnull_eff_Rhat = est_Rnull_eff$result[6]
   )
   
   return(mout)
