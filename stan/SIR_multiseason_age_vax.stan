@@ -14,14 +14,14 @@ data {
   matrix[n_age_groups, n_age_groups] contact_matrix; //contact matrix
   matrix[n_day_fit, n_age_groups] delta_vax; // daily fraction of newly vaccinated individuals per age group
   // data relevant for projected scenarios
-  int n_week_project;// number of projected values, weekly
-  int n_day_project;
-  int n_scenario;// 
-  int axis_transmission[n_scenario];
-  int axis_vax[n_scenario];
-  matrix[n_day_project, n_age_groups] delta_vax_opti;
-  matrix[n_day_project, n_age_groups] delta_vax_pess;
-  matrix[n_day_project, n_age_groups] delta_vax_null;
+  int n_week_project; // number of projected weeks
+  int n_day_project; // number of projected days
+  int n_scenario;// // number of projected scenarios
+  int axis_transmission[n_scenario]; // indicator for the transmission scenario axis
+  int axis_vax[n_scenario]; // indicator for the vaccine scenario axis
+  matrix[n_day_project, n_age_groups] delta_vax_opti; // daily assumed vax uptake in projection period
+  matrix[n_day_project, n_age_groups] delta_vax_pess; // daily assumed vax uptake in projection period
+  matrix[n_day_project, n_age_groups] delta_vax_null; // daily assumed vax uptake in projection period
   // epi parameters
   real Rnull; // R0
   real rate_infectious; // infectious rate, such that beta = Rnull*rate_infectious
@@ -47,23 +47,23 @@ parameters {
   real<lower=0> sigma_s;
   real<lower=0> sigma_i;
   
-  real<lower=0, upper=1> reciprocal_phi; // overdipersion parameter for severe obs fit
+  real<lower=0, upper=1> reciprocal_phi; // overdipersion parameter for severe obs fit, var=mu+reciprocal_phi*mu^2
 }
 
 transformed parameters {
   // daily stuff
   // SIR compartments unvaccinated and vaccinated
-  matrix<lower=0, upper=1>[n_day_fit,n_age_groups] S_u; // unvaccinated
-  matrix<lower=0, upper=1>[n_day_fit,n_age_groups] I_u;
-  matrix<lower=0, upper=1>[n_day_fit,n_age_groups] R_u;
-  matrix<lower=0, upper=1>[n_day_fit,n_age_groups] S_v; // vaccinated
-  matrix<lower=0, upper=1>[n_day_fit,n_age_groups] I_v;
-  matrix<lower=0, upper=1>[n_day_fit,n_age_groups] R_v;
-  array[n_day_fit,n_age_groups] real<lower=0, upper=1> delta_severe;
-  array[n_day_fit,n_age_groups] real<lower=0> severe_mean;
-  real phi;
+  matrix<lower=0, upper=1>[n_day_fit,n_age_groups] S_u; // susceptible compartment, relative to population size, unvaccinated
+  matrix<lower=0, upper=1>[n_day_fit,n_age_groups] I_u; // infetious compartment,   relative to population size, unvaccinated
+  matrix<lower=0, upper=1>[n_day_fit,n_age_groups] R_u; // recovered compartment,   relative to population size, unvaccinated
+  matrix<lower=0, upper=1>[n_day_fit,n_age_groups] S_v; // susceptible compartment, relative to population size, vaccinated
+  matrix<lower=0, upper=1>[n_day_fit,n_age_groups] I_v; // infetious compartment,   relative to population size, vaccinated
+  matrix<lower=0, upper=1>[n_day_fit,n_age_groups] R_v; // recovered compartment,   relative to population size, vaccinated
+  array[n_day_fit,n_age_groups] real<lower=0, upper=1> delta_severe; // severe/detectable incidence relative to population size
+  array[n_day_fit,n_age_groups] real<lower=0> delta_severe_abs; // severe/detectable incidence in absolute numbers
+  real phi; // dispersion parameter, var=mu+reciprocal_phi*mu^2
   // weekly stuff
-  array[n_week_fit,n_age_groups] real<lower=0> severe_mean_weekly;
+  array[n_week_fit,n_age_groups] real<lower=0> delta_severe_abs_weekly; // severe/detectable incidence in absolute numbers, weekly aggregate
   
   // Overdispersion
     phi = 1 / reciprocal_phi; // dispersion parameter: var=mu+reciprocal_phi*mu^2
@@ -116,11 +116,11 @@ transformed parameters {
         
         //
         delta_severe[t,a] = (delta_infective_exposures_u * 1 + delta_infective_exposures_v * (1-ve_severe) ) * prop_severe[season_id[t], a] ; 
-        severe_mean[t,a] = delta_severe[t,a] * pop_age_group[a,1];
+        delta_severe_abs[t,a] = delta_severe[t,a] * pop_age_group[a,1];
         
         if (season_start[t]==2){
           // fill first position of the season in other vectors
-          severe_mean[t-1,a] = severe_mean[t,a];
+          delta_severe_abs[t-1,a] = delta_severe_abs[t,a];
           delta_severe[t-1,a] = delta_severe[t,a];
         }
       }
@@ -134,7 +134,7 @@ transformed parameters {
         // define 2 local variables
         int day_start = (i-1)*7+1; 
         int day_end = day_start+6;
-        severe_mean_weekly[i,a] = sum( severe_mean[day_start:day_end,a] );
+        delta_severe_abs_weekly[i,a] = sum( delta_severe_abs[day_start:day_end,a] );
       }
     }
     
@@ -146,7 +146,7 @@ model {
   // --------------------------------likelihood part
   for (t in 1:n_week_fit) {
     for (a in 1:n_age_groups) {
-      if (severe_obs_notna[t]==1) severe_obs_fit[t,a] ~ neg_binomial_2( severe_mean_weekly[t,a], phi ) ;
+      if (severe_obs_notna[t]==1) severe_obs_fit[t,a] ~ neg_binomial_2( delta_severe_abs_weekly[t,a], phi ) ;
     }
   }
   
@@ -174,19 +174,24 @@ generated quantities {
   matrix<lower=0,upper=1>[n_day_project, n_age_groups] gen_S_v;
   matrix<lower=0,upper=1>[n_day_project, n_age_groups] gen_I_v;
   matrix<lower=0,upper=1>[n_day_project, n_age_groups] gen_R_v;
+  array[n_week_fit, n_age_groups] int<lower=0> gen_severe_obs_fit;
   // note: stan does not have 3-dimensional matrices, thus opting for arrays or 2-dimensional matrixes
   // note: matrix[n,m] M[o] creates an array of length o, each element contraining an nxm matrix, M CONFUSINGLY has then dimension [o,n,m]
-  matrix<lower=0>[n_day_project, n_age_groups] gen_delta_severe[n_scenario];
-  matrix<lower=0>[n_day_project, n_age_groups] gen_severe_mean[n_scenario];
-  array[n_week_fit, n_age_groups] int<lower=0> gen_severe_obs_fit;
-  array[n_scenario, n_week_project, n_age_groups ] int<lower=0> gen_severe_obs_project;
-  array[n_scenario, n_week_project, n_age_groups] real gen_severe_mean_weekly;
+  matrix<lower=0>[n_day_project, n_age_groups] gen_delta_severe_u[n_scenario];
+  matrix<lower=0>[n_day_project, n_age_groups] gen_delta_severe_v[n_scenario];
+  matrix<lower=0>[n_day_project, n_age_groups] gen_delta_severe_u_abs[n_scenario];
+  matrix<lower=0>[n_day_project, n_age_groups] gen_delta_severe_v_abs[n_scenario];
+  array[n_scenario, n_week_project, n_age_groups ] int<lower=0> gen_severe_u_obs_project; // unvaccinated
+  array[n_scenario, n_week_project, n_age_groups ] int<lower=0> gen_severe_v_obs_project; // vaccinated
+  array[n_scenario, n_week_project, n_age_groups ] int<lower=0> gen_severe_t_obs_project; // total
+  array[n_scenario, n_week_project, n_age_groups] real gen_delta_severe_u_abs_weekly; // unvaccinated
+  array[n_scenario, n_week_project, n_age_groups] real gen_delta_severe_v_abs_weekly; // vaccinated
   real Rnull_eff[n_season];
   
   // print("dims(gen_delta_severe): ", dims(gen_delta_severe) ); // 
-  // print("dims(gen_severe_mean): ", dims(gen_severe_mean) ); // [6,364,1]
+  // print("dims(gen_delta_severe_abs): ", dims(gen_delta_severe_abs) ); // [6,364,1]
   // print("dims(gen_severe_obs_project): ", dims(gen_severe_obs_project) ); // 
-  // print("dims(gen_severe_mean_weekly): ", dims(gen_severe_mean_weekly) ); // 
+  // print("dims(gen_delta_severe_abs_weekly): ", dims(gen_delta_severe_abs_weekly) ); // 
   
   // --------------------------------simulate some quantities of interest
   // computation of Rnull_eff that is not quite correct due to age-structure
@@ -198,7 +203,7 @@ generated quantities {
   // simulate fitted observations
   for (t in 1:n_week_fit) {
     for (a in 1:n_age_groups) {
-      gen_severe_obs_fit[t,a] = neg_binomial_2_rng( severe_mean_weekly[t,a], phi );
+      gen_severe_obs_fit[t,a] = neg_binomial_2_rng( delta_severe_abs_weekly[t,a], phi );
     }
   }
   
@@ -251,12 +256,17 @@ generated quantities {
         gen_R_u[t,a] = gen_R_u[t-1,a] + delta_R_u - delta_vax_j[t-1,a] * gen_R_u[t-1,a] / (gen_S_u[t-1,a] + gen_R_u[t-1,a]); 
         gen_R_v[t,a] = gen_R_v[t-1,a] + delta_R_v + delta_vax_j[t-1,a] * gen_R_u[t-1,a] / (gen_S_u[t-1,a] + gen_R_u[t-1,a]);
         //
-        gen_delta_severe[j,t,a] = (delta_infective_exposures_u + delta_infective_exposures_v * (1-ve_severe)) * prop_severe_mu[a]; 
-        gen_severe_mean[ j,t,a] = gen_delta_severe[j,t,a] * pop_age_group[a,1] ;
+        gen_delta_severe_u[j,t,a] = (delta_infective_exposures_u * (1-0) )          * prop_severe_mu[a];
+        gen_delta_severe_v[j,t,a] = (delta_infective_exposures_v * (1-ve_severe))   * prop_severe_mu[a]; 
+
+        gen_delta_severe_u_abs[ j,t,a] = gen_delta_severe_u[j,t,a] * pop_age_group[a,1] ;
+        gen_delta_severe_v_abs[ j,t,a] = gen_delta_severe_v[j,t,a] * pop_age_group[a,1] ;
         //
         if (t==2) { // also impute the first position
-        gen_severe_mean[j,1,a] = gen_severe_mean[j,2,a];
-        gen_delta_severe[j,1,a] = gen_delta_severe[j,2,a];
+        gen_delta_severe_u_abs[j,1,a] = gen_delta_severe_u_abs[j,2,a];
+        gen_delta_severe_v_abs[j,1,a] = gen_delta_severe_v_abs[j,2,a];
+        gen_delta_severe_u[j,1,a] = gen_delta_severe_u[j,2,a];
+        gen_delta_severe_v[j,1,a] = gen_delta_severe_v[j,2,a];
         }
         }
       } // n_age_groups loop 
@@ -270,7 +280,8 @@ generated quantities {
         // define 2 local variables
         int day_start = (i-1)*7+1; // f(i=1)=1 , f(i=2)=8
         int day_end = day_start+6;
-        gen_severe_mean_weekly[j,i,a] = sum( gen_severe_mean[j,day_start:day_end,a] );
+        gen_delta_severe_u_abs_weekly[j,i,a] = sum( gen_delta_severe_u_abs[j,day_start:day_end,a] );
+        gen_delta_severe_v_abs_weekly[j,i,a] = sum( gen_delta_severe_v_abs[j,day_start:day_end,a] );
       }
     }
   }
@@ -279,7 +290,9 @@ generated quantities {
   for (j in 1:n_scenario) {
     for (t in 1:n_week_project) {
       for (a in 1:n_age_groups) {
-        gen_severe_obs_project[j,t,a] = neg_binomial_2_rng( gen_severe_mean_weekly[j,t,a] , phi ) ;
+        gen_severe_u_obs_project[j,t,a] = neg_binomial_2_rng( gen_delta_severe_u_abs_weekly[j,t,a] , phi ) ;
+        gen_severe_v_obs_project[j,t,a] = neg_binomial_2_rng( gen_delta_severe_v_abs_weekly[j,t,a] , phi ) ;
+        gen_severe_t_obs_project[j,t,a] = gen_severe_u_obs_project[j,t,a] + gen_severe_v_obs_project[j,t,a]
       }
     }
   }
