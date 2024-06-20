@@ -237,17 +237,29 @@ model_SIR_multiseason = function( params=NULL,
   # plotting
   p1 = all_season_fit %>% ggplot(aes(date,value)) + geom_line() + geom_rug()
   
+  df_scenarios = 
+    tibble(
+      n=1:6,
+      scenario_id=c("A","B","C","D","E","F"),
+      axis_transmission=c(),
+      axis_vax=c(1,1,2,2,3,3),
+      axis_transmission=c(1,2,1,2,1,2)
+    ) %>% left_join(
+      tibble(axis_vax=c(1,2,3),axis_vax_name=c("opti","pess","null"))
+    ) %>% left_join(
+      tibble(axis_transmission=c(1,2),axis_transmission_name=c("opti","pess"))
+    )
+  
   # ---- |-Stan list and fit----
   stan_list = list(
-    ## extra stuff good to carry forward
+    ## EXTRA stuff good to carry forward
     all_season_fit=all_season_fit,
     all_season_project=all_season_project,
     season_id_raw = fct_inorder(all_season_fit_daily$season) %>% levels() %>% enframe(),
-    ## below required for stan model
+    ## data relevated for the fit
     n_season = n_distinct(all_season_fit$season),
     n_week_fit = nrow(all_season_fit),
     n_day_fit = nrow(all_season_fit_daily),
-    n_week_project = nrow(all_season_project),
     #
     n_age_groups = 1,
     #
@@ -262,7 +274,16 @@ model_SIR_multiseason = function( params=NULL,
     pop_age_group=matrix(pop_country,nrow=1,ncol=1),
     contact_matrix=matrix(data=1,nrow=1,ncol=1),
     delta_vax=tibble( value=rep(0,nrow(all_season_fit_daily)) ),
-    # 
+    # data relevant for projected scenarios
+    n_week_project = nrow(all_season_project),
+    n_day_project= nrow(all_season_project)*7,
+    n_scenario = nrow(df_scenarios),
+    axis_transmission = df_scenarios$axis_transmission,
+    axis_vax = df_scenarios$axis_vax,
+    delta_vax_opti=tibble( value=rep(0,nrow(all_season_project_daily)) ),
+    delta_vax_pess=tibble( value=rep(0,nrow(all_season_project_daily)) ),
+    delta_vax_null=tibble( value=rep(0,nrow(all_season_project_daily)) ),
+    # epi parameters
     Rnull = params$Rnull,
     rate_infectious = params$rate_infectious,
     ve_inf = params$ve_inf,
