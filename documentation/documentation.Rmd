@@ -14,19 +14,19 @@ library(fst)
 
 ## Introduction
 
-This document describes an age and vaccination dissaggregated SIR model.
-We are fitting the model to weekly ILI incidence multiplied by flu-positivity in that same week. 
+This document describes an age and vaccination dissaggregated SIR model. We are fitting the model to weekly ILI incidence multiplied by flu-positivity in that same week.
 
 ## SIR
 
-We consider a population consisting of $N$ individuals.  The population is divided into three compartments: the susceptible, infectious and removed compartments. Their sizes, at any time $t$ for an age class $j$, are denoted by $S^{(j)}(t)$, $I^{(j)}(t)$ and $R^{(j)}(t)$ respectively. We also use a community contact rate $\beta$. We let the rate of recovery be denoted $\gamma$.
+We consider a population consisting of $N$ individuals. The population is divided into three compartments: the susceptible, infectious and removed compartments. Their sizes, at any time $t$ for an age class $j$, are denoted by $S^{(j)}(t)$, $I^{(j)}(t)$ and $R^{(j)}(t)$ respectively. We also use a community contact rate $\beta$. We let the rate of recovery be denoted $\gamma$.
 
-We use a contact matrix $C$, with elements $C_{i,j}$ being the average number of contacts an individual in age group $i$ has with individuals in age group $j$ within 24h. 
+We use a contact matrix $C$, with elements $C_{i,j}$ being the average number of contacts an individual in age group $i$ has with individuals in age group $j$ within 24h.
 
-We let $vax(t)$ be the fraction of new people being vaccinated on day $t$. Subscript $u$ and $v$ are used to distinguish between the unvaccinated and vaccinated groups. We further let $ve_{inf}$, $ve_{susc}$ and $ve_{severe}$ be the vaccine efficacy in terms of infectiousness, susceptibility and severe disease. 
+We let $vax(t)$ be the fraction of new people being vaccinated on day $t$. Subscript $u$ and $v$ are used to distinguish between the unvaccinated and vaccinated groups. We further let $ve_{inf}$, $ve_{susc}$ and $ve_{severe}$ be the vaccine efficacy in terms of infectiousness, susceptibility and severe disease.
 
 The SIR model is specified as follows
 
+```{=tex}
 \begin{aligned}
 S_u^{(j)}(t) & = S_u^{(j)}(t-1) - vax^{(j)}(t-1) \frac{S_u^{(j)}(t-1) }{S_u^{(j)}(t-1) +R_u^{(j)}(t-1) }\\
    & -\beta\sum_{i} C_{i,j}  \big(I_u^{(i)}(t-1)+ (1-ve_{inf}) (I_{v}^{(i)}(t-1)\big) S_u^{(j)}(t-1) \\
@@ -43,26 +43,24 @@ R_u^{(j)}(t) & = R_u^{(j)}(t-1) + \gamma I_u^{(j)}(t - 1) - vax^{(j)}(t-1) \frac
 R_{v}^{(j)}(t) & = R_{v}^{(j)}(t-1) + \gamma I_{v}^{(j)}(t - 1) + vax^{(j)}(t-1) \frac{R_u^{(j)}(t-1) }{S_u^{(j)}(t-1) + R_u^{(j)}(t-1) }.
 
 \end{aligned}
-
-
+```
 We let both susceptible and recovered be vaccinated proportional to their size at time $t$, assuming that you will not get vaccinated during the time of being infectious.
 
 ## Statistical inference
 
 We assume an Negative Binomial distribution for the weekly ILI incidence multiplied by the flu positivity for that week.
 
-The SIR model is fitted on a daily scale and then 
+The SIR model is fitted on a daily scale and then
 
 $$
 \text{weekly ILI for age group } i \text{ at time } t\sim \text{NegBin}( \mu(t)^i, \phi ),
-$$
-where $\mu(t)^i$ is the mean of the severe outcomes for age group $i$ for week $t$ and $\phi$ is the overdispersion parameter.
+$$ where $\mu(t)^i$ is the mean of the severe outcomes for age group $i$ for week $t$ and $\phi$ is the overdispersion parameter.
 
 ## Contact matrix
 
 For the contact matrix $C$, we use country specific estimates from the study ["Projecting social contact matrices in 152 countries using contact surveys and demographic data" (Prem et al, 2017)](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1005697). This study provides model based estimates of the expected number of contacts of an individual in age-group $i$ with individuals from age-group $j$ within 24h.
 
-The contact frequencies are provided in sixteen 5-year age-groups from age 0-4 until age 75-79.  
+The contact frequencies are provided in sixteen 5-year age-groups from age 0-4 until age 75-79.
 
 Below is the contact matrix for Albania.
 
@@ -86,11 +84,11 @@ dat_long %>% ggplot() +
   ylab("Contact age")
 ```
 
-To specify new age groups we need to make some specific assumptions: 
+To specify new age groups we need to make some specific assumptions:
 
-- The contact behavior within each 5-year age group is the same for all ages. Every member of an age-group $i$, e.g. 15-19 year old, has the same expected number of contacts with other age-groups.
+-   The contact behavior within each 5-year age group is the same for all ages. Every member of an age-group $i$, e.g. 15-19 year old, has the same expected number of contacts with other age-groups.
 
-- The contacts of an individual with age-group $i$ to individual with age (in years) $k$ from age-group $j$ occur with a expected frequency corresponding to the share of individuals with age $k$ years in age-group $j$. 
+-   The contacts of an individual with age-group $i$ to individual with age (in years) $k$ from age-group $j$ occur with a expected frequency corresponding to the share of individuals with age $k$ years in age-group $j$.
 
 Based on these assumptions and in combination with the age distribution of each country, we can derive a contact matrix with 1-year resolution in the age-range 0-79 years.
 
@@ -207,8 +205,6 @@ obtain_demography = function( country, ten_year_brackets = FALSE ){
 }
 ```
 
-
-
 ```{r echo=TRUE}
 # Obs this code does not work yet but should follow what is written above. 
 # age_str should contain population for each year of age
@@ -280,9 +276,7 @@ obtain_demography = function( country, ten_year_brackets = FALSE ){
 #   arrange(age, age_contact)
 ```
 
-We can check the implementation of our *algorithm* by reproducing the original Polymod contact matrix from derived year-specific contact frequencies (using assumptions 1. and 2.).
-The results should be identical to the original Polymod contact matrix.
-
+We can check the implementation of our *algorithm* by reproducing the original Polymod contact matrix from derived year-specific contact frequencies (using assumptions 1. and 2.). The results should be identical to the original Polymod contact matrix.
 
 ```{r echo=TRUE}
 # cont_yearly = cont_yearly %>% 
@@ -310,5 +304,3 @@ The results should be identical to the original Polymod contact matrix.
 #                        midpoint = 7, limits = c(0,15.1))
 
 ```
-
-
