@@ -245,9 +245,9 @@ model_SIR_multiseason = function( params=NULL,
       axis_vax=c(1,1,2,2,3,3),
       axis_transmission=c(1,2,1,2,1,2)
     ) %>% left_join(
-      tibble(axis_vax=c(1,2,3),axis_vax_name=c("opti","pess","null"))
+      tibble(axis_vax=c(1,2,3),axis_vax_name=c("opti","pess","null")) , by = join_by(axis_vax)
     ) %>% left_join(
-      tibble(axis_transmission=c(1,2),axis_transmission_name=c("opti","pess"))
+      tibble(axis_transmission=c(1,2),axis_transmission_name=c("opti","pess")), by = join_by(axis_transmission)
     )
   
   # ---- |-Stan list and fit----
@@ -256,6 +256,7 @@ model_SIR_multiseason = function( params=NULL,
     all_season_fit=all_season_fit,
     all_season_project=all_season_project,
     season_id_raw = fct_inorder(all_season_fit_daily$season) %>% levels() %>% enframe(),
+    df_scenarios = df_scenarios,
     ## data relevated for the fit
     n_season = n_distinct(all_season_fit$season),
     n_week_fit = nrow(all_season_fit),
@@ -263,7 +264,7 @@ model_SIR_multiseason = function( params=NULL,
     #
     n_age_groups = 2,
     #
-    severe_obs_fit = ( all_season_fit %>% select(value) %>% 
+    severe_obs_fit = ( all_season_fit %>% select(value) %>% mutate(value=value/2) %>% 
                          mutate(value=replace_na(value,0) %>% as.integer(),val=value) ),
     severe_obs_notna = as.integer(!is.na(all_season_fit$value)),
     season_start = as.integer(all_season_fit_daily$season_start),
@@ -291,11 +292,24 @@ model_SIR_multiseason = function( params=NULL,
     ve_susc = params$ve_susc,
     ve_severe = params$ve_severe
   )
+  ### make it 1 age group
+  if (params$debug==TRUE) {
+    stan_list$contact_matrix = matrix(data=c(1),nrow=1,ncol=1)
+    stan_list$pop_age_group = matrix(c(pop_country) ,nrow=1,ncol=1)
+    stan_list$severe_obs_fit =  ( all_season_fit %>% select(value) %>% 
+                                    mutate(value=replace_na(value,0) %>% as.integer()) )
+    stan_list$delta_vax = tibble( val1=rep(0,nrow(all_season_fit_daily)) )
+    stan_list$delta_vax_opti = tibble( val1=rep(0,nrow(all_season_project_daily)) )
+    stan_list$delta_vax_pess = tibble( val1=rep(0,nrow(all_season_project_daily)) )
+    stan_list$delta_vax_null = tibble( val1=rep(0,nrow(all_season_project_daily)) )
+  }
+  
   p2 = NULL
   path_fit = paste0("../Big data/multiseason_age_vax",target_input,country_short_input,".Rdata")
   path_fit = "../Big data/multiseason_age_vaxili_typing_sentinelAT.Rdata"
+  pr=paste("> Fitting:",target_input,"for",country_short_input,"... "); cleancat(green(pr))
   if (params$debug==F) {
-    pr=paste("> Fitting:",target_input,"for",country_short_input,"... \n"); cat(green(pr))
+    
     fit00=rstan::stan(
       file='./stan/SIR_multiseason_age_vax.stan',
       chains=1 ,thin=1,iter=100,
@@ -306,12 +320,13 @@ model_SIR_multiseason = function( params=NULL,
       ),
       data=stan_list
     ) # 2.3 mins
-    pr=paste("> Running:",target_input,"for",country_short_input,"... \n"); cat(green(pr))
+   
     
     save(fit00,stan_list,file = path_fit)
   } else {
     load(path_fit)
   }
+  pr=paste("> Fitting:",target_input,"for",country_short_input,"Done \n"); cleancat(green(pr))
   
   # ---- |-Extract parameters and plot ----
   if (F){
@@ -323,15 +338,11 @@ model_SIR_multiseason = function( params=NULL,
   }
   
   
-  p2 = fit00 %>% gather_draws(gen_severe_obs_fit[n,]) %>% 
+  p2 = fit00 %>% gather_draws(delta_severe_abs_weekly_sum[n]) %>% 
     filter(.draw%in%c(1:20)) %>% select(-.chain,-.iteration) %>% ungroup() %>% 
-    right_join(all_season_fit) %>% 
+    right_join(all_season_fit,by = join_by(n)) %>% 
     ggplot(aes(date,value)) + 
-    geom_line(aes(y=.value,group=.draw),col="lightblue") + geom_line() 
-  
-  pr=paste("> Running:",target_input,"for",country_short_input,"done \n"); cat(green(pr))
-  
-  print(paste(target_input,"done"))
+    geom_line(aes(y=.value,group=.draw),col="lightblue") + geom_line() + coord_cartesian(ylim=c(0,10000))
   
   # ---- |-Compile output ----
   modl = 

@@ -179,6 +179,14 @@ if ("Tahoma" %in% extrafont::fonts()) {
   FONT <- NULL
 }
 
+cleancat <- function(astring, width=80) {
+  # Reserves a line of 80 (default) characters
+  # and uses it for serial updates
+  # require("stringr")
+  astring <- paste("\r", astring, sep="")
+  cat(str_pad(astring, 80, "right"))
+}
+
 # Theme (got this from WNV repo)
 .plottheme <- ggplot2::theme(axis.text = ggplot2::element_text(size = 8, family = FONT),
                              axis.title = ggplot2::element_text(size = 9, family = FONT),

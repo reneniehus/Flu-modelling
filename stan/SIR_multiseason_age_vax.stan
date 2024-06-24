@@ -66,7 +66,7 @@ transformed parameters {
   array[n_week_fit,n_age_groups] real<lower=0> delta_severe_abs_weekly; // severe/detectable incidence in absolute numbers, weekly aggregate
   
   // Overdispersion
-    phi = 1 / reciprocal_phi; // dispersion parameter: var=mu+reciprocal_phi*mu^2
+  phi = 1 / reciprocal_phi; // dispersion parameter: var=mu+reciprocal_phi*mu^2
   
   // loop through all days
   for (t in 1:n_day_fit){
@@ -86,10 +86,10 @@ transformed parameters {
       // initiate the compartments based on current season\
       // S I R initial values age dist corrected
       for(a in 1:n_age_groups){
-        S_u[t,a] = SIR_ini[season_id[t], a, 1] * pop_age_group[a, 1] / pop; // rescaled
-        I_u[t,a] = SIR_ini[season_id[t], a, 2] * pop_age_group[a, 1] / pop;
-        R_u[t,a] = SIR_ini[season_id[t], a, 3] * pop_age_group[a, 1] / pop;
-        S_v[t,a] = 0;  // initaillay noone is vaccinated
+        S_u[t,a] = SIR_ini[season_id[t], a, 1] * pop_age_group[a, 1] / pop; // rescaling 
+        I_u[t,a] = SIR_ini[season_id[t], a, 2] * pop_age_group[a, 1] / pop; // rescaling
+        R_u[t,a] = SIR_ini[season_id[t], a, 3] * pop_age_group[a, 1] / pop; // rescaling
+        S_v[t,a] = 0;  // at start of season, no one is vaccinated
         I_v[t,a] = 0; 
         R_v[t,a] = 0; 
         
@@ -158,9 +158,9 @@ model {
     logit( SIR_ini[,a,2] ) ~ normal( logit(SIR_ini_mu[a,2] ) , sigma_i );
   }
   // priors on dispersion parameters
-  sigma_prop_severe    ~ exponential(5); // parameter is the exponential RATE, so BIG numbers mean LOW mean
-  sigma_s              ~ exponential(5); // parameter is the exponential RATE, so BIG numbers mean low mean
-  sigma_i              ~ exponential(1); // parameter is the exponential RATE, so BIG numbers mean low mean
+  sigma_prop_severe    ~ exponential(2); // parameter is the exponential RATE, so BIG numbers mean LOW mean
+  sigma_s              ~ exponential(2); // parameter is the exponential RATE, so BIG numbers mean low mean
+  sigma_i              ~ exponential(2); // parameter is the exponential RATE, so BIG numbers mean low mean
   
 }
 
@@ -174,6 +174,7 @@ generated quantities {
   matrix<lower=0,upper=1>[n_day_project, n_age_groups] gen_S_v;
   matrix<lower=0,upper=1>[n_day_project, n_age_groups] gen_I_v;
   matrix<lower=0,upper=1>[n_day_project, n_age_groups] gen_R_v;
+  array[n_week_fit] real<lower=0> delta_severe_abs_weekly_sum;
   array[n_week_fit, n_age_groups] int<lower=0> gen_severe_obs_fit;
   array[n_week_fit] int<lower=0> gen_severe_obs_fit_sum;
   // note: stan does not have 3-dimensional matrices, thus opting for arrays or 2-dimensional matrixes
@@ -190,6 +191,7 @@ generated quantities {
   array[n_scenario, n_week_project  ] int<lower=0> gen_severe_t_obs_project_sum;
   array[n_scenario, n_week_project, n_age_groups] real gen_delta_severe_u_abs_weekly; // unvaccinated
   array[n_scenario, n_week_project, n_age_groups] real gen_delta_severe_v_abs_weekly; // vaccinated
+  
   real Rnull_eff[n_season];
   
   // print("dims(gen_delta_severe): ", dims(gen_delta_severe) ); // 
@@ -208,8 +210,9 @@ generated quantities {
   for (t in 1:n_week_fit) {
     for (a in 1:n_age_groups) {
       gen_severe_obs_fit[t,a] = neg_binomial_2_rng( delta_severe_abs_weekly[t,a], phi );
-      gen_severe_obs_fit_sum[t] = sum( gen_severe_obs_fit[t,] );
     }
+    gen_severe_obs_fit_sum[t] = sum( gen_severe_obs_fit[t,] );
+    delta_severe_abs_weekly_sum[t] = sum( delta_severe_abs_weekly[t, ] );
   }
   
   // --------------------------------simulate projected observations
@@ -263,7 +266,7 @@ generated quantities {
         //
         gen_delta_severe_u[j,t,a] = (delta_infective_exposures_u * (1-0) )          * prop_severe_mu[a];
         gen_delta_severe_v[j,t,a] = (delta_infective_exposures_v * (1-ve_severe))   * prop_severe_mu[a]; 
-
+        
         gen_delta_severe_u_abs[ j,t,a] = gen_delta_severe_u[j,t,a] * pop_age_group[a,1] ;
         gen_delta_severe_v_abs[ j,t,a] = gen_delta_severe_v[j,t,a] * pop_age_group[a,1] ;
         //
@@ -298,11 +301,11 @@ generated quantities {
         gen_severe_u_obs_project[j,t,a] = neg_binomial_2_rng( gen_delta_severe_u_abs_weekly[j,t,a]+1e-6 , phi ) ; // add small value to location parameter to avoid it being zero
         gen_severe_v_obs_project[j,t,a] = neg_binomial_2_rng( gen_delta_severe_v_abs_weekly[j,t,a]+1e-6 , phi ) ; // add small value to location parameter to avoid it being zero
         gen_severe_t_obs_project[j,t,a] = gen_severe_u_obs_project[j,t,a] + gen_severe_v_obs_project[j,t,a] ;
-        // sums across age-groups
-        gen_severe_u_obs_project_sum[j,t] = sum(gen_severe_u_obs_project[j,t, ]) ;
-        gen_severe_v_obs_project_sum[j,t]=  sum(gen_severe_v_obs_project[j,t, ]) ;
-        gen_severe_t_obs_project_sum[j,t]=  sum(gen_severe_t_obs_project[j,t, ]) ;
       }
+      // sums across age-groups
+      gen_severe_u_obs_project_sum[j,t] = sum(gen_severe_u_obs_project[j,t, ]) ;
+      gen_severe_v_obs_project_sum[j,t]=  sum(gen_severe_v_obs_project[j,t, ]) ;
+      gen_severe_t_obs_project_sum[j,t]=  sum(gen_severe_t_obs_project[j,t, ]) ;
     }
   }
   
