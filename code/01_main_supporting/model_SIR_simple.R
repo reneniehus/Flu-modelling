@@ -294,6 +294,7 @@ model_SIR_multiseason = function( params=NULL,
   )
   ### make it 1 age group
   if (params$debug==TRUE) {
+    stan_list$n_age_groups = 1
     stan_list$contact_matrix = matrix(data=c(1),nrow=1,ncol=1)
     stan_list$pop_age_group = matrix(c(pop_country) ,nrow=1,ncol=1)
     stan_list$severe_obs_fit =  ( all_season_fit %>% select(value) %>% 
@@ -330,10 +331,10 @@ model_SIR_multiseason = function( params=NULL,
   
   # ---- |-Extract parameters and plot ----
   if (F){
-    precis(fit00,pars=c("SIR_ini_mu"),depth = 2)
+    precis(fit00,pars=c("SIR_ini_mu"),depth = 3)
     precis(fit00,pars=c("Rnull_eff"),depth = 2)
     precis(fit00,pars=c("prop_severe"),depth = 2)
-    precis(fit00,pars=c("sigma_s"),depth = 2) # 3.66
+    precis(fit00,pars=c("sigma_i"),depth = 2) # 3.66
     precis(fit00,pars=c("SIR_ini"),depth = 3)
   }
   

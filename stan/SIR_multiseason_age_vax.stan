@@ -153,14 +153,15 @@ model {
   // --------------------------------prior part
   // prior
   for (a in 1:n_age_groups) {
-    logit(prop_severe[,a]) ~ normal( logit(prop_severe_mu[a] ) , sigma_prop_severe );
-    logit( SIR_ini[,a,1] ) ~ normal( logit(SIR_ini_mu[a,1] ) , sigma_s );
-    logit( SIR_ini[,a,2] ) ~ normal( logit(SIR_ini_mu[a,2] ) , sigma_i );
+    logit( prop_severe[,a] ) ~ normal( logit( prop_severe_mu[a] ) , sigma_prop_severe );
+    logit( SIR_ini[,a,1] )   ~ normal( logit( SIR_ini_mu[a,1] )   , sigma_s );
+    logit( SIR_ini[,a,3] )   ~ normal( logit( SIR_ini_mu[a,3] )   , sigma_i );
   }
+  
   // priors on dispersion parameters
   sigma_prop_severe    ~ exponential(2); // parameter is the exponential RATE, so BIG numbers mean LOW mean
   sigma_s              ~ exponential(2); // parameter is the exponential RATE, so BIG numbers mean low mean
-  sigma_i              ~ exponential(2); // parameter is the exponential RATE, so BIG numbers mean low mean
+  sigma_i              ~ exponential(5); // parameter is the exponential RATE, so BIG numbers mean low mean
   
 }
 
