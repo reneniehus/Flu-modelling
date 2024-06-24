@@ -261,28 +261,29 @@ model_SIR_multiseason = function( params=NULL,
     n_week_fit = nrow(all_season_fit),
     n_day_fit = nrow(all_season_fit_daily),
     #
-    n_age_groups = 1,
+    n_age_groups = 2,
     #
     severe_obs_fit = ( all_season_fit %>% select(value) %>% 
-                         mutate(value=replace_na(value,0) %>% as.integer()) ),
+                         mutate(value=replace_na(value,0) %>% as.integer(),val=value) ),
     severe_obs_notna = as.integer(!is.na(all_season_fit$value)),
     season_start = as.integer(all_season_fit_daily$season_start),
     season_id = fct_inorder(all_season_fit_daily$season) %>% as.integer(),
     #
     pop = pop_country,
     #
-    pop_age_group=matrix(pop_country,nrow=1,ncol=1),
-    contact_matrix=matrix(data=1,nrow=1,ncol=1),
-    delta_vax=tibble( value=rep(0,nrow(all_season_fit_daily)) ),
+    pop_age_group=matrix(c(pop_country/2,pop_country/2) ,nrow=2,ncol=1),
+    contact_matrix=matrix(data=c(1,1,1,1),nrow=2,ncol=2),
+    delta_vax=tibble( val1=rep(0,nrow(all_season_fit_daily)),
+                      val2=rep(0,nrow(all_season_fit_daily))),
     # data relevant for projected scenarios
     n_week_project = nrow(all_season_project),
     n_day_project= nrow(all_season_project)*7,
     n_scenario = nrow(df_scenarios),
     axis_transmission = df_scenarios$axis_transmission,
     axis_vax = df_scenarios$axis_vax,
-    delta_vax_opti=tibble( value=rep(0,nrow(all_season_project_daily)) ),
-    delta_vax_pess=tibble( value=rep(0,nrow(all_season_project_daily)) ),
-    delta_vax_null=tibble( value=rep(0,nrow(all_season_project_daily)) ),
+    delta_vax_opti=tibble( val1=rep(0,nrow(all_season_project_daily)),val2=rep(0,nrow(all_season_project_daily)) ),
+    delta_vax_pess=tibble( val1=rep(0,nrow(all_season_project_daily)),val2=rep(0,nrow(all_season_project_daily)) ),
+    delta_vax_null=tibble( val1=rep(0,nrow(all_season_project_daily)),val2=rep(0,nrow(all_season_project_daily)) ),
     # epi parameters
     Rnull = params$Rnull,
     rate_infectious = params$rate_infectious,
@@ -292,32 +293,37 @@ model_SIR_multiseason = function( params=NULL,
   )
   p2 = NULL
   path_fit = paste0("../Big data/multiseason_age_vax",target_input,country_short_input,".Rdata")
+  path_fit = "../Big data/multiseason_age_vaxili_typing_sentinelAT.Rdata"
   if (params$debug==F) {
     pr=paste("> Fitting:",target_input,"for",country_short_input,"... \n"); cat(green(pr))
     fit00=rstan::stan(
       file='./stan/SIR_multiseason_age_vax.stan',
-      chains=1 ,thin=1,iter=200,
+      chains=1 ,thin=1,iter=100,
       seed=12, cores = getOption("mc.cores", 1L),
       control=list(
-        #adapt_delta=0.9,
+        adapt_delta=0.95
         #max_treedepth=14
       ),
       data=stan_list
     ) # 2.3 mins
     pr=paste("> Running:",target_input,"for",country_short_input,"... \n"); cat(green(pr))
     
-    save(fit00,path_fit)
+    save(fit00,stan_list,file = path_fit)
   } else {
     load(path_fit)
   }
   
   # ---- |-Extract parameters and plot ----
-  precis(fit00,pars=c("SIR_ini_mu"),depth = 2)
-  precis(fit00,pars=c("Rnull_eff"),depth = 2)
-  precis(fit00,pars=c("prop_severe"),depth = 2)
-  precis(fit00,pars=c("sigma_s"),depth = 2) # 3.66
-  precis(fit00,pars=c("SIR_ini"),depth = 3)
-  p2 = fit00 %>% gather_draws(severe_mean_weekly[n]) %>% 
+  if (F){
+    precis(fit00,pars=c("SIR_ini_mu"),depth = 2)
+    precis(fit00,pars=c("Rnull_eff"),depth = 2)
+    precis(fit00,pars=c("prop_severe"),depth = 2)
+    precis(fit00,pars=c("sigma_s"),depth = 2) # 3.66
+    precis(fit00,pars=c("SIR_ini"),depth = 3)
+  }
+  
+  
+  p2 = fit00 %>% gather_draws(gen_severe_obs_fit[n,]) %>% 
     filter(.draw%in%c(1:20)) %>% select(-.chain,-.iteration) %>% ungroup() %>% 
     right_join(all_season_fit) %>% 
     ggplot(aes(date,value)) + 

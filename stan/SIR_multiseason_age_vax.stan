@@ -175,6 +175,7 @@ generated quantities {
   matrix<lower=0,upper=1>[n_day_project, n_age_groups] gen_I_v;
   matrix<lower=0,upper=1>[n_day_project, n_age_groups] gen_R_v;
   array[n_week_fit, n_age_groups] int<lower=0> gen_severe_obs_fit;
+  array[n_week_fit] int<lower=0> gen_severe_obs_fit_sum;
   // note: stan does not have 3-dimensional matrices, thus opting for arrays or 2-dimensional matrixes
   // note: matrix[n,m] M[o] creates an array of length o, each element contraining an nxm matrix, M CONFUSINGLY has then dimension [o,n,m]
   matrix<lower=0>[n_day_project, n_age_groups] gen_delta_severe_u[n_scenario];
@@ -184,6 +185,9 @@ generated quantities {
   array[n_scenario, n_week_project, n_age_groups ] int<lower=0> gen_severe_u_obs_project; // unvaccinated
   array[n_scenario, n_week_project, n_age_groups ] int<lower=0> gen_severe_v_obs_project; // vaccinated
   array[n_scenario, n_week_project, n_age_groups ] int<lower=0> gen_severe_t_obs_project; // total
+  array[n_scenario, n_week_project  ] int<lower=0> gen_severe_u_obs_project_sum;
+  array[n_scenario, n_week_project  ] int<lower=0> gen_severe_v_obs_project_sum;
+  array[n_scenario, n_week_project  ] int<lower=0> gen_severe_t_obs_project_sum;
   array[n_scenario, n_week_project, n_age_groups] real gen_delta_severe_u_abs_weekly; // unvaccinated
   array[n_scenario, n_week_project, n_age_groups] real gen_delta_severe_v_abs_weekly; // vaccinated
   real Rnull_eff[n_season];
@@ -204,6 +208,7 @@ generated quantities {
   for (t in 1:n_week_fit) {
     for (a in 1:n_age_groups) {
       gen_severe_obs_fit[t,a] = neg_binomial_2_rng( delta_severe_abs_weekly[t,a], phi );
+      gen_severe_obs_fit_sum[t] = sum( gen_severe_obs_fit[t,] );
     }
   }
   
@@ -290,9 +295,13 @@ generated quantities {
   for (j in 1:n_scenario) {
     for (t in 1:n_week_project) {
       for (a in 1:n_age_groups) {
-        gen_severe_u_obs_project[j,t,a] = neg_binomial_2_rng( gen_delta_severe_u_abs_weekly[j,t,a] , phi ) ;
-        gen_severe_v_obs_project[j,t,a] = neg_binomial_2_rng( gen_delta_severe_v_abs_weekly[j,t,a] , phi ) ;
-        gen_severe_t_obs_project[j,t,a] = gen_severe_u_obs_project[j,t,a] + gen_severe_v_obs_project[j,t,a]
+        gen_severe_u_obs_project[j,t,a] = neg_binomial_2_rng( gen_delta_severe_u_abs_weekly[j,t,a]+1e-6 , phi ) ; // add small value to location parameter to avoid it being zero
+        gen_severe_v_obs_project[j,t,a] = neg_binomial_2_rng( gen_delta_severe_v_abs_weekly[j,t,a]+1e-6 , phi ) ; // add small value to location parameter to avoid it being zero
+        gen_severe_t_obs_project[j,t,a] = gen_severe_u_obs_project[j,t,a] + gen_severe_v_obs_project[j,t,a] ;
+        // sums across age-groups
+        gen_severe_u_obs_project_sum[j,t] = sum(gen_severe_u_obs_project[j,t, ]) ;
+        gen_severe_v_obs_project_sum[j,t]=  sum(gen_severe_v_obs_project[j,t, ]) ;
+        gen_severe_t_obs_project_sum[j,t]=  sum(gen_severe_t_obs_project[j,t, ]) ;
       }
     }
   }
