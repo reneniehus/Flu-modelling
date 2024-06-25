@@ -2,7 +2,8 @@ model_SIR_multiseason = function( params=NULL,
                                   all_season=NULL, 
                                   target_input=NULL, 
                                   country_short_input , 
-                                  pop_country ){
+                                  pop_country, 
+                                  vax_country){
   
   # ---- |-Filtering and computing compound indicators ----
   all_season %>% 
@@ -109,9 +110,9 @@ model_SIR_multiseason = function( params=NULL,
     n_scenario = nrow(df_scenarios),
     axis_transmission = df_scenarios$axis_transmission,
     axis_vax = df_scenarios$axis_vax,
-    delta_vax_opti=tibble( val1=rep(0,nrow(all_season_project_daily)),val2=rep(0,nrow(all_season_project_daily)) ),
-    delta_vax_pess=tibble( val1=rep(0,nrow(all_season_project_daily)),val2=rep(0,nrow(all_season_project_daily)) ),
-    delta_vax_null=tibble( val1=rep(0,nrow(all_season_project_daily)),val2=rep(0,nrow(all_season_project_daily)) ),
+    delta_vax_opti=tibble( val1=rep(0, nrow(all_season_project_daily)), val2=rep(0,nrow(all_season_project_daily)) ),
+    delta_vax_pess=tibble( val1=rep(0, nrow(all_season_project_daily)), val2=rep(0,nrow(all_season_project_daily)) ),
+    delta_vax_null=tibble( val1=rep(0, nrow(all_season_project_daily)), val2=rep(0,nrow(all_season_project_daily)) ),
     # epi parameters
     Rnull = params$Rnull,
     rate_infectious = params$rate_infectious,
@@ -119,6 +120,13 @@ model_SIR_multiseason = function( params=NULL,
     ve_susc = params$ve_susc,
     ve_severe = params$ve_severe
   )
+  
+  # Add vaccination to Oct 1st to the second age group
+  ind_vax = which(date_v == paste0(year(min(date_v)),"-10-01"))
+  stan_list$delta_vax_opti$val2[ind_vax] = vax_country$higher_vax_coverage
+  stan_list$delta_vax_pess$val2[ind_vax] = vax_country$lower_vax_coverage
+  stan_list$delta_vax_null$val2[ind_vax] = 0
+  
   ### make it 1 age group
   if (params$debug==TRUE) {
     stan_list$n_age_groups = 1
