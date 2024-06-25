@@ -57,12 +57,15 @@ run_flu_models = function( params=NULL , data=NULL ){
         pop_country = data$demography$population_pyramid %>% 
           filter(country==country_short_input) %>% pull(population) %>% sum()
         if (country_short_input=="GR") pop_country = 10.43*1e6
+        vax_country = data$vax$data_vax %>% filter( location_name == EU_long(country_short_input) ) # vaccination data for a country
+        if (nrow(vax_country) != 1) stop("Vaccination data is wrong format: either no data or too many rows")
         # run model
         modl[[target_input]][[country_short_input]] = model_SIR_multiseason( params , 
                                                                              all_season=all_season , 
                                                                              target_input, 
                                                                              country_short_input,
-                                                                             pop_country)
+                                                                             pop_country,
+                                                                             vax_country)
       }
     }
     end_time <- Sys.time() # 5 hrs
