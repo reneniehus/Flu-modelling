@@ -90,12 +90,14 @@ load_flu_data_vax = function(data=data, params=NULL , new_from_online=T , regene
     
     if (new_from_online==T) {
       # load data freshly from the internet
+      data_vax = read.csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/influenza/vaccination/influenza_vax_scenarios.csv")
     }
     if (new_from_online==F) {
       # load data from local storage
     }
     
     vax = list(
+      data_vax = data_vax %>% pivot_wider(names_from = "scenario", values_from = vaccine_coverage)
     )
     save(vax,file="output/vax.Rdata")
     
