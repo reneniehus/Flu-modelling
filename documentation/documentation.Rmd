@@ -44,6 +44,8 @@ R_{v}^{(j)}(t) & = R_{v}^{(j)}(t-1) + \gamma I_{v}^{(j)}(t - 1) + vax^{(j)}(t-1)
 
 \end{aligned}
 ```
+Interpretation of the first equation: Let's multiply both sides with $N$ to interpret this equation in terms of how absolute numbers of susceptible, unvaccinated individuals changes. The new number of susceptible, unvaccinated individuals is given through the number of such individuals in the previous time-step, minus those that were vaccinated and those that were infected. In particular, the number of vaccinated susceptible, unvaccinated individuals is given by the total number of vaccinated individuals in the last time-step multiplied by the chance of a vaccination occurring in the susceptible as opposed to the recovered group. The number of newly infected suceptible, unvaccinated individuals in a specific age group is given through the number of potentially infectious encounters, multiplied by a modifying factor of the encounter based on the age-group's contacts with others, multiplied by the change of any encounter being with an actually infectious individual. Let's take a number example for this: assume there are 40 susceptible, unvaccinated individuals of the group 'young' in the previous time-step. Each 'young' individual has 2 times the typical number of 0.25 potentially infectious encouters, such that there for those 40 indivuals, there are 40\*2\*0.25 = 20 potentially infectious encounters.
+
 We let both susceptible and recovered be vaccinated proportional to their size at time $t$, assuming that you will not get vaccinated during the time of being infectious.
 
 ## Statistical inference
