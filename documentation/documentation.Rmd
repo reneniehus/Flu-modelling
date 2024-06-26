@@ -50,13 +50,10 @@ According to the above, the first equation above requires changes like so:
 
 ``` tex
 \begin{aligned}
-old
 S_u^{(j)}(t) & = S_u^{(j)}(t-1) - vax^{(j)}(t-1) \frac{S_u^{(j)}(t-1) }{S_u^{(j)}(t-1) +R_u^{(j)}(t-1) }\\
 & -\beta\sum_{i} C_{i,j}  \big(I_u^{(i)}(t-1)+ (1-ve_{inf}) (I_{v}^{(i)}(t-1)\big) S_u^{(j)}(t-1) \\
-
-new
 S_u^{(j)}(t) & = S_u^{(j)}(t-1) - vax^{(j)}(t-1) \frac{S_u^{(j)}(t-1) }{S_u^{(j)}(t-1) +R_u^{(j)}(t-1) }\\
-& -\beta\gamma_{j}\sum_{i} C_{i,j}  \big(I_u^{(i)}(t-1)+ (1-ve_{inf}) (I_{v}^{(i)}(t-1)\big) S_u^{(j)}(t-1) \\
+& -\beta\gamma_{j}\sum_{i} C_{i,j}  \big(I_u^{(i)}(t-1)+ (1-ve_{inf}) (I_{v}^{(i)}(t-1)\big) S_u^{(j)}(t-1).
 
 
 \end{aligned}
