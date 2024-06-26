@@ -146,15 +146,25 @@ model_SIR_multiseason = function( params=NULL,
   pr=paste("> Fitting:",target_input,"for",country_short_input,"... "); cleancat(green(pr))
   if (params$debug==F) {
     
+    #
+    fit_means = get_posterior_mean(fit00)
+    #
+    myl = vector(mode = "list", length = 36)
+    myl[1:36] = fit_means[1:36]
+    names(myl) = row.names(fit_means)[1:36]
+    init_fun = function(...) myl
+    
+    
     fit00=rstan::stan(
       file='./stan/SIR_multiseason_age_vax.stan',
-      chains=1 ,thin=1,iter=100,
+      chains=1 ,thin=1,iter=300,
       seed=12, cores = getOption("mc.cores", 1L),
       control=list(
         adapt_delta=0.95
         #max_treedepth=14
       ),
-      data=stan_list
+      data=stan_list,
+      init = init_fun
     ) # 2.3 mins
     
     
