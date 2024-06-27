@@ -16,7 +16,7 @@ model_SIR_multiseason = function( params=NULL,
     filter(agegroup==params$SIR_simple$agegroup) -> all_season_filtered
   # filter:pandemic seasons
   all_season_filtered %>% 
-    filter(!season%in%params$SIR_multiseason$seasons_exclude) %>% 
+    filter(season%in%params$SIR_multiseason$seasons_include) %>% 
     select(country_short,season,date,value) %>% 
     mutate(n=1:n()) -> all_season_fit
   
@@ -146,13 +146,17 @@ model_SIR_multiseason = function( params=NULL,
   pr=paste("> Fitting:",target_input,"for",country_short_input,"... "); cleancat(green(pr))
   if (params$debug==F) {
     
-    #
-    fit_means = get_posterior_mean(fit00)
-    #
-    myl = vector(mode = "list", length = 36)
-    myl[1:36] = fit_means[1:36]
-    names(myl) = row.names(fit_means)[1:36]
-    init_fun = function(...) myl
+    # using a preious fit, set initial conditions
+    if (F) {
+      fit_means = get_posterior_mean(fit00)
+      # mp="SIR_ini_mu[1,3]";mcmc_areas(fit00,mp);precis(fit00,depth=3,mp)
+      #
+      myl = vector(mode = "list", length = 36)
+      myl[1:36] = fit_means[1:36]
+      names(myl) = row.names(fit_means)[1:36]
+      init_fun = function(...) myl
+    }
+    
     
     
     fit00=rstan::stan(
@@ -160,8 +164,8 @@ model_SIR_multiseason = function( params=NULL,
       chains=1 ,thin=1,iter=300,
       seed=12, cores = getOption("mc.cores", 1L),
       control=list(
-        adapt_delta=0.95
-        #max_treedepth=14
+        adapt_delta=0.98,
+        max_treedepth=14
       ),
       data=stan_list,
       init = init_fun

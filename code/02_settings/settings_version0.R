@@ -29,6 +29,7 @@ settings = function() {
   # Settings for SIR_multiseason
   params$SIR_simple_multi_season$target = c("ili_typing_sentinel") # c("ili","ili_typing_sentinel","ili_typing_all")
   params$SIR_multiseason$seasons_exclude = c("2019/2020","2020/2021","2021/2022") # those impacted by COVID-19 acute phase
+  params$SIR_multiseason$seasons_include = c("2017/2018","2018/2019","2023/2024") # 2017-2018, 2018-2019, and 2023-2024
   # Settings for last_year_burden
   params$last_year_burden$target = "ILIconsultationrate"
   params$last_year_burden$agegroup = "age_total"
