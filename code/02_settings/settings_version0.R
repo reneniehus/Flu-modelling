@@ -9,6 +9,12 @@ settings = function() {
   params$rate_infectious = 0.2777778
   params$Rnull = 2.0 # https://www.cambridge.org/core/journals/epidemiology-and-infection/article/estimation-of-the-basic-reproductive-number-r0-for-epidemic-highly-pathogenic-avian-influenza-subtype-h5n1-spread/A60F72F5004F3BC5FAC2A3F8BB188A0F
   # vaccine parameters
+  params$ve_spread = 0.20 # assuming a similar size of effect as for ve_inf
+  params$ve_inf = 0.20 #
+  params$ve_ili_cond_inf = 0.25 # 
+  # (1-ve_ili) = (1-ve_inf)*(1-ve_ili_cond_inf) 
+  params$ve_ili = 1-(1-params$ve_inf)*(1-params$ve_ili_cond_inf) # (1-ve_ili) = (1-ve_inf)*(1-ve_ili_cond_inf) 
+  
   params$ve_inf = 0.3 # vaccine efficacy on infectiousness
   params$ve_susc = 0.3 # vaccine efficacy on susceptability
   params$ve_severe = 0.6 # vaccine efficacy on severity, given infection

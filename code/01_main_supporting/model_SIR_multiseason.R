@@ -92,9 +92,9 @@ model_SIR_multiseason = function( params=NULL,
     #
     n_age_groups = 2,
     #
-    severe_obs_fit = ( all_season_fit %>% select(value) %>% mutate(value=value/2) %>% 
+    ili_obs_fit = ( all_season_fit %>% select(value) %>% mutate(value=value/2) %>% 
                          mutate(value=replace_na(value,0) %>% as.integer(),val=value) ),
-    severe_obs_notna = as.integer(!is.na(all_season_fit$value)),
+    ili_obs_notna = as.integer(!is.na(all_season_fit$value)),
     season_start = as.integer(all_season_fit_daily$season_start),
     season_id = fct_inorder(all_season_fit_daily$season) %>% as.integer(),
     #
@@ -116,9 +116,9 @@ model_SIR_multiseason = function( params=NULL,
     # epi parameters
     Rnull = params$Rnull,
     rate_infectious = params$rate_infectious,
+    ve_spread = params$ve_spread,
     ve_inf = params$ve_inf,
-    ve_susc = params$ve_susc,
-    ve_severe = params$ve_severe
+    ve_ili_cond_inf = params$ve_ili_cond_inf
   )
   
   # Add vaccination to Oct 1st to the second age group
@@ -148,20 +148,19 @@ model_SIR_multiseason = function( params=NULL,
     
     # using a preious fit, set initial conditions
     if (F) {
+      load(path_fit) # loading fit00
       fit_means = get_posterior_mean(fit00)
       # mp="SIR_ini_mu[1,3]";mcmc_areas(fit00,mp);precis(fit00,depth=3,mp)
       #
-      myl = vector(mode = "list", length = 36)
-      myl[1:36] = fit_means[1:36]
-      names(myl) = row.names(fit_means)[1:36]
+      myl = vector(mode = "list", length = 20)
+      myl[1:20] = fit_means[1:20]
+      names(myl) = row.names(fit_means)[1:20]
       init_fun = function(...) myl
     }
     
-    
-    
     fit00=rstan::stan(
       file='./stan/SIR_multiseason_age_vax.stan',
-      chains=1 ,thin=1,iter=300,
+      chains=2 ,thin=2,iter=200,
       seed=12, cores = getOption("mc.cores", 1L),
       control=list(
         adapt_delta=0.98,
@@ -169,7 +168,7 @@ model_SIR_multiseason = function( params=NULL,
       ),
       data=stan_list,
       init = init_fun
-    ) # 2.3 mins
+    ) # X mins
     
     
     save(fit00,stan_list,file = path_fit)
