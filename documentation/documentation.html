@@ -406,56 +406,64 @@ vax^{(j)}(t-1) \frac{R_u^{(j)}(t-1) }{S_u^{(j)}(t-1) + R_u^{(j)}(t-1) }.
 
 \end{aligned}\]</span>
 <p>Interpretation of the first equation: Let’s multiply both sides with
-the population size of the focus age group (<span class="math inline">\(N_{j}\)</span>) to interpret this equation in
-terms of how the absolute number of susceptible, unvaccinated
-individuals of age group <span class="math inline">\(j\)</span> changes.
-The new number of susceptible, unvaccinated individuals of <span class="math inline">\(j\)</span> (<span class="math inline">\(N_{j}S_u^{(j)}(t)\)</span>) is given through the
+the population size of the focus age group (<span class="math inline">\(N^{(j)}\)</span>) to allow interpretation of this
+equation in terms of how the absolute number of susceptible,
+unvaccinated individuals of age group <span class="math inline">\(j\)</span> changes. The new number of susceptible,
+unvaccinated individuals of age group <span class="math inline">\(j\)</span> (<span class="math inline">\(N^{(j)}S_u^{(j)}(t)\)</span>) is given through the
 number of such individuals in the previous time-step (<span class="math inline">\(N_{j}S_u^{(j)}(t-1)\)</span>), minus those that
-were vaccinated and those that were infected. In particular, the number
-of newly vaccinated susceptible, unvaccinated individuals in <span class="math inline">\(j\)</span> is given by the total number of
-vaccinated individuals in <span class="math inline">\(j\)</span> in the
-last time-step ( <span class="math inline">\(N_{j}vax^{(j)}(t-1)\)</span> ) multiplied by the
+were vaccinated and those that were infected.</p>
+<p>In particular, the number of newly vaccinated susceptible,
+unvaccinated individuals in <span class="math inline">\(j\)</span> is
+given by the total number of vaccinated individuals in <span class="math inline">\(j\)</span> in the last time-step ( <span class="math inline">\(N^{(j)}vax^{(j)}(t-1)\)</span> ) multiplied by the
 chance of a vaccination occurring in the susceptible as opposed to the
 recovered group of <span class="math inline">\(j\)</span> ( <span class="math inline">\(\frac{S_u^{(j)}(t-1)
 }{S_u^{(j)}(t-1)+R_u^{(j)}(t-1)}\)</span> ). Let’s take a number
 example: There are 10 new individuals being vaccinated in the group
 ‘young’, and this group contains 40 susceptible, unvaccinated
-individuals as well as 100 recovered, unvaccinated individuals. Thus,
-10x20/100=2 individuals of the group ‘young’ that are susceptible and
-unvaccinated are being vaccinated. The number of newly infected
-susceptible, unvaccinated individuals in <span class="math inline">\(j\)</span> is given through the number of
-potentially infectious encounters ( <span class="math inline">\(\beta\)</span> ), multiplied by a modifying factor
-of the encounter based on the age-group’s contacts with others ( <span class="math inline">\(C_{i,j}\)</span> ), multiplied by the change of
-any encounter being with an actually infectious individual ( <span class="math inline">\(\frac(I_u^{(i)}(t-1)+ (1-ve_{inf})
-(I_{v}^{(i)}(t-1)\big)\)</span> ). Let’s take a number example for this
-too: assume again there are 40 susceptible, unvaccinated individuals of
-the group ‘young’ in the previous time-step. ‘Young’ individuals
-interact with other individuals in the ‘young’ group, as well as with
-individuals of a second, ‘old’, group. Any individual has the country’s
-typical number of 0.2 ( <span class="math inline">\(\beta\)</span> )
-“potentially infecting encounters”. Each ‘young’ individual would meet
-80% ( <span class="math inline">\(N_{j}/N\)</span> ) other young
-individuals and 20% old individuals if mixing at random purely due to
-the age pyramid (and odds of young-meeting-young of odds(0.8)=4 ), but
-there is preferential mixing: the meeting preference is such that the
-odds of young-meeting-young is 2x4 (inv_odds(2*4)=89% of encounters by
-individuals of ‘young’ are with ‘young’). Finally, given age-specific
-behaviour any ‘young’ individual has 120% of the country’s typical
-number of contacts, and ‘old’ individuals have 20% ( 80%x1.2 + 20%x0.2 =
-1 ). Now, the 40 susceptible, unvaccinated indiviudals of the ‘young’
-group have a total of 40 x 1.2 x 0.2 x 0.89 = 8.5 potentially infecting
-encounters with other ‘young’ individuals, and and 40 x 1.2 x 0.2 x 0.11
-= 1 potentially infecting encounter with ‘old’ individuals. Assuming
-that there are no infectious individuals in the ‘old’ group, this 1
-encounter leads to 0 infections. But there are 20% infectious
-unvaccinated and 10% infected vaccinated individuals (ve_inf=0.5) of the
-‘young’ group, then each encounter leads to 1 x (0.25 + 0.05)=0.25
-infections, so that the 40 susceptible, unvaccinated individuals will
-experience 8.5 x 0.25=2.1 infections. Thus the new number of
-susceptible, unvaccinated individuals in the group ‘young’ is 40 - 2 -
-2.1 = 35.9.</p>
-<p>According to the above, the first equation above requires changes
-like so:</p>
+individuals as well as 100 recovered, unvaccinated individuals. Thus, 10
+x 20/100=2 individuals of the group ‘young’ that are susceptible and
+unvaccinated are being vaccinated and therefore removed from this
+group.</p>
+<p>The number of newly infected susceptible, unvaccinated individuals in
+<span class="math inline">\(j\)</span> due encounters with individuals
+of age group <span class="math inline">\(i\)</span> to is given through
+the number of “potentially infecting encounters” for an average
+individual ( <span class="math inline">\(\beta\)</span> ) with any
+other, multiplied by a modifying factor of that encounter number based
+on the age-group’s encounter-willingness ( <span class="math inline">\(\gamma_{j}\)</span> ), multiplied by the chance of
+such an encounter of group <span class="math inline">\(i\)</span>
+happening with someone from group <span class="math inline">\(i\)</span>
+( <span class="math inline">\(\frac{ \alpha_{i,j}*N^{(i)} }{ \sum_{k}
+\alpha_{i,k} N^{(k)} }\)</span> , where <span class="math inline">\(\alpha_{i,j}\)</span> determines preferential
+meeting/attachment of group <span class="math inline">\(i\)</span> with
+someone from group <span class="math inline">\(j\)</span> ), multiplied
+by the chance of any encounter being with an actually infectious
+individual ( <span class="math inline">\(\big( I_u^{(i)}(t-1)+
+(1-ve_{inf}) (I_{v}^{(i)}(t-1)\big)\)</span> ). Let’s take a number
+example for this too: assume again a focus set of 40 susceptible,
+unvaccinated individuals of the group ‘young’ in the previous time-step.
+In this simple example, ‘young’ individuals interact with other
+individuals in the ‘young’ group, as well as with individuals of a
+second, ‘old’, group. An average individual has the country’s typical
+number of 0.2 ( <span class="math inline">\(\beta\)</span> ) potentially
+infecting encounters. Given age-specific encounter-willingness, any
+‘young’ individual has 120% of the country’s typical number of contacts,
+while ‘old’ individuals have 20% ( 80%x1.2 + 20%x0.2 = 1 ). Thus 40 x
+0.2 x 1.2 = 9.6 encounters happen to our focus set of individuals. Each
+‘young’ individual would meet 80% ( <span class="math inline">\(N^{(j)}/N\)</span> ) other young individuals and
+20% old individuals if mixing at random purely due to the age pyramid,
+but there is preferential mixing: the meeting preference is such that
+the odds of young-meeting-young is 2-times that of young-meeting-old (
+<span class="math inline">\(\frac{\alpha_{young,young}}
+{\alpha_{young,old}}=2\)</span> ). Thus the 9.6 encounters are split
+into 8.5 encounters with ‘young’, and 1.1 encounters with ‘old’.
+Assuming that there are no infectious individuals in the ‘old’ group,
+these 1.1 encountes leads to 0 infections. But there are 20% infectious
+unvaccinated and 10% infected vaccinated individuals ( <span class="math inline">\(ve_{inf}=0.5\)</span> ) of the ‘young’ group, then
+each encounter leads to 1 x (0.20 + 0.05)=0.25 infections, so that the
+40 susceptible, unvaccinated individuals will experience 8.5 x 0.25=2.1
+infections. Thus the new number of susceptible, unvaccinated individuals
+in the group ‘young’ is 40 - 2 - 2.1 = 35.9.</p>
 <pre class="tex"><code>\begin{aligned}
 S_u^{(j)}(t) &amp; = S_u^{(j)}(t-1) - vax^{(j)}(t-1) \frac{S_u^{(j)}(t-1) }{S_u^{(j)}(t-1) +R_u^{(j)}(t-1) }\\
 &amp; -\beta\sum_{i} C_{i,j}  \big(I_u^{(i)}(t-1)+ (1-ve_{inf}) (I_{v}^{(i)}(t-1)\big) S_u^{(j)}(t-1) \\
