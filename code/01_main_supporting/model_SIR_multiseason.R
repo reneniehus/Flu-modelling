@@ -132,7 +132,7 @@ model_SIR_multiseason = function( params=NULL,
     stan_list$n_age_groups = 1
     stan_list$contact_matrix = matrix(data=c(1),nrow=1,ncol=1)
     stan_list$pop_age_group = matrix(c(pop_country) ,nrow=1,ncol=1)
-    stan_list$severe_obs_fit =  ( all_season_fit %>% select(value) %>% 
+    stan_list$ili_obs_fit =  ( all_season_fit %>% select(value) %>% 
                                     mutate(value=replace_na(value,0) %>% as.integer()) )
     stan_list$delta_vax = tibble( val1=rep(0,nrow(all_season_fit_daily)) )
     stan_list$delta_vax_opti = tibble( val1=rep(0,nrow(all_season_project_daily)) )
@@ -147,7 +147,8 @@ model_SIR_multiseason = function( params=NULL,
   if (params$debug==F) {
     
     # using a preious fit, set initial conditions
-    if (F) {
+    ini_tune = F
+    if (ini_tune==T) {
       load(path_fit) # loading fit00
       fit_means = get_posterior_mean(fit00)
       # mp="SIR_ini_mu[1,3]";mcmc_areas(fit00,mp);precis(fit00,depth=3,mp)
@@ -156,6 +157,10 @@ model_SIR_multiseason = function( params=NULL,
       myl[1:20] = fit_means[1:20]
       names(myl) = row.names(fit_means)[1:20]
       init_fun = function(...) myl
+      save(init_fun,file="output/ini_SIR__multiseason_age_vax.Rdata")
+    }
+    if (ini_tune==F) {
+      load(file="output/ini_SIR__multiseason_age_vax.Rdata")
     }
     
     fit00=rstan::stan(
@@ -187,7 +192,7 @@ model_SIR_multiseason = function( params=NULL,
   }
   
   
-  p2 = fit00 %>% gather_draws(delta_severe_abs_weekly_sum[n]) %>% 
+  p2 = fit00 %>% gather_draws(delta_ili_abs_weekly_sum[n]) %>% 
     filter(.draw%in%c(1:20)) %>% select(-.chain,-.iteration) %>% ungroup() %>% 
     right_join(all_season_fit,by = join_by(n)) %>% 
     ggplot(aes(date,value)) + 
