@@ -46,8 +46,20 @@ settings = function() {
   # ---- |-Fitting and uncertainty ----
   
   # ---- |-Flu scenarios ----
-  params$scenarios = c("baseline")
-  params$scenarios = c("baseline")
+  params$scenarios =  df_scenarios = 
+    tibble(
+      n=1:6,
+      scenario_id=c("A","B","C","D","E","F"),
+      axis_transmission=c(),
+      axis_vax=c(1,1,2,2,3,3),
+      axis_transmission=c(1,2,1,2,1,2)
+    ) %>% left_join(
+      tibble(axis_vax=c(1,2,3),axis_vax_name=c("opti","pess","null")) , by = join_by(axis_vax)
+    ) %>% left_join(
+      tibble(axis_transmission=c(1,2),axis_transmission_name=c("opti","pess")), by = join_by(axis_transmission)
+    )
+  
+  
   
   # ---- |-Folder paths ----
   # season_cycle_round_id>-<team>-<model>.parquet (Ex. 2024_2025_1_FLU2-ISI-GLEAM.parquet)

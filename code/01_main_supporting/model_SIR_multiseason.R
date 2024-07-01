@@ -12,8 +12,7 @@ model_SIR_multiseason = function( params=NULL,
       select(-typing_sentinel,-typing_nonsentinel,-typing_combined) %>% 
       unnest(respicompass_ili_plus) %>% 
       filter(season%in%params$SIR_multiseason$seasons_include) %>% 
-      select(country_short,date,season,agegroup,value) %>% 
-      mutate(n=1:n())-> all_season_fit
+      select(country_short,date,season,agegroup,value)-> all_season_fit
   } else {
     all_season %>% 
       filter(country_short == country_short_input) %>% 
@@ -65,10 +64,10 @@ model_SIR_multiseason = function( params=NULL,
   
   # take care of age groups
   all_season_fit_wide = all_season_fit %>% 
-    pivot_wider(names_from = agegroup, values_from = value)
+    pivot_wider(names_from = agegroup, values_from = value) %>% 
+    mutate(n=1:n())
   
-  
-  # from weekly, make daily
+  # make daily version of the data frame - from some daily indicators that the model needs
   crossing( country_short=country_short_input,
             nesting(data_w=all_season_fit$date,season=all_season_fit$season), 
             d_shift=c(-6:0) ) %>% 
@@ -82,20 +81,10 @@ model_SIR_multiseason = function( params=NULL,
             d_shift=c(-6:0) ) %>% 
     mutate(date=data_w+d_shift) %>% select(country_short,season,date) -> all_season_project_daily
   # plotting
-  p1 = all_season_fit %>% ggplot(aes(date,value)) + geom_line() + geom_rug()
+  p1 = all_season_fit %>% ggplot(aes(date,value,color=agegroup)) + geom_line() + geom_rug()
   
-  df_scenarios = 
-    tibble(
-      n=1:6,
-      scenario_id=c("A","B","C","D","E","F"),
-      axis_transmission=c(),
-      axis_vax=c(1,1,2,2,3,3),
-      axis_transmission=c(1,2,1,2,1,2)
-    ) %>% left_join(
-      tibble(axis_vax=c(1,2,3),axis_vax_name=c("opti","pess","null")) , by = join_by(axis_vax)
-    ) %>% left_join(
-      tibble(axis_transmission=c(1,2),axis_transmission_name=c("opti","pess")), by = join_by(axis_transmission)
-    )
+  # scenarios as per user settings
+  df_scenarios = params$scenarios
   
   # ---- |-Stan list and fit----
   stan_list = list(
@@ -111,15 +100,20 @@ model_SIR_multiseason = function( params=NULL,
     #
     n_age_groups = 2,
     #
-    ili_obs_fit = ( all_season_fit %>% select(value) %>% mutate(value=value/2) %>% 
-                         mutate(value=replace_na(value,0) %>% as.integer(),val=value) ),
-    ili_obs_notna = as.integer(!is.na(all_season_fit$value)),
+    ili_obs_fit = all_season_fit_wide %>% transmute(
+      age_1=replace_na(age_00_04+age_05_14,0),
+      age_2=replace_na(age_15_64+age_65_99,0)
+      ),
+    ili_obs_notna = all_season_fit_wide %>% transmute(
+      age_1=as.integer(!is.na(age_00_04+age_05_14)),
+      age_2=as.integer(!is.na(age_15_64+age_65_99))
+    ),
     season_start = as.integer(all_season_fit_daily$season_start),
     season_id = fct_inorder(all_season_fit_daily$season) %>% as.integer(),
     #
-    pop = pop_country,
+    pop = sum(1315044,7789728), # hard coded for AT
     #
-    pop_age_group=matrix(c(pop_country/2,pop_country/2) ,nrow=2,ncol=1),
+    pop_age_group=matrix(c(1315044,7789728) ,nrow=2,ncol=1),
     contact_matrix=matrix(data=c(1,1,1,1),nrow=2,ncol=2),
     delta_vax=tibble( val1=rep(0,nrow(all_season_fit_daily)),
                       val2=rep(0,nrow(all_season_fit_daily))),
@@ -147,7 +141,7 @@ model_SIR_multiseason = function( params=NULL,
   stan_list$delta_vax_null$val2[ind_vax] = 0
   
   ### make it 1 age group
-  if (params$debug==TRUE) {
+  if (F) {
     stan_list$n_age_groups = 1
     stan_list$contact_matrix = matrix(data=c(1),nrow=1,ncol=1)
     stan_list$pop_age_group = matrix(c(pop_country) ,nrow=1,ncol=1)
@@ -163,7 +157,7 @@ model_SIR_multiseason = function( params=NULL,
   path_fit = paste0("../Big data/multiseason_age_vax",target_input,country_short_input,".Rdata")
   path_fit = "../Big data/multiseason_age_vaxili_typing_sentinelAT.Rdata"
   pr=paste("> Fitting:",target_input,"for",country_short_input,"... "); cleancat(green(pr))
-  if (params$debug==F) {
+  if (T) {
     
     # using a preious fit, set initial conditions
     ini_tune = F
@@ -184,14 +178,14 @@ model_SIR_multiseason = function( params=NULL,
     
     fit00=rstan::stan(
       file='./stan/SIR_multiseason_age_vax.stan',
-      chains=2 ,thin=2,iter=200,
+      chains=1 ,thin=1,iter=200,
       seed=12, cores = getOption("mc.cores", 1L),
       control=list(
         adapt_delta=0.98,
         max_treedepth=14
       ),
-      data=stan_list,
-      init = init_fun
+      data=stan_list
+      #init = init_fun
     ) # X mins
     
     

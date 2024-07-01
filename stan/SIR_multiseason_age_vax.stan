@@ -6,7 +6,7 @@ data {
   int n_day_fit;     // number of obervatble values, daily
   int n_age_groups;  // number of age groups
   int ili_obs_fit[n_week_fit, n_age_groups]; // observed hospitalisations
-  array[n_week_fit]int<lower=0,upper=1> ili_obs_notna; // indicating non-missing data with 1, otherwise 0
+  array[n_week_fit,n_age_groups]int<lower=0,upper=1> ili_obs_notna; // indicating non-missing data with 1, otherwise 0
   array[n_day_fit] int<lower=0,upper=2> season_start; // indicating first week of a season with 1, the second week with 2, otherwise 0
   array[n_day_fit] int<lower=1,upper=n_season> season_id; // indicating which seasn each obervable day belongs to
   real pop; // population size
@@ -148,7 +148,7 @@ model {
   // --------------------------------likelihood part
   for (t in 1:n_week_fit) {
     for (a in 1:n_age_groups) {
-      if (ili_obs_notna[t]==1) ili_obs_fit[t,a] ~ neg_binomial_2( delta_ili_abs_weekly[t,a], phi ) ;
+      if (ili_obs_notna[t,a]==1) ili_obs_fit[t,a] ~ neg_binomial_2( delta_ili_abs_weekly[t,a], phi ) ;
     }
   }
   
