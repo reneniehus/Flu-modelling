@@ -39,8 +39,8 @@ transformed data {
 parameters {
   // note: a simplex of length 3, has 2 free parameters
   // note: simplex[n] X[m,o] creates an m x o sized array of simplex, each of size n
-  simplex[3] SIR_ini[n_season, n_age_groups]; // S I R initial values per season
-  simplex[3] SIR_ini_mu[n_age_groups]; // overall season mean 
+  simplex[3] SIR_ini[n_season, 1]; // S I R initial values per season, 1 can be replaced by n_age_groups
+  simplex[3] SIR_ini_mu[1]; // overall season mean 
   real<lower=0, upper=1> prop_ili[n_season, n_age_groups]; // proportion of infections that are ili 
   real<lower=0, upper=1> prop_ili_mu[n_age_groups]; // overall mean over season 
   // dispersion parameters
@@ -88,9 +88,9 @@ transformed parameters {
       // initiate the compartments based on current season\
       // S I R initial values age dist corrected
       for(a in 1:n_age_groups){
-        S_u[t,a] = SIR_ini[season_id[t], a, 1] * pop_age_group[a, 1] / pop; // rescaling 
-        I_u[t,a] = SIR_ini[season_id[t], a, 2] * pop_age_group[a, 1] / pop; // rescaling
-        R_u[t,a] = SIR_ini[season_id[t], a, 3] * pop_age_group[a, 1] / pop; // rescaling
+        S_u[t,a] = SIR_ini[season_id[t], 1, 1] * pop_age_group[a, 1] / pop; // rescaling 
+        I_u[t,a] = SIR_ini[season_id[t], 1, 2] * pop_age_group[a, 1] / pop; // rescaling
+        R_u[t,a] = SIR_ini[season_id[t], 1, 3] * pop_age_group[a, 1] / pop; // rescaling
         S_v[t,a] = 0;  // at start of season, no one is vaccinated
         I_v[t,a] = 0; 
         R_v[t,a] = 0; 
@@ -156,8 +156,8 @@ model {
   // prior
   for (a in 1:n_age_groups) {
     logit( prop_ili[,a] ) ~ normal( logit( prop_ili_mu[a] ) , sigma_prop_ili );
-    logit( SIR_ini[,a,1] )   ~ normal( logit( SIR_ini_mu[a,1] )   , sigma_s );
-    logit( SIR_ini[,a,3] )   ~ normal( logit( SIR_ini_mu[a,3] )   , sigma_i );
+    logit( SIR_ini[,1,1] )   ~ normal( logit( SIR_ini_mu[1,1] )   , sigma_s );
+    logit( SIR_ini[,1,3] )   ~ normal( logit( SIR_ini_mu[1,3] )   , sigma_i );
   }
   // more priors: put priors on things that we want to fixate more
   logit(prop_ili_mu) ~ normal( logit(0.7) , 0.2 );// check in R: rnorm(2000,logit(0.7),0.2) %>% inv_logit() %>% dens()
@@ -167,8 +167,8 @@ model {
   logit(reciprocal_phi) ~ normal( logit(0.99) , 0.1 ); // check in R: rnorm(2000,logit(0.99),0.1) %>% inv_logit() %>% dens()
   // priors on dispersion parameters
   sigma_prop_ili    ~ exponential(0.5); // parameter is the exponential RATE, so BIG numbers mean LOW mean
-  sigma_s              ~ exponential(0.1); // parameter is the exponential RATE, so BIG numbers mean low mean
-  sigma_i              ~ exponential(0.1); // parameter is the exponential RATE, so BIG numbers mean low mean
+  sigma_s              ~ exponential(0.5); // parameter is the exponential RATE, so BIG numbers mean low mean
+  sigma_i              ~ exponential(0.5); // parameter is the exponential RATE, so BIG numbers mean low mean
   
 }
 

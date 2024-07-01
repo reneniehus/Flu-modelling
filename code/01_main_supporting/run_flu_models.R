@@ -42,8 +42,17 @@ run_flu_models = function( params=NULL , data=NULL ){
     pr=paste("Initiating SIR_simple_multi_season \n"); cat(green(pr))
     
     # ---- |-Data ----
-    all_season = data_into_all_season(data,params,withforce=F)
-    country_short_input_v = all_season %>% filter_log(ili_sum>0) %>% pull(country_short) %>% unique()
+    all_season = data_into_all_season(data,params,withforce=T)
+    
+    if (F) {
+      all_season %>% 
+        filter(season%in%c(params$SIR_multiseason$seasons_include) ) %>% 
+        unnest(respicompass_ili_plus) %>% 
+        ggplot(aes(date,value,color=season)) + geom_line() + 
+        facet_wrap(~country_short,scales="free_y") 
+    }
+    
+    country_short_input_v = all_season %>% filter_log(ili_plus_sum>0) %>% pull(country_short) %>% unique()
     target_input_v = params$SIR_simple_multi_season$target
     scenario_tag = "A"
     

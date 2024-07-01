@@ -89,13 +89,13 @@ model_SIR_multiseason = function( params=NULL,
   # ---- |-Stan list and fit----
   stan_list = list(
     ## EXTRA stuff good to carry forward
-    all_season_fit=all_season_fit,
+    all_season_fit=all_season_fit_wide,
     all_season_project=all_season_project,
     season_id_raw = fct_inorder(all_season_fit_daily$season) %>% levels() %>% enframe(),
     df_scenarios = df_scenarios,
     ## data relevated for the fit
-    n_season = n_distinct(all_season_fit$season),
-    n_week_fit = nrow(all_season_fit),
+    n_season = n_distinct(all_season_fit_wide$season),
+    n_week_fit = nrow(all_season_fit_wide),
     n_day_fit = nrow(all_season_fit_daily),
     #
     n_age_groups = 2,
@@ -164,11 +164,11 @@ model_SIR_multiseason = function( params=NULL,
     if (ini_tune==T) {
       load(path_fit) # loading fit00
       fit_means = get_posterior_mean(fit00)
-      # mp="SIR_ini_mu[1,3]";mcmc_areas(fit00,mp);precis(fit00,depth=3,mp)
+      mp="SIR_ini_mu[1,3]";mcmc_areas(fit00,mp);precis(fit00,depth=3,mp)
       #
-      myl = vector(mode = "list", length = 20)
-      myl[1:20] = fit_means[1:20]
-      names(myl) = row.names(fit_means)[1:20]
+      myl = vector(mode = "list", length = 36)
+      myl[1:36] = fit_means[1:36]
+      names(myl) = row.names(fit_means)[1:36]
       init_fun = function(...) myl
       save(init_fun,file="output/ini_SIR__multiseason_age_vax.Rdata")
     }
