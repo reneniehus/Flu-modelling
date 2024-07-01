@@ -101,8 +101,8 @@ model_SIR_multiseason = function( params=NULL,
     n_age_groups = 2,
     #
     ili_obs_fit = all_season_fit_wide %>% transmute(
-      age_1=replace_na(age_00_04+age_05_14,0),
-      age_2=replace_na(age_15_64+age_65_99,0)
+      age_1=replace_na(age_00_04+age_05_14,0) %>% as.integer(),
+      age_2=replace_na(age_15_64+age_65_99,0) %>% as.integer()
       ),
     ili_obs_notna = all_season_fit_wide %>% transmute(
       age_1=as.integer(!is.na(age_00_04+age_05_14)),
