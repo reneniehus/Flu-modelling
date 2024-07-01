@@ -6,38 +6,49 @@ model_SIR_multiseason = function( params=NULL,
                                   vax_country){
   
   # ---- |-Filtering and computing compound indicators ----
-  all_season %>% 
-    filter(country_short == country_short_input) %>% 
-    select(-typing_sentinel,-typing_nonsentinel,-typing_combined) %>% 
-    unnest(inc_iliari) %>% 
-    filter(target==params$SIR_simple$target) -> all_season_filtered
-  # filter:age groups
-  all_season_filtered %>% 
-    filter(agegroup==params$SIR_simple$agegroup) -> all_season_filtered
-  # filter:pandemic seasons
-  all_season_filtered %>% 
-    filter(season%in%params$SIR_multiseason$seasons_include) %>% 
-    select(country_short,season,date,value) %>% 
-    mutate(n=1:n()) -> all_season_fit
-  
-  if (target_input=="ili_typing_sentinel") {
-    xtyping = all_season %>% filter(country_short==country_short_input) %>% 
-      unnest(c(typing_sentinel)) %>% filter(indicator=="positivity") %>% 
-      filter(!season%in%params$SIR_multiseason$seasons_exclude) %>% 
-      select(date,value_typing=value)
-    all_season_fit = all_season_fit %>% left_join(xtyping,by="date") %>% 
-      mutate(value=value*(value_typing/100)) %>% select(-value_typing)
+  if (target_input=="respicompass_ili_plus") {
+    all_season %>% 
+      filter(country_short == country_short_input) %>% 
+      select(-typing_sentinel,-typing_nonsentinel,-typing_combined) %>% 
+      unnest(respicompass_ili_plus) %>% 
+      filter(season%in%params$SIR_multiseason$seasons_include) %>% 
+      select(country_short,date,season,agegroup,value) %>% 
+      mutate(n=1:n())-> all_season_fit
+  } else {
+    all_season %>% 
+      filter(country_short == country_short_input) %>% 
+      select(-typing_sentinel,-typing_nonsentinel,-typing_combined) %>% 
+      unnest(inc_iliari) %>% 
+      filter(target==params$SIR_simple$target) -> all_season_filtered
+    # filter:age groups
+    all_season_filtered %>% 
+      filter(agegroup==params$SIR_simple$agegroup) -> all_season_filtered
+    # filter:pandemic seasons
+    all_season_filtered %>% 
+      filter(season%in%params$SIR_multiseason$seasons_include) %>% 
+      select(country_short,season,date,value) %>% 
+      mutate(n=1:n()) -> all_season_fit
+    
+    if (target_input=="ili_typing_sentinel") {
+      xtyping = all_season %>% filter(country_short==country_short_input) %>% 
+        unnest(c(typing_sentinel)) %>% filter(indicator=="positivity") %>% 
+        filter(!season%in%params$SIR_multiseason$seasons_exclude) %>% 
+        select(date,value_typing=value)
+      all_season_fit = all_season_fit %>% left_join(xtyping,by="date") %>% 
+        mutate(value=value*(value_typing/100)) %>% select(-value_typing)
+    }
+    if (target_input=="ili_typing_all") {
+      xtyping = all_season %>% filter(country_short==country_short_input) %>% 
+        unnest(c(typing_combined)) %>% filter(indicator=="positivity") %>% 
+        filter(!season%in%params$SIR_multiseason$seasons_exclude) %>% 
+        select(date,value_typing=value_add_narm) %>% 
+        mutate(value_typing=ifelse(is.nan(value_typing),NA,value_typing ) )
+      all_season_fit = all_season_fit %>% left_join(xtyping,by="date") %>% 
+        mutate(value=value*(value_typing)) %>% select(-value_typing)
+    }
   }
-  if (target_input=="ili_typing_all") {
-    xtyping = all_season %>% filter(country_short==country_short_input) %>% 
-      unnest(c(typing_combined)) %>% filter(indicator=="positivity") %>% 
-      filter(!season%in%params$SIR_multiseason$seasons_exclude) %>% 
-      select(date,value_typing=value_add_narm) %>% 
-      mutate(value_typing=ifelse(is.nan(value_typing),NA,value_typing ) )
-    all_season_fit = all_season_fit %>% left_join(xtyping,by="date") %>% 
-      mutate(value=value*(value_typing)) %>% select(-value_typing)
-  }
   
+  #
   # ---- |-Project df and weekly to daily ----
   # project df
   start_year =year(today())
@@ -50,6 +61,13 @@ model_SIR_multiseason = function( params=NULL,
                               season=season,
                               date=date_v_wed,
                               value=NA)
+  
+  
+  # take care of age groups
+  all_season_fit_wide = all_season_fit %>% 
+    pivot_wider(names_from = agegroup, values_from = value)
+  
+  
   # from weekly, make daily
   crossing( country_short=country_short_input,
             nesting(data_w=all_season_fit$date,season=all_season_fit$season), 
@@ -57,7 +75,8 @@ model_SIR_multiseason = function( params=NULL,
     mutate(date=data_w+d_shift) %>% select(country_short,season,date) %>% 
     group_by(season) %>%  mutate(h=1:n(),
                                  season_start=case_when(h==1~1,h==2~2,.default=0) ) %>% 
-    ungroup() %>% select(-h)-> all_season_fit_daily
+    ungroup() %>% select(-h) -> all_season_fit_daily
+  
   crossing( country_short=country_short_input,
             nesting(data_w=all_season_project$date,season=all_season_project$season), 
             d_shift=c(-6:0) ) %>% 

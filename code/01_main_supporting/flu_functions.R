@@ -87,7 +87,7 @@ data_into_all_season = function(data,params,withforce=F){
       filter(target==params$SIR_simple$target) %>% 
       pull(country_short) %>% unique() ; length(country_short_input_v)
     
-    for (country_short_input_i in country_short_input_v) {
+    for (country_short_input_i in country_short_input_v) { # country_short_input_i = country_short_input_v[1] 
       start_year = data$epi$erviss_ili_ari %>% filter(country_short==country_short_input_i) %>% 
         pull(date) %>% min() %>% year() %>% as.numeric()
       while( start_year<=params$latest_start_year ) {
@@ -152,6 +152,19 @@ data_into_all_season = function(data,params,withforce=F){
                                   value_add_narm)
           ) %>% ungroup()
         
+        ## respicompass ili_plus
+        data$epi$respicompass_iliplus %>% 
+          filter(country_short == country_short_input_i) %>% 
+          select(-country_short) %>% 
+          filter( date%in%date_v ) -> x_iliplus; rep_warning_wed(x_iliplus,"respicompass_iliplus")
+        crossing(target=c("ili_plus"), 
+                 date=date_v_wed,
+                 agegroup=c("age_00_04", "age_15_64", "age_05_14", "age_65_99", "age_total")
+        ) %>% 
+          left_join(  x_iliplus,by = join_by(target,date,agegroup) ) %>% 
+          fill(c("agegroup", "target"),.direction = "downup") -> x_iliplus
+        
+        
         ## data quality measures
         ili_sum=xinc_iliari %>% filter(target=="ILIconsultationrate") %>% summarise(x=sum(value,na.rm=T)) %>% pull(x)
         ili_quality=xinc_iliari %>% filter(target=="ILIconsultationrate") %>% mutate(v_q= !is.na(value)&(value>0) ) %>% summarise(x=mean( v_q )) %>% pull(x)
@@ -163,10 +176,14 @@ data_into_all_season = function(data,params,withforce=F){
         ntests_nonsent = xtyping_nonsent%>% filter(indicator=="tests")%>% summarise(msum=sum(value,na.rm=T)) %>% pull(msum)
         tests_nonsentinel_quality = xtyping_nonsent %>% filter(indicator=="tests") %>% summarise(x=mean(value>5,na.rm=T)) %>% pull(x)
         
+        ili_plus_sum=x_iliplus %>% summarise(x=sum(value,na.rm=T)) %>% pull(x)
+        ili_plus_quality=x_iliplus %>% summarise(x=mean(!is.na(value))) %>% pull(x)
+        
         ## plotting
         xinc_iliari %>% ggplot(aes(date,value))+geom_line()
         xtyping_sent %>% filter(indicator=="positivity") %>% ggplot(aes(date,value))+geom_line()
         xtyping_nonsent %>% filter(indicator=="positivity") %>% ggplot(aes(date,value))+geom_line()
+        x_iliplus %>% filter(agegroup=="age_total") %>% ggplot(aes(date,value))+geom_line()
         
         ## skipping 
         # if ( nrow(xinc_iliari) < 10 ) next;
@@ -192,11 +209,14 @@ data_into_all_season = function(data,params,withforce=F){
           tests_sentinel_quality=tests_sentinel_quality,
           tests_nonsentinel=ntests_nonsent,
           tests_nonsentinel_quality=tests_nonsentinel_quality,
+          ili_plus_sum=ili_plus_sum,
+          ili_plus_quality=ili_plus_quality,
           # nested dataframes
           nest(xinc_iliari) %>% rename(inc_iliari=data),
           nest(xtyping_sent) %>% rename(typing_sentinel=data),
           nest(xtyping_nonsent) %>% rename(typing_nonsentinel=data),
-          nest(xtyping_combined) %>% rename(typing_combined=data)
+          nest(xtyping_combined) %>% rename(typing_combined=data),
+          nest(x_iliplus) %>% rename(respicompass_ili_plus=data)
         )
         df_i = df_i + 1
       } # season loop

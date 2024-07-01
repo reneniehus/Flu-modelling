@@ -15,6 +15,12 @@ load_flu_data_epi = function(data=data, params=NULL , new_from_online=T , regene
       erviss_ili_ari = read_csv(file="https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/snapshots/2024-05-24_ILIARIRates.csv",show_col_types = FALSE)
       data_sentinel_detections = read_csv(file="https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/snapshots/2024-05-24_sentinelTestsDetectionsPositivity.csv",show_col_types = FALSE)
       data_nonsentinel_detections = read_csv(file="https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/snapshots/2024-05-24_nonSentinelTestsDetections.csv",show_col_types = FALSE)
+      data_respicompass_iliplus = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/target-data/influenza/ili_plus.csv",show_col_types = FALSE)
+      # save locally
+      erviss_ili_ari %>% write_csv(file="./data/erviss_iliari_snapshot_2024-05-24.csv")
+      data_sentinel_detections %>% write_csv(file="./data/erviss_detections_sentinel_snapshot_2024-05-24.csv")
+      data_nonsentinel_detections %>% write_csv(file="./data/erviss_detections_nonsentinel_snapshot_2024-05-24.csv")
+      data_respicompass_iliplus %>% write_csv(file="./data/data_respicompass_iliplus.csv")
     }
     if (new_from_online==F) {
       pr=paste("Loading epi data from disk ... \n"); cat(green(pr))
@@ -22,6 +28,7 @@ load_flu_data_epi = function(data=data, params=NULL , new_from_online=T , regene
       erviss_ili_ari = read_csv(file="./data/erviss_iliari_snapshot_2024-05-24.csv",show_col_types = FALSE)
       data_sentinel_detections = read_csv(file="./data/erviss_detections_sentinel_snapshot_2024-05-24.csv",show_col_types = FALSE)
       data_nonsentinel_detections = read_csv(file="./data/erviss_detections_nonsentinel_snapshot_2024-05-24.csv",show_col_types = FALSE)
+      data_respicompass_iliplus = read_csv(file="./data/data_respicompass_iliplus.csv",show_col_types = FALSE)
     }
     
     erviss_ili_ari = erviss_ili_ari %>% 
@@ -68,11 +75,31 @@ load_flu_data_epi = function(data=data, params=NULL , new_from_online=T , regene
       )) %>% 
       mutate(country_short=EU_short(countryname)) 
     
+    #
+    respicompass_iliplus = data_respicompass_iliplus %>% mutate(date=ISOweek2date(paste0(yearweek,"-3"))) %>% 
+      mutate(age = case_when(
+        age == "0-4" ~ "age_00_04",
+        age == "5-14" ~ "age_05_14",
+        age == "15-64" ~ "age_15_64",
+        age == "65+" ~ "age_65_99",
+        age == "total" ~ "age_total",
+        age == "unk" ~ "age_unk",
+      )) %>% 
+      mutate(countrycode=EU_short(location_name),target="ili_plus") %>% 
+      select( 
+        country_short=countrycode,
+        date=date, # see if we need to be more explicit
+        target,
+        agegroup=age,
+        value=value
+      ) 
+    
     epi = list(
       date_list_created = today(),
       erviss_ili_ari = erviss_ili_ari,
       erviss_typing_sentinel = data_sentinel_detections,
-      erviss_typing_nonsentinel = data_nonsentinel_detections
+      erviss_typing_nonsentinel = data_nonsentinel_detections,
+      respicompass_iliplus = respicompass_iliplus
     )
     save(epi,file="output/epi.Rdata")
     
@@ -90,10 +117,12 @@ load_flu_data_vax = function(data=data, params=NULL , new_from_online=T , regene
     
     if (new_from_online==T) {
       # load data freshly from the internet
-      data_vax = read.csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/influenza/vaccination/influenza_vax_scenarios.csv")
+      data_vax = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/influenza/vaccination/influenza_vax_scenarios.csv")
+      data_vax %>% write_csv(file="data/vax_flu_data.csv")
     }
     if (new_from_online==F) {
       # load data from local storage
+      data_vax = read_csv(file="data/vax_flu_data.csv", )
     }
     
     vax = list(
