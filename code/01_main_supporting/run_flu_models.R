@@ -42,7 +42,7 @@ run_flu_models = function( params=NULL , data=NULL ){
     pr=paste("Initiating SIR_simple_multi_season \n"); cat(green(pr))
     
     # ---- |-Data ----
-    all_season = data_into_all_season(data,params,withforce=T)
+    all_season = data_into_all_season(data,params,withforce=F)
     
     if (F) {
       all_season %>% 

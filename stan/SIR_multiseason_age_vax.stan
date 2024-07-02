@@ -163,7 +163,7 @@ model {
   logit(prop_ili_mu) ~ normal( logit(0.7) , 0.2 );// check in R: rnorm(2000,logit(0.7),0.2) %>% inv_logit() %>% dens()
   // I_ini determined the season timing and certainly be a very low value
   // R and S we want to keep free to allow learning about immunity
-  for (a in 1:n_age_groups) logit(SIR_ini_mu[a,2]) ~ normal( logit(0.0015) , 0.4 ); // check in R: rnorm(2000,logit(0.0015),0.4) %>% inv_logit() %>% dens()
+  logit(SIR_ini_mu[1,2]) ~ normal( logit(0.0015) , 0.4 ); // check in R: rnorm(2000,logit(0.0015),0.4) %>% inv_logit() %>% dens()
   logit(reciprocal_phi) ~ normal( logit(0.99) , 0.1 ); // check in R: rnorm(2000,logit(0.99),0.1) %>% inv_logit() %>% dens()
   // priors on dispersion parameters
   sigma_prop_ili    ~ exponential(0.5); // parameter is the exponential RATE, so BIG numbers mean LOW mean
@@ -249,8 +249,8 @@ generated quantities {
         real delta_infective_exposures_v;
         //
         if (t==1) { // set initial conditions
-        gen_S_u[t,a] = SIR_ini_mu[a,1];
-        gen_I_u[t,a] = SIR_ini_mu[a,2];
+        gen_S_u[t,a] = SIR_ini_mu[1,1];
+        gen_I_u[t,a] = SIR_ini_mu[1,2];
         gen_R_u[t,a] = 1 - (gen_S_u[t,a] + gen_I_u[t,a]);
         gen_S_v[t,a] = 0;  // Adding a small number to avoid dividing by 0
         gen_I_v[t,a] = 0;  // Adding a small number to avoid dividing by 0

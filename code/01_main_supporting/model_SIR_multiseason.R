@@ -181,11 +181,11 @@ model_SIR_multiseason = function( params=NULL,
       chains=1 ,thin=1,iter=200,
       seed=12, cores = getOption("mc.cores", 1L),
       control=list(
-        adapt_delta=0.98,
+        adapt_delta=0.95,
         max_treedepth=14
       ),
-      data=stan_list
-      #init = init_fun
+      data=stan_list,
+      init = init_fun
     ) # X mins
     
     
