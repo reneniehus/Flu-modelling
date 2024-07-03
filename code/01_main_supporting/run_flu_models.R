@@ -31,7 +31,7 @@ run_flu_models = function( params=NULL , data=NULL ){
     all_season = data_into_all_season(data,params,withforce=F)
     contacts = transform_contracts(data,params) # transform the contact matrixes for model requirements
     
-    if (F) {
+    if (T) {
     figs$prefit$fit_seasons_countries <<- all_season %>% 
         filter(season%in%c(params$SIR_multiseason$seasons_include) ) %>% 
         unnest(respicompass_ili_plus) %>% 

@@ -306,7 +306,7 @@ load_flu_data_demography_respicast = function(data=data, params=NULL , regenerat
   } else { load(file="output/demography_respicast.Rdata") }
   
   # adding to data 
-  data$demography_ECDC = dat_demography
+  data$demography_respicast = dat_demography
   
   return(data)
 }
