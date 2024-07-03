@@ -161,7 +161,7 @@ load_flu_data_contact = function(data=data, params=NULL , new_from_online=T , re
   return(data)
 }
 
-load_flu_data_demography = function(data=data, params=NULL , new_from_online=F , regenerate=T ){
+load_flu_data_demography_ECDC = function(data=data, params=NULL , new_from_online=F , regenerate=T ){
   file_doesnot_exist = !file.exists("output/demography.Rdata")
   if ( file_doesnot_exist|regenerate==T ) {
     
@@ -221,7 +221,7 @@ load_flu_data_demography = function(data=data, params=NULL , new_from_online=F ,
   } else { load(file="output/demography.Rdata") }
   
   # adding to data 
-  data$demography = dat_demography
+  data$demography_ECDC = dat_demography
   
   return(data)
 }
@@ -239,7 +239,7 @@ load_flu_data = function( params=NULL , new_from_online=T, regenerate=F ){
   
   data = load_flu_data_contact( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
   
-  data = load_flu_data_demography( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
+  data = load_flu_data_demography_ECDC( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
   
   return(data)
 }

@@ -36,6 +36,8 @@ settings = function() {
   params$SIR_simple_multi_season$target = c("respicompass_ili_plus") # c("ili","ili_typing_sentinel","ili_typing_all","respicompass_ili_plus")
   params$SIR_multiseason$seasons_exclude = c("2019/2020","2020/2021","2021/2022") # those impacted by COVID-19 acute phase
   params$SIR_multiseason$seasons_include = c("2017/2018","2018/2019","2023/2024") # 2017-2018, 2018-2019, and 2023-2024
+  params$SIR_multiseason$age_groups = c("age_00_04","age_05_14","age_15_64","age_65_99")
+  
   # Settings for last_year_burden
   params$last_year_burden$target = "ILIconsultationrate"
   params$last_year_burden$agegroup = "age_total"

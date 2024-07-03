@@ -97,17 +97,14 @@ model_SIR_multiseason = function( params=NULL,
     n_season = n_distinct(all_season_fit_wide$season),
     n_week_fit = nrow(all_season_fit_wide),
     n_day_fit = nrow(all_season_fit_daily),
+    n_age_groups = length(params$SIR_multiseason$age_groups),
     #
-    n_age_groups = 2,
-    #
-    ili_obs_fit = all_season_fit_wide %>% transmute(
-      age_1=replace_na(age_00_04+age_05_14,0) %>% as.integer(),
-      age_2=replace_na(age_15_64+age_65_99,0) %>% as.integer()
-      ),
-    ili_obs_notna = all_season_fit_wide %>% transmute(
-      age_1=as.integer(!is.na(age_00_04+age_05_14)),
-      age_2=as.integer(!is.na(age_15_64+age_65_99))
-    ),
+    ili_obs_fit = all_season_fit_wide %>% 
+      select( any_of(params$SIR_multiseason$age_groups) ) %>% 
+      mutate_all(~ replace_na(.,0) ) %>% mutate_all(~as.integer(.) ),
+    ili_obs_notna = all_season_fit_wide %>% 
+      select( any_of(params$SIR_multiseason$age_groups) ) %>% 
+      mutate_all(~ !is.na(.) ) %>% mutate_all(~as.integer(.) ),
     season_start = as.integer(all_season_fit_daily$season_start),
     season_id = fct_inorder(all_season_fit_daily$season) %>% as.integer(),
     #
@@ -123,6 +120,7 @@ model_SIR_multiseason = function( params=NULL,
     n_scenario = nrow(df_scenarios),
     axis_transmission = df_scenarios$axis_transmission,
     axis_vax = df_scenarios$axis_vax,
+    delta_vax_real=tibble( val1=rep(0, nrow(all_season_project_daily)), val2=rep(0,nrow(all_season_project_daily)) ),
     delta_vax_opti=tibble( val1=rep(0, nrow(all_season_project_daily)), val2=rep(0,nrow(all_season_project_daily)) ),
     delta_vax_pess=tibble( val1=rep(0, nrow(all_season_project_daily)), val2=rep(0,nrow(all_season_project_daily)) ),
     delta_vax_null=tibble( val1=rep(0, nrow(all_season_project_daily)), val2=rep(0,nrow(all_season_project_daily)) ),
@@ -140,14 +138,38 @@ model_SIR_multiseason = function( params=NULL,
   stan_list$delta_vax_pess$val2[ind_vax] = vax_country$lower_vax_coverage
   stan_list$delta_vax_null$val2[ind_vax] = 0
   
-  ### make it 1 age group
+  ### for debugging: make it 2 age groups
+  if (F) {
+    stan_list$n_age_groups = 2
+    stan_list$contact_matrix = matrix(data=c(1,1,1,1),nrow=2,ncol=2)
+    stan_list$pop_age_group = matrix(c(1315044,7789728) ,nrow=2,ncol=1)
+    stan_list$ili_obs_fit =  all_season_fit_wide %>% transmute(
+      age_1=replace_na(age_00_04+age_05_14,0) %>% as.integer(),
+      age_2=replace_na(age_15_64+age_65_99,0) %>% as.integer()
+    )
+    stan_list$ili_obs_notna = all_season_fit_wide %>% transmute(
+      age_1=as.integer(!is.na(age_00_04+age_05_14)),
+      age_2=as.integer(!is.na(age_15_64+age_65_99))
+    )
+    stan_list$delta_vax_real = tibble( val1=rep(0,nrow(all_season_project_daily)) )
+    stan_list$delta_vax_opti = tibble( val1=rep(0,nrow(all_season_project_daily)) )
+    stan_list$delta_vax_opti = tibble( val1=rep(0,nrow(all_season_project_daily)) )
+    stan_list$delta_vax_pess = tibble( val1=rep(0,nrow(all_season_project_daily)) )
+    stan_list$delta_vax_null = tibble( val1=rep(0,nrow(all_season_project_daily)) )
+  }
+  ### for debugging: make it 1 age group
   if (F) {
     stan_list$n_age_groups = 1
     stan_list$contact_matrix = matrix(data=c(1),nrow=1,ncol=1)
     stan_list$pop_age_group = matrix(c(pop_country) ,nrow=1,ncol=1)
-    stan_list$ili_obs_fit =  ( all_season_fit %>% select(value) %>% 
-                                    mutate(value=replace_na(value,0) %>% as.integer()) )
-    stan_list$delta_vax = tibble( val1=rep(0,nrow(all_season_fit_daily)) )
+    stan_list$ili_obs_notna =  all_season_fit_wide %>% transmute(
+      age_1=as.integer(!is.na(age_00_04+age_05_14+age_15_64+age_65_99))
+    )
+    stan_list$ili_obs_fit =  all_season_fit_wide %>% transmute(
+      age_1=replace_na(age_00_04+age_05_14+age_15_64+age_65_99,0) %>% as.integer()
+    )
+    stan_list$delta_vax_real = tibble( val1=rep(0,nrow(all_season_project_daily)) )
+    stan_list$delta_vax_opti = tibble( val1=rep(0,nrow(all_season_project_daily)) )
     stan_list$delta_vax_opti = tibble( val1=rep(0,nrow(all_season_project_daily)) )
     stan_list$delta_vax_pess = tibble( val1=rep(0,nrow(all_season_project_daily)) )
     stan_list$delta_vax_null = tibble( val1=rep(0,nrow(all_season_project_daily)) )
@@ -178,7 +200,7 @@ model_SIR_multiseason = function( params=NULL,
     
     fit00=rstan::stan(
       file='./stan/SIR_multiseason_age_vax.stan',
-      chains=2 ,thin=2,iter=400,
+      chains=1 ,thin=1,iter=150,
       seed=12, cores = getOption("mc.cores", 1L),
       control=list(
         # adapt_delta=0.97,
