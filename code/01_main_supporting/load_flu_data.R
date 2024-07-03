@@ -119,19 +119,26 @@ load_flu_data_vax = function(data=data, params=NULL , new_from_online=T , regene
       # load data freshly from the internet
       data_vax = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/influenza/vaccination/influenza_vax_scenarios.csv",show_col_types = FALSE)
       data_vax_hist = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/influenza/vaccination/vaccine_coverage_65plus.csv",show_col_types = FALSE)
+      data_vax_hist_all = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/influenza/vaccination/vaccine_coverage_all.csv",show_col_types = F)
+      
       # write
       data_vax %>% write_csv(file="data/vax_flu_scenarios.csv")
       data_vax_hist %>% write_csv(file="data/vax_flu_history.csv")
+      data_vax_hist_all %>% write_csv(file="data/vax_flu_history_all.csv")
+      
     }
     if (new_from_online==F) {
       # load data from local storage
       data_vax = read_csv(file="data/vax_flu_scenarios.csv",show_col_types = F )
       data_vax_hist = read_csv(file="data/vax_flu_history.csv",show_col_types = F )
+      data_vax_hist_all = read_csv(file="data/vax_flu_history_all.csv",show_col_types = F )
+      
     }
     
     vax = list(
       data_vax = data_vax %>% mutate(vaccine_coverage=vaccine_coverage/100) %>% pivot_wider(names_from = "scenario", values_from = vaccine_coverage),
-      data_vax_history = data_vax_hist %>% mutate(vaccine_coverage=as.numeric(vaccine_coverage)/100 )
+      data_vax_history = data_vax_hist %>% mutate(vaccine_coverage=as.numeric(vaccine_coverage)/100 ),
+      data_vax_history_all = data_vax_hist %>% mutate(vaccine_coverage=as.numeric(vaccine_coverage)/100 )
     )
     save(vax,file="output/vax.Rdata")
     
@@ -311,17 +318,17 @@ load_flu_data = function( params=NULL , new_from_online=T, regenerate=F ){
   
   data = list() # reset data list
   
-  data = load_flu_data_epi( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
+  data = load_flu_data_epi( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate)
   
-  data = load_flu_data_vax( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
+  data = load_flu_data_vax( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate)
   
-  data = load_flu_data_contact( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
+  data = load_flu_data_contact( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate)
   
-  data = load_flu_data_helpers_respicompass( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
+  data = load_flu_data_helpers_respicompass( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate)
   
-  data = load_flu_data_demography_ECDC( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
+  data = load_flu_data_demography_ECDC( data=data, params=NULL , new_from_online=F , regenerate=F)
   
-  data = load_flu_data_demography_respicast( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
+  data = load_flu_data_demography_respicast( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate)
   
   return(data)
 }
