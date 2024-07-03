@@ -4,7 +4,7 @@
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ### Defining data-loading functions for each data stream ##########
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-load_flu_data_epi = function(data=data, params=NULL , new_from_online=T , regenerate=T ){
+load_flu_data_epi = function(data=data, params=NULL, regenerate=T , new_from_online=T){
   
   file_doesnot_exist = !file.exists("output/epi.Rdata")
   if ( file_doesnot_exist|regenerate==T ) {
@@ -111,7 +111,7 @@ load_flu_data_epi = function(data=data, params=NULL , new_from_online=T , regene
   return(data)
 }
 
-load_flu_data_vax = function(data=data, params=NULL , new_from_online=T , regenerate=T ){
+load_flu_data_vax = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
   file_doesnot_exist = !file.exists("output/vax.Rdata")
   if ( file_doesnot_exist|regenerate==T ) {
     
@@ -150,7 +150,7 @@ load_flu_data_vax = function(data=data, params=NULL , new_from_online=T , regene
   return(data)
 }
 
-load_flu_data_contact = function(data=data, params=NULL , new_from_online=T , regenerate=T ){
+load_flu_data_contact = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
   file_doesnot_exist = !file.exists("output/contact.Rdata")
   if ( file_doesnot_exist|regenerate==T ) {
     
@@ -173,7 +173,7 @@ load_flu_data_contact = function(data=data, params=NULL , new_from_online=T , re
   return(data)
 }
 
-load_flu_data_helpers_respicompass = function(data=data, params=NULL , new_from_online=T , regenerate=T ){
+load_flu_data_helpers_respicompass = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
   
   file_doesnot_exist = !file.exists("output/respicompass_helpers.Rdata")
   
@@ -207,7 +207,7 @@ load_flu_data_helpers_respicompass = function(data=data, params=NULL , new_from_
   return(data)
 }
 
-load_flu_data_demography_ECDC = function(data=data, params=NULL , new_from_online=F , regenerate=T ){
+load_flu_data_demography_ECDC = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
   file_doesnot_exist = !file.exists("output/demography.Rdata")
   if ( file_doesnot_exist|regenerate==T ) {
     
@@ -272,7 +272,7 @@ load_flu_data_demography_ECDC = function(data=data, params=NULL , new_from_onlin
   return(data)
 }
 
-load_flu_data_demography_respicast = function(data=data, params=NULL , new_from_online=F , regenerate=T ){
+load_flu_data_demography_respicast = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
   file_doesnot_exist = !file.exists("output/demography_respicast.Rdata")
   if ( file_doesnot_exist|regenerate==T ) {
     
@@ -314,7 +314,7 @@ load_flu_data_demography_respicast = function(data=data, params=NULL , new_from_
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ### Mother function: calling the data-loading functions for each data stream ##########
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-load_flu_data = function( params=NULL , new_from_online=T, regenerate=F ){
+load_flu_data = function( params=NULL , regenerate=F,new_from_online=T  ){
   
   data = list() # reset data list
   

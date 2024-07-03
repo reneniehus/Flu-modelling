@@ -32,7 +32,7 @@ run_flu_models = function( params=NULL , data=NULL ){
     contacts = transform_contracts(data,params) # transform the contact matrixes for model requirements
     
     if (F) {
-      all_season %>% 
+    figs$prefit$fit_seasons_countries <<- all_season %>% 
         filter(season%in%c(params$SIR_multiseason$seasons_include) ) %>% 
         unnest(respicompass_ili_plus) %>% 
         ggplot(aes(date,value,color=season)) + geom_line() + 
