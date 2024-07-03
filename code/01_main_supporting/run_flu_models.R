@@ -27,7 +27,7 @@ run_flu_models = function( params=NULL , data=NULL ){
     
     pr=paste("Initiating SIR_simple_multi_season \n"); cat(green(pr))
     
-    # ---- |-Data ----
+    # ---- |-Data for all countries ----
     all_season = data_into_all_season(data,params,withforce=F)
     contacts = transform_contracts(data,params) # transform the contact matrixes for model requirements
     
@@ -45,16 +45,19 @@ run_flu_models = function( params=NULL , data=NULL ){
     
     modl = list()
     start_time <- Sys.time()
-    
-    # ---- |-Run model ----
+    # ---- |-Run model for each target and each country ----
     for ( target_input in target_input_v ) { # target_input=target_input_v[1]
       for (country_short_input in country_short_input_v ) { # country_short_input=country_short_input_v[1]
-        # population
-        pop_country = data$demography$population_pyramid %>% 
-          filter(country==country_short_input) %>% pull(population) %>% sum()
-        if (country_short_input=="GR") pop_country = 10.43*1e6
+        
+        # COuntry specific data
+        pop_country = data$demography_respicast$population_pyramid %>% 
+          filter(country==EU_long(country_short_input)) %>% pull(population) %>% sum()
+        
+        pr=paste(target_input,"for",country_short_input,"with population:",pop_country,"\n"); cat(yellow(pr))
+        
         vax_country = data$vax$data_vax %>% filter( location_name == EU_long(country_short_input) ) # vaccination data for a country
         if (nrow(vax_country) != 1) stop("Vaccination data is wrong format: either no data or too many rows")
+        
         # run model
         modl[[target_input]][[country_short_input]] = model_SIR_multiseason( params , 
                                                                              all_season=all_season , 
@@ -67,58 +70,10 @@ run_flu_models = function( params=NULL , data=NULL ){
     }
     end_time <- Sys.time() # 5 hrs
     pr=paste("> Method run:",round(end_time - start_time,2),"sec \n"); cat(green(pr))
+    
     save(modl,file = "../Big data/modl.Rdata")
     
-    # ---- |-Analyse model output ----
-    mdf_all = NULL
-    for (target_input in target_input_v)
-    for (country_short_input in country_short_input_v){
-      fit = modl[[target_input]][[country_short_input]]$fit
-      stan_list = modl[[target_input]][[country_short_input]]$stan_list
-      season_df = stan_list$season_id_raw %>% 
-        rename(season_numeric=name,season=value)
-      mdf = crossing( target=target_input,country=country_short_input , 
-                      season_df )
-      mdf$prop_severe = precis(fit,"prop_severe",depth=2)$mean
-      
-      sir_names = precis(fit,"SIR_ini",depth=3) %>% rownames()
-      pat <- "(\\d)+"
-      season_id = as.numeric(str_extract(sir_names, pat))
-      sir_id = rep(c("S","I","R"),nrow(mdf))
-      mdf$S_ini = precis(fit,"SIR_ini",depth=3)$mean[sir_id=="S"]
-      mdf$R_ini = precis(fit,"SIR_ini",depth=3)$mean[sir_id=="R"]
-      mdf$reciprocal_phi = precis(fit,"reciprocal_phi",depth=1)[1,1]
-      
-      mdf$prop_severe_rhat = precis(fit,"prop_severe",depth=2)$Rhat4
-      mdf$S_ini_rhat = precis(fit,"SIR_ini",depth=3)$Rhat4[sir_id=="S"]
-      mdf$R_ini_rhat = precis(fit,"SIR_ini",depth=3)$Rhat4[sir_id=="R"]
-      mdf$reciprocal_phi_rhat = precis(fit,"reciprocal_phi",depth=1)[6,1]
-      mdf_all = bind_rows(mdf_all,mdf)
-    }
-  
-    mdf_all %>% filter(!target=="ili_typing_all") %>% 
-      ggplot(aes(season,logit(prop_severe),fill=target)) + geom_boxplot()
-    
-    mdf_all %>% filter(!target=="ili_typing_all") %>% 
-      ggplot(aes(season,logit(prop_severe),group=country)) + geom_line() + 
-      facet_wrap(~target)
-    
-    mdf_all %>% filter(!target=="ili_typing_all") %>% 
-      ggplot(aes(season,logit(S_ini),fill=target)) + geom_boxplot()
-    mdf_all %>% filter(!target=="ili_typing_all") %>% 
-      ggplot(aes(season,logit(R_ini),fill=target)) + geom_boxplot()
-    
-    mdf_all %>% 
-      ggplot(aes(target,(reciprocal_phi))) + geom_boxplot()
-    
-    mcountry ="AT"
-    p1=modl[["ili"]][[mcountry]]$pdata
-    p2=modl[["ili_typing_sentinel"]][[mcountry]]$pdata
-    p3=modl[["ili_typing_all"]][[mcountry]]$pdata
-    p1/p2/p3
-    
-    df = NULL
-    df_out %<>% bind_rows(df) # Add DK model to the df_out
+    df_out$output_other$SIR_simple_multi_season = modl
   }
   
   if ( "SIR_simple" %in% params$models_to_run ){ 

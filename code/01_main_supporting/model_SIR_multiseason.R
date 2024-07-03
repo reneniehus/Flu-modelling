@@ -24,7 +24,7 @@ model_SIR_multiseason = function( params=NULL,
   
   # make daily version of the data frame - from some daily indicators that the model needs
   crossing( country_short=country_short_input,
-            nesting(data_w=all_season_fit$date,season=all_season_fit$season), 
+            nesting(data_w=all_season_fit_wide$date,season=all_season_fit_wide$season), 
             d_shift=c(-6:0) ) %>% 
     mutate(date=data_w+d_shift) %>% select(country_short,season,date) %>% 
     group_by(season) %>%  mutate(h=1:n(),
@@ -36,19 +36,13 @@ model_SIR_multiseason = function( params=NULL,
             d_shift=c(-6:0) ) %>% 
     mutate(date=data_w+d_shift) %>% select(country_short,season,date) -> all_season_project_daily
   # plotting
-  p1 = all_season_fit %>% ggplot(aes(date,value,color=agegroup)) + geom_line() + geom_rug()
+  p1 = all_season_fit_wide %>% ggplot(aes(date,age_total)) + geom_line() + geom_rug()
   
-  # scenarios as per user settings
+  
+  # helpers for stan list
   df_scenarios = params$scenarios
-  
-  data$demography$population_pyramid %>% filter(country=="AT") %>% pull(population) -> x
-  x[1] %>% sum()
-  x[2:3]%>% sum()
-  x[4:13]%>% sum()
-  x[14:20]%>% sum()
-  
-  # helpers
-  pop_age_group = c(431473,883571,6009025,1780703) # hard coded! (based on data for AT)
+  pop_pyramid = data$demography_respicast$population_pyramid %>% filter(country==EU_long(country_short_input))
+  pop_age_group = pop_pyramid$population 
   age_groups = params$SIR_multiseason$age_groups
   n_age_groups = length(age_groups)
   z_proj = rep(0,nrow(all_season_project_daily))
@@ -142,7 +136,7 @@ model_SIR_multiseason = function( params=NULL,
   p2 = NULL
   path_fit = paste0("../Big data/multiseason_age_vax",target_input,country_short_input,".Rdata")
   path_fit = "../Big data/multiseason_age_vaxili_typing_sentinelAT.Rdata"
-  pr=paste("> Fitting:",target_input,"for",country_short_input,"... "); cleancat(green(pr))
+  pr=paste("> Now fitting:",target_input,"for",country_short_input,"... "); cleancat(green(pr))
   if (T) {
     
     # using a preious fit, set initial conditions

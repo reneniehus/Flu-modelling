@@ -3,5 +3,7 @@
 .RData
 .Ruserdata
 stan/SIR_simple.rds
-*.csv
 .RDataTmp
+/output/covid-forecast-hub
+/output/ari-forecast-hub
+/output/flu-forecast-hub
