@@ -167,8 +167,8 @@ model_SIR_multiseason = function( params=NULL,
       mp="SIR_ini_mu[1,3]";mcmc_areas(fit00,mp);precis(fit00,depth=3,mp)
       #
       myl = vector(mode = "list", length = 24)
-      myl[1:36] = fit_means[1:36]
-      names(myl) = row.names(fit_means)[1:36]
+      myl[1:24] = fit_means[1:24]
+      names(myl) = row.names(fit_means)[1:24]
       init_fun = function(...) myl
       save(init_fun,file="output/ini_SIR__multiseason_age_vax.Rdata")
     }
@@ -178,7 +178,7 @@ model_SIR_multiseason = function( params=NULL,
     
     fit00=rstan::stan(
       file='./stan/SIR_multiseason_age_vax.stan',
-      chains=1 ,thin=1,iter=200,
+      chains=2 ,thin=2,iter=400,
       seed=12, cores = getOption("mc.cores", 1L),
       control=list(
         # adapt_delta=0.97,

@@ -19,6 +19,7 @@ data {
   int n_scenario;// // number of projected scenarios
   int axis_transmission[n_scenario]; // indicator for the transmission scenario axis
   int axis_vax[n_scenario]; // indicator for the vaccine scenario axis
+  matrix[n_day_project, n_age_groups] delta_vax_real; // daily assumed vax uptake in projection period
   matrix[n_day_project, n_age_groups] delta_vax_opti; // daily assumed vax uptake in projection period
   matrix[n_day_project, n_age_groups] delta_vax_pess; // daily assumed vax uptake in projection period
   matrix[n_day_project, n_age_groups] delta_vax_null; // daily assumed vax uptake in projection period
@@ -199,8 +200,10 @@ generated quantities {
   array[n_scenario, n_week_project  ] int<lower=0> gen_ili_t_obs_project_sum;
   array[n_scenario, n_week_project, n_age_groups] real gen_delta_ili_u_abs_weekly; // unvaccinated
   array[n_scenario, n_week_project, n_age_groups] real gen_delta_ili_v_abs_weekly; // vaccinated
-  
   real Rnull_eff[n_season];
+  real beta_noise;
+  
+  beta_noise = normal_rng( 1, 0.25 ); // to be applied as factor to log2( beta ), sd=1 interpreted as halfing / doubling of beta
   
   // print("dims(gen_delta_ili): ", dims(gen_delta_ili) ); // 
   // print("dims(gen_delta_ili_abs): ", dims(gen_delta_ili_abs) ); // [6,364,1]
@@ -229,8 +232,10 @@ generated quantities {
     // define 2 local variables
     real beta_j; // scenario-specific beta
     matrix[n_day_project, n_age_groups] delta_vax_j; // scenario-specific vaccine uptake
-    if ( axis_transmission[j]==1 ) beta_j = 0.9*beta; // more var: 0.9*normal_rng( log2( beta ), 0.25 ) // pessimistic transmission
-    if ( axis_transmission[j]==2 ) beta_j = 1.1*beta; // more var: 1.1*normal_rng( log2( beta ), 0.25 ) // optimisitc transmission
+    if ( axis_transmission[j]==0 ) beta_j = 1.0*beta; // more var: 1.0*2^( log2(beta)*beta_noise ) // pessimistic transmission
+    if ( axis_transmission[j]==1 ) beta_j = 0.9*beta; // more var: 0.9*2^( log2(beta)*beta_noise ) // pessimistic transmission
+    if ( axis_transmission[j]==2 ) beta_j = 1.1*beta; // more var: 1.1*2^( log2(beta)*beta_noise ) // optimisitc transmission
+    if ( axis_vax[j]==0 ) delta_vax_j = delta_vax_real;
     if ( axis_vax[j]==1 ) delta_vax_j = delta_vax_opti;
     if ( axis_vax[j]==2 ) delta_vax_j = delta_vax_pess;
     if ( axis_vax[j]==3 ) delta_vax_j = delta_vax_null; 

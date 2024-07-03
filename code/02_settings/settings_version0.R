@@ -46,17 +46,16 @@ settings = function() {
   # ---- |-Fitting and uncertainty ----
   
   # ---- |-Flu scenarios ----
-  params$scenarios =  df_scenarios = 
+  params$scenarios =   
     tibble(
-      n=1:6,
-      scenario_id=c("A","B","C","D","E","F"),
-      axis_transmission=c(),
-      axis_vax=c(1,1,2,2,3,3),
-      axis_transmission=c(1,2,1,2,1,2)
+      n=1:7,
+      scenario_id=c("A","B","C","D","E","F","G"),
+      axis_vax=c(1,1,2,2,3,3,0),
+      axis_transmission=c(1,2,1,2,1,2,0)
     ) %>% left_join(
-      tibble(axis_vax=c(1,2,3),axis_vax_name=c("opti","pess","null")) , by = join_by(axis_vax)
+      tibble(axis_vax=c(1,2,3,0),axis_vax_name=c("opti","pess","null","status_quo")) , by = join_by(axis_vax)
     ) %>% left_join(
-      tibble(axis_transmission=c(1,2),axis_transmission_name=c("opti","pess")), by = join_by(axis_transmission)
+      tibble(axis_transmission=c(1,2,0),axis_transmission_name=c("opti","pess","status_quo")), by = join_by(axis_transmission)
     )
   
   
