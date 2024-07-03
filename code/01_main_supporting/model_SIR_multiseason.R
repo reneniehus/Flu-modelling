@@ -166,7 +166,7 @@ model_SIR_multiseason = function( params=NULL,
       fit_means = get_posterior_mean(fit00)
       mp="SIR_ini_mu[1,3]";mcmc_areas(fit00,mp);precis(fit00,depth=3,mp)
       #
-      myl = vector(mode = "list", length = 36)
+      myl = vector(mode = "list", length = 24)
       myl[1:36] = fit_means[1:36]
       names(myl) = row.names(fit_means)[1:36]
       init_fun = function(...) myl
@@ -181,8 +181,8 @@ model_SIR_multiseason = function( params=NULL,
       chains=1 ,thin=1,iter=200,
       seed=12, cores = getOption("mc.cores", 1L),
       control=list(
-        adapt_delta=0.95,
-        max_treedepth=14
+        # adapt_delta=0.97,
+        # max_treedepth=14
       ),
       data=stan_list,
       init = init_fun
