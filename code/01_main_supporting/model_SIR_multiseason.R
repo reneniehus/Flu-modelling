@@ -3,7 +3,8 @@ model_SIR_multiseason = function( params=NULL,
                                   target_input=NULL, 
                                   country_short_input , 
                                   pop_country, 
-                                  vax_country){
+                                  vax_country,
+                                  contacts){
   
   # ---- |-Obtain the fitting dataframe from the data ----
   # with age groups in separate columns

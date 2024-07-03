@@ -17,7 +17,7 @@ source("code/01_main_supporting/model_SIR_simple.R")
 source("code/01_main_supporting/model_last_year_burden.R")
 
 # ---- |-load flu data ----
-data = load_flu_data( params ) # loads the data
+data = load_flu_data( params,new_from_online = T,regenerate = T ) # loads the data
 
 # ---- |-run models (i.e. fitting and projections) ----
 models_out = run_flu_models( params, data ) # runs the model scripts

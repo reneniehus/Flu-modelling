@@ -23,26 +23,13 @@ run_flu_models = function( params=NULL , data=NULL ){
   # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   ### Running selected models ##########
   # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  
-  if ( "SIR_simple" %in% params$models_to_run ){ 
-    # prepare for model
-    country_short_input = "AT"
-    date_v_fit = seq(from=ymd("2022-10-05"),to=ymd("2023-05-01"),by="day")
-    # Run SIR_simple model
-    df = model_SIR_simple( params, dat=data$epi$erviss_ili_ari, country_short_input, date_v_fit )
-    # add data
-    df_out$df_for_submission[["SIR_simple"]] = df
-    df_out$output_other[["SIR_simple"]] = list(
-      date_v_fit = date_v_fit
-    )
-  }
-  
   if ( "SIR_simple_multi_season" %in% params$models_to_run ){
     
     pr=paste("Initiating SIR_simple_multi_season \n"); cat(green(pr))
     
     # ---- |-Data ----
     all_season = data_into_all_season(data,params,withforce=F)
+    contacts = transform_contracts(data,params) # transform the contact matrixes for model requirements
     
     if (F) {
       all_season %>% 
@@ -74,7 +61,8 @@ run_flu_models = function( params=NULL , data=NULL ){
                                                                              target_input, 
                                                                              country_short_input,
                                                                              pop_country,
-                                                                             vax_country)
+                                                                             vax_country,
+                                                                             contacts)
       }
     }
     end_time <- Sys.time() # 5 hrs
@@ -131,6 +119,19 @@ run_flu_models = function( params=NULL , data=NULL ){
     
     df = NULL
     df_out %<>% bind_rows(df) # Add DK model to the df_out
+  }
+  
+  if ( "SIR_simple" %in% params$models_to_run ){ 
+    # prepare for model
+    country_short_input = "AT"
+    date_v_fit = seq(from=ymd("2022-10-05"),to=ymd("2023-05-01"),by="day")
+    # Run SIR_simple model
+    df = model_SIR_simple( params, dat=data$epi$erviss_ili_ari, country_short_input, date_v_fit )
+    # add data
+    df_out$df_for_submission[["SIR_simple"]] = df
+    df_out$output_other[["SIR_simple"]] = list(
+      date_v_fit = date_v_fit
+    )
   }
   
   if ( "SIR_simple_r0_variation" %in% params$models_to_run ){ 

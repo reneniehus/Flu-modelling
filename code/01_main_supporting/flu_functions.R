@@ -234,3 +234,7 @@ data_into_all_season = function(data,params,withforce=F){
   load(file="output/all_season.Rdata")
   return(all_season)
 }
+
+transform_contracts = function(data,params) {
+  return(NULL)
+}
