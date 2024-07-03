@@ -27,6 +27,11 @@ natural_severity = function(
   return(list_out)
 }
 
+mnaming = function(df,mnames){
+  names(df) = mnames
+  return(df)
+}
+
 # Computing severe outcomes from infections
 severity_factor = function(
     incident_infections, # [t,a] infections by time-bin, and by age
