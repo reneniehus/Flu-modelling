@@ -95,7 +95,7 @@ load_flu_data_epi = function(data=data, params=NULL , new_from_online=T , regene
       ) 
     
     epi = list(
-      date_list_created = today(),
+      date_epilist_created = today(),
       erviss_ili_ari = erviss_ili_ari,
       erviss_typing_sentinel = data_sentinel_detections,
       erviss_typing_nonsentinel = data_nonsentinel_detections,
@@ -118,15 +118,20 @@ load_flu_data_vax = function(data=data, params=NULL , new_from_online=T , regene
     if (new_from_online==T) {
       # load data freshly from the internet
       data_vax = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/influenza/vaccination/influenza_vax_scenarios.csv",show_col_types = FALSE)
-      data_vax %>% write_csv(file="data/vax_flu_data.csv",show_col_types = FALSE)
+      data_vax_hist = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/influenza/vaccination/vaccine_coverage_65plus.csv",show_col_types = FALSE)
+      # write
+      data_vax %>% write_csv(file="data/vax_flu_scenarios.csv")
+      data_vax_hist %>% write_csv(file="data/vax_flu_history.csv")
     }
     if (new_from_online==F) {
       # load data from local storage
-      data_vax = read_csv(file="data/vax_flu_data.csv", )
+      data_vax = read_csv(file="data/vax_flu_scenarios.csv",show_col_types = F )
+      data_vax_hist = read_csv(file="data/vax_flu_history.csv",show_col_types = F )
     }
     
     vax = list(
-      data_vax = data_vax %>% pivot_wider(names_from = "scenario", values_from = vaccine_coverage)
+      data_vax = data_vax %>% mutate(vaccine_coverage=vaccine_coverage/100) %>% pivot_wider(names_from = "scenario", values_from = vaccine_coverage),
+      data_vax_history = data_vax_hist %>% mutate(vaccine_coverage=as.numeric(vaccine_coverage)/100 )
     )
     save(vax,file="output/vax.Rdata")
     
@@ -161,29 +166,36 @@ load_flu_data_contact = function(data=data, params=NULL , new_from_online=T , re
   return(data)
 }
 
-load_flu_data_locations_respicompass = function(data=data, params=NULL , new_from_online=T , regenerate=T ){
-  file_doesnot_exist = !file.exists("output/respicompass_locations.Rdata")
+load_flu_data_helpers_respicompass = function(data=data, params=NULL , new_from_online=T , regenerate=T ){
+  
+  file_doesnot_exist = !file.exists("output/respicompass_helpers.Rdata")
+  
   if ( file_doesnot_exist|regenerate==T ) {
     
     if (new_from_online==T) {
       # load data freshly from the internet
       xlocations = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/supporting-files/locations_iso2_codes.csv",show_col_types = F)
+      xweeks = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/supporting-files/iso_weeks.csv",show_col_types = F)
+      # write to disk
       xlocations %>% write_csv(file="output/respicompass_locations.csv")
-      }
+      xweeks %>% write_csv(file="output/respicompass_weeks.csv")
+    }
     if (new_from_online==F) {
       # load data from local storage
       xlocations = read_csv(file="output/respicompass_locations.csv",show_col_types = F)
+      xweeks = read_csv(file="output/respicompass_weeks.csv",show_col_types = F)
     }
     
-    dat_locations = list(
-      iso2_code = xlocations
+    dat_helpers = list(
+      iso2_code = xlocations,
+      iso_weeks = xweeks
     )
-    save(dat_locations,file="output/respicompass_locations.Rdata")
+    save(dat_helpers,file="output/respicompass_helpers.Rdata")
     
-  } else { load(file="output/respicompass_locations.Rdata") }
+  } else { load(file="output/respicompass_helpers.Rdata") }
   
   # adding to data 
-  data$contact = dat_locations
+  data$helpers_respicompass = dat_helpers
   
   return(data)
 }
@@ -305,7 +317,7 @@ load_flu_data = function( params=NULL , new_from_online=T, regenerate=F ){
   
   data = load_flu_data_contact( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
   
-  data = load_flu_data_locations_respicompass( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
+  data = load_flu_data_helpers_respicompass( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
   
   data = load_flu_data_demography_ECDC( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
   
