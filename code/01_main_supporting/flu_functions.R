@@ -236,5 +236,65 @@ data_into_all_season = function(data,params,withforce=F){
 }
 
 transform_contracts = function(data,params) {
-  return(NULL)
+  
+  stop("Implement the 5th age group!")
+  contacts_normalized_all = list()
+  
+  xlocations = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/supporting-files/locations_iso2_codes.csv",show_col_types = F)
+  for (country_i in xlocations$location_name){ # country_i = xlocations$location_name[1]
+    contacts = data$contact[[country_i]]
+    
+    # Get population sizes
+    read_file=paste0("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/miscellaneous/population/",country_i,".csv")
+    x_pop = read_csv(read_file,show_col_types = FALSE)
+    
+    # Get total number of contacts per age group; aka, each element is total number of contacts between age group i and j
+    contacts_total = (as.matrix(contacts) * (matrix(rep(x_pop$population[1:16], 16), nrow = 16))) %>% round(digits = 1)
+    warning("check if we need to multiple rows or columns in the line above!")
+    warning("Check why contacts_total matrix is not symmetrical!")
+    
+    # Change from 16 age groups to 4
+    contacts_total_new = matrix(NA,4,4)
+    contacts_total_new[1,1] = contacts_total[1,1]
+    #
+    contacts_total_new[2,2] = sum(contacts_total[2:3,2:3]) 
+    contacts_total_new[1,2] = sum(contacts_total[1,2:3])
+    contacts_total_new[2,1] = sum(contacts_total[2:3,1])
+    #
+    contacts_total_new[3,3] = sum(contacts_total[4:13,4:13])
+    contacts_total_new[1,3] = sum(contacts_total[1,4:13])
+    contacts_total_new[3,1] = sum(contacts_total[4:13,1])
+    contacts_total_new[2,3] = sum(contacts_total[2:3,4:13])
+    contacts_total_new[3,2] = sum(contacts_total[4:13,2:3])
+    #
+    contacts_total_new[4,4] = sum(contacts_total[14:16,14:16])
+    contacts_total_new[1,4] = sum(contacts_total[1,14:16])
+    contacts_total_new[4,1] = sum(contacts_total[14:16,1])
+    contacts_total_new[2,4] = sum(contacts_total[2:3,14:16])
+    contacts_total_new[4,2] = sum(contacts_total[14:16,2:3])
+    contacts_total_new[3,4] = sum(contacts_total[4:13,14:16])
+    contacts_total_new[4,3] = sum(contacts_total[14:16,4:13])
+    
+    # Get total mean number of contacts per person
+    total_nr_contacts_per_person = sum( contacts_total_new[row(contacts_total_new)>=col(contacts_total_new)] ) / sum(x_pop$population[1:16])
+    #sum( contacts_total[row(contacts_total)>=col(contacts_total)] ) / sum(x_pop$population[1:16])
+    
+    # Get a new contact matrix with only 5 age groups, such that average number of contacts per person equals to one
+    x_new_pop = data$demography_respicast$population_pyramid %>% filter(country == country_i) %>% pull(population)
+    x_pop_matrix = (matrix(rep(x_new_pop,4), nrow=4))
+    warning("Is the above above ok or should it be transposed?")
+    
+    # The new contact matrix where elements are per person contacts between age group i and j such that the (weighted) average number of contacts is 1
+    contacts_normalized = contacts_total_new / (x_pop_matrix * total_nr_contacts_per_person)
+    
+    contacts_normalized_all[[country_i]] = contacts_normalized
+    
+    
+    
+  }
+  
+  
+  
+  
+  return(contacts_normalized_all)
 }
