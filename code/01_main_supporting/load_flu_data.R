@@ -117,8 +117,8 @@ load_flu_data_vax = function(data=data, params=NULL , new_from_online=T , regene
     
     if (new_from_online==T) {
       # load data freshly from the internet
-      data_vax = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/influenza/vaccination/influenza_vax_scenarios.csv")
-      data_vax %>% write_csv(file="data/vax_flu_data.csv")
+      data_vax = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/influenza/vaccination/influenza_vax_scenarios.csv",show_col_types = FALSE)
+      data_vax %>% write_csv(file="data/vax_flu_data.csv",show_col_types = FALSE)
     }
     if (new_from_online==F) {
       # load data from local storage
@@ -157,6 +157,33 @@ load_flu_data_contact = function(data=data, params=NULL , new_from_online=T , re
   
   # adding to data 
   data$contact = dat_contact
+  
+  return(data)
+}
+
+load_flu_data_locations_respicompass = function(data=data, params=NULL , new_from_online=T , regenerate=T ){
+  file_doesnot_exist = !file.exists("output/respicompass_locations.Rdata")
+  if ( file_doesnot_exist|regenerate==T ) {
+    
+    if (new_from_online==T) {
+      # load data freshly from the internet
+      xlocations = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/supporting-files/locations_iso2_codes.csv",show_col_types = F)
+      xlocations %>% write_csv(file="output/respicompass_locations.csv")
+      }
+    if (new_from_online==F) {
+      # load data from local storage
+      xlocations = read_csv(file="output/respicompass_locations.csv",show_col_types = F)
+    }
+    
+    dat_locations = list(
+      iso2_code = xlocations
+    )
+    save(dat_locations,file="output/respicompass_locations.Rdata")
+    
+  } else { load(file="output/respicompass_locations.Rdata") }
+  
+  # adding to data 
+  data$contact = dat_locations
   
   return(data)
 }
@@ -226,6 +253,45 @@ load_flu_data_demography_ECDC = function(data=data, params=NULL , new_from_onlin
   return(data)
 }
 
+load_flu_data_demography_respicast = function(data=data, params=NULL , new_from_online=F , regenerate=T ){
+  file_doesnot_exist = !file.exists("output/demography_respicast.Rdata")
+  if ( file_doesnot_exist|regenerate==T ) {
+    
+    if (new_from_online==T) {
+      # load data freshly from the internet
+      pop_df = NULL
+      xlocations = read_csv(file="output/respicompass_locations.csv",show_col_types = F)
+      country_v = xlocations$location_name
+      for (country_i in country_v) {
+        pr=paste("> Loading pop data for:",country_i,"... \n"); cat(green(pr))
+        read_file=paste0("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/miscellaneous/population/",country_i,"_aggr.csv")
+        xdf = read_csv(read_file,show_col_types = FALSE)
+        xdf$country = country_i
+        pop_df=rbind(pop_df,xdf)
+      }
+      pop_df = pop_df %>% select(country,age_group,population)
+      
+      pop_df %>% write_csv("output/population_pyramid_respicast.csv")
+    }
+    if (new_from_online==F) {
+      # load data from local storage
+      pr=paste("Loading respicast demography data from disk ... \n"); cat(green(pr))
+      pop_df = read_csv("output/population_pyramid_respicast.csv",show_col_types = F) 
+    }
+    
+    dat_demography = list(
+      population_pyramid = pop_df
+    )
+    save(dat_demography,file="output/demography_respicast.Rdata")
+    
+  } else { load(file="output/demography_respicast.Rdata") }
+  
+  # adding to data 
+  data$demography_ECDC = dat_demography
+  
+  return(data)
+}
+
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ### Mother function: calling the data-loading functions for each data stream ##########
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -239,7 +305,11 @@ load_flu_data = function( params=NULL , new_from_online=T, regenerate=F ){
   
   data = load_flu_data_contact( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
   
+  data = load_flu_data_locations_respicompass( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
+  
   data = load_flu_data_demography_ECDC( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
+  
+  data = load_flu_data_demography_respicast( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
   
   return(data)
 }
