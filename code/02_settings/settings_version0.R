@@ -5,6 +5,7 @@ settings = function() {
   # ---- |-Names/identifiers ----
   params$scenario_round_id = "2024_2025_1_FLU1"
   params$scenario_team = "ECDC"
+  params$scenario_model = "ECDC_lefluflu"
   # ---- |-Disease parameters ----
   params$rate_infectious = 0.2777778
   params$Rnull = 2.0 # https://www.cambridge.org/core/journals/epidemiology-and-infection/article/estimation-of-the-basic-reproductive-number-r0-for-epidemic-highly-pathogenic-avian-influenza-subtype-h5n1-spread/A60F72F5004F3BC5FAC2A3F8BB188A0F
@@ -50,7 +51,7 @@ settings = function() {
   # ---- |-Flu scenarios ----
   params$scenarios =   
     tibble(
-      n=1:7,
+      scen_id=1:7,
       scenario_id=c("A","B","C","D","E","F","G"),
       axis_vax=c(1,1,2,2,3,3,0),
       axis_transmission=c(1,2,1,2,1,2,0)

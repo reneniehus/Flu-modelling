@@ -16,12 +16,17 @@ model_SIR_multiseason = function( params=NULL,
   start_date = ymd(paste0(start_year,params$season_start_monthday))
   end_date   = ymd(paste0(start_year+1,params$season_end_monthday))
   date_v = seq(from=start_date,to=end_date,by="day")
-  date_v_wed = date_v[weekdays(date_v)=="Wednesday"]
+  date_v_wed = date_v[weekdays(date_v)=="Wednesday"][1:52]
+  date_v_mon = date_v[weekdays(date_v)=="Monday"][1:52]
   all_season_project = tibble(country_short=country_short_input,
                               season=season,
-                              date=date_v_wed,
-                              value=NA)
+                              date_mon=date_v_mon,
+                              date_wed=date_v_wed,
+                              value=NA) %>% 
+    mutate(week_id=1:n()) %>% 
+    left_join(data$helpers_respicompass$iso_weeks,by=c("date_mon"="start_week_day"))
   
+  data$helpers_respicompass$iso_weeks
   # make daily version of the data frame - from some daily indicators that the model needs
   crossing( country_short=country_short_input,
             nesting(data_w=all_season_fit_wide$date,season=all_season_fit_wide$season), 
@@ -41,10 +46,16 @@ model_SIR_multiseason = function( params=NULL,
   
   # helpers for stan list
   df_scenarios = params$scenarios
+  
   pop_pyramid = data$demography_respicast$population_pyramid %>% filter(country==EU_long(country_short_input))
   pop_age_group = pop_pyramid$population 
   age_groups = params$SIR_multiseason$age_groups
   n_age_groups = length(age_groups)
+  df_agegroups_ecdc = tibble(agegroup_id=c(0:n_age_groups),
+                             age_group_ecdc=c("age_total", age_groups) )
+  df_age_translate = tibble(age_group_ecdc=df_agegroups_ecdc$age_group_ecdc,
+                            age_group_respicompass=c("total","0-4","5-14","15-64","65+"))
+  df_agegroups = df_agegroups_ecdc %>% left_join(df_age_translate,by = join_by(age_group_ecdc))
   z_proj = rep(0,nrow(all_season_project_daily))
   z_fit  = rep(0,nrow(all_season_fit_daily))
   # ---- |-Stan list and fit----
@@ -143,17 +154,22 @@ model_SIR_multiseason = function( params=NULL,
     ini_tune = F
     if (ini_tune==T) {
       load(path_fit) # loading fit00
-      fit_means = get_posterior_mean(fit00)
-      mp="SIR_ini_mu[1,3]";mcmc_areas(fit00,mp);precis(fit00,depth=3,mp)
+      fit_means = get_posterior_mean(fit00) # extract mean estimates
+      row.names(fit_means)[1:32] # print parameter names
+      mp="sigma_i";mcmc_areas(fit00,mp);precis(fit00,depth=3,mp)
       #
-      myl = vector(mode = "list", length = 24)
-      myl[1:24] = fit_means[1:24]
-      names(myl) = row.names(fit_means)[1:24]
+      myl = vector(mode = "list", length = 32)
+      myl[1:32] = fit_means[1:32]
+      names(myl) = row.names(fit_means)[1:32]
       init_fun = function(...) myl
-      save(init_fun,file="output/ini_SIR__multiseason_age_vax.Rdata")
+      save(init_fun,file=paste0("output/ini_SIR__multiseason_age_vax",target_input,country_short_input,".Rdata") )
+      save_as_general = T
+      if (save_as_general) save(init_fun,file="output/ini_SIR__multiseason_age_vax.Rdata")
     }
     if (ini_tune==F) {
-      load(file="output/ini_SIR__multiseason_age_vax.Rdata")
+      load_which = "general"
+      if (load_which == "general") load(file="output/ini_SIR__multiseason_age_vax.Rdata")
+      if (load_which == "specific") load(file=paste0("output/ini_SIR__multiseason_age_vax",target_input,country_short_input,".Rdata"))
     }
     
     fit00=rstan::stan(
@@ -184,20 +200,58 @@ model_SIR_multiseason = function( params=NULL,
     precis(fit00,pars=c("SIR_ini"),depth = 3)
   }
   
+  # extract fit
+  modelled_fit = fit00 %>% gather_draws(gen_ili_obs_fit_sum[n]) %>% 
+    filter(.draw%in%c(1:20)) %>% # filter a number of posterior draws
+    select(-.chain,-.iteration) %>% ungroup() %>% 
+    right_join(all_season_fit_wide,by = join_by(n)) 
+  modelled_fit %>% ggplot(aes(date,age_total)) + geom_line() + 
+    geom_line(aes(y=.value,group=.draw),col="lightblue")
   
-  p2 = fit00 %>% gather_draws(delta_ili_abs_weekly_sum[n]) %>% 
-    filter(.draw%in%c(1:20)) %>% select(-.chain,-.iteration) %>% ungroup() %>% 
-    right_join(all_season_fit,by = join_by(n)) %>% 
-    ggplot(aes(date,value)) + 
-    geom_line(aes(y=.value,group=.draw),col="lightblue") + geom_line() + coord_cartesian(ylim=c(0,10000))
+  # extract projections
+  modelled_proj = fit00 %>% 
+    gather_draws(gen_ili_u_obs_project[scen_id,week_id,agegroup_id], # if you want to apply changes here, do look up the useful gather_draws {tidybayes} syntax
+                 gen_ili_v_obs_project[scen_id,week_id,agegroup_id],
+                 gen_ili_u_obs_project_sum[scen_id,week_id],
+                 gen_ili_v_obs_project_sum[scen_id,week_id]) %>% 
+    filter(.draw%in%c(1:20)) %>% # filter a number of posterior draws
+    select(-.chain,-.iteration) %>% ungroup() %>% # remove unneeded columns and grouping
+    mutate(vax_status=case_when(
+      .variable=="gen_ili_u_obs_project"~"vaxNo",
+      .variable=="gen_ili_v_obs_project"~"vaxYes",
+      .variable=="gen_ili_u_obs_project_sum"~"vaxNo",
+      .variable=="gen_ili_v_obs_project_sum"~"vaxYes"
+    )) %>% 
+    mutate(agegroup_id=case_when(
+      .variable=="gen_ili_u_obs_project_sum"~0,
+      .variable=="gen_ili_v_obs_project_sum"~0,
+      TRUE ~ agegroup_id
+    )) %>% 
+    left_join(df_scenarios,by = join_by(scen_id)) %>% # add scenario info
+    left_join(df_agegroups,by = join_by(agegroup_id)) %>% # add agegroup info
+    left_join(all_season_project, by=join_by(week_id)) %>% # add week info
+    mutate(model_id=params$scenario_model,round_id=params$scenario_round_id, # add needed columns
+           target="ili_plus",output_type="sample") %>% 
+    unite(col="pop_group",age_group_respicompass,vax_status,sep="_") %>% 
+    select( round_id, # select according to submission definition
+            scenario_id,
+            target=target,
+            location=country_short,
+            pop_group=pop_group,
+            horizon=horizon,
+            target_end_date=end_week_day,
+            date_mon=date_mon, # keeping this in to have dates for all weeks beyond data$helpers_respicompass$iso_weeks
+            output_type=output_type,
+            output_type_id=.draw,
+            value=.value) 
+  # Required columns in df_for_submission (as per: https://github.com/european-modelling-hubs/RespiCompass/wiki/Submission-format):
   
   # ---- |-Compile output ----
   modl = 
     list(
-      fit = fit00,
       stan_list = stan_list,
-      pdata = p1,
-      pfit = p2
+      modelled_fit = modelled_fit,
+      modelled_proj = modelled_proj
     )
   
   return(modl)
