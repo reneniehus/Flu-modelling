@@ -150,19 +150,33 @@ load_flu_data_vax = function(data=data, params=NULL , regenerate=T  , new_from_o
   return(data)
 }
 
-load_flu_data_contact = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
+load_flu_data_contact = function(data=data, params=NULL , regenerate=T  , new_from_online=F){
   file_doesnot_exist = !file.exists("output/contact.Rdata")
   if ( file_doesnot_exist|regenerate==T ) {
     
     if (new_from_online==T) {
       # load data freshly from the internet
+      stop("Data available only locally")
+      
     }
     if (new_from_online==F) {
       # load data from local storage
+      xdata = list()
+      xlocations = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/supporting-files/locations_iso2_codes.csv",show_col_types = F)
+      for (country_i in xlocations$location_name){ # country_i = xlocations$location_name[1]
+        contacts = 0
+        try({ # As there are two files, each with half the countries, try to get contact matrix for a given country from both files
+          contacts = read_excel("./data/MUestimates_all_locations_1.xlsx", sheet = country_i, col_names = F, .name_repair = "unique_quiet", skip = 1)
+        }, silent = T)
+        try({
+          contacts = read_excel("./data/MUestimates_all_locations_2.xlsx", sheet = country_i, col_names = F, .name_repair = "unique_quiet")
+        }, silent = T)
+        xdata[[country_i]] = contacts
+        
+      }
     }
     
-    dat_contact = list(
-    )
+    dat_contact = xdata
     save(dat_contact,file="output/contact.Rdata")
     
   } else { load(file="output/contact.Rdata") }
