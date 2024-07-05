@@ -105,8 +105,8 @@ model_SIR_multiseason = function( params=NULL,
   )
   # Add vaccination to Oct 1st to the second age group
   ind_vax = which(date_v == paste0(year(min(date_v)),"-10-01"))
-  stan_list$delta_vax_opti$age_65_99[ind_vax] = vax_country$higher_vax_coverage/100
-  stan_list$delta_vax_pess$age_65_99[ind_vax] = vax_country$lower_vax_coverage/100
+  stan_list$delta_vax_opti$age_65_99[ind_vax] = vax_country$higher_vax_coverage
+  stan_list$delta_vax_pess$age_65_99[ind_vax] = vax_country$lower_vax_coverage
   stan_list$delta_vax_null$age_65_99[ind_vax] = 0
   
   ### for debugging: make it 2 age groups
@@ -146,7 +146,6 @@ model_SIR_multiseason = function( params=NULL,
   
   p2 = NULL
   path_fit = paste0("../Big data/multiseason_age_vax",target_input,country_short_input,".Rdata")
-  path_fit = "../Big data/multiseason_age_vaxili_typing_sentinelAT.Rdata"
   pr=paste("> Now fitting:",target_input,"for",country_short_input,"... "); cleancat(green(pr))
   if (T) {
     
@@ -174,7 +173,7 @@ model_SIR_multiseason = function( params=NULL,
     
     fit00=rstan::stan(
       file='./stan/SIR_multiseason_age_vax.stan',
-      chains=1 ,thin=1,iter=200,
+      chains=1 ,thin=1,iter=400,
       seed=12, cores = getOption("mc.cores", 1L),
       control=list(
         # adapt_delta=0.97,
@@ -182,7 +181,7 @@ model_SIR_multiseason = function( params=NULL,
       ),
       data=stan_list
       #init = init_fun
-    ) # X mins
+    ) # 8.5 hrs
     
     
     save(fit00,stan_list,file = path_fit)
