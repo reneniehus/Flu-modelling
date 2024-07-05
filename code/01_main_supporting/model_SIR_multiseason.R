@@ -105,6 +105,7 @@ model_SIR_multiseason = function( params=NULL,
   )
   # Add vaccination to Oct 1st to the second age group
   ind_vax = which(date_v == paste0(year(min(date_v)),"-10-01"))
+  stan_list$delta_vax_real$age_65_99[ind_vax] = (vax_country$higher_vax_coverage + vax_country$lower_vax_coverage)/2
   stan_list$delta_vax_opti$age_65_99[ind_vax] = vax_country$higher_vax_coverage
   stan_list$delta_vax_pess$age_65_99[ind_vax] = vax_country$lower_vax_coverage
   stan_list$delta_vax_null$age_65_99[ind_vax] = 0
@@ -155,7 +156,7 @@ model_SIR_multiseason = function( params=NULL,
       load(path_fit) # loading fit00
       fit_means = get_posterior_mean(fit00) # extract mean estimates
       row.names(fit_means)[1:32] # print parameter names
-      mp="sigma_i";mcmc_areas(fit00,mp);precis(fit00,depth=3,mp)
+      # mp="sigma_i";mcmc_areas(fit00,mp);precis(fit00,depth=3,mp)
       #
       myl = vector(mode = "list", length = 32)
       myl[1:32] = fit_means[1:32]
@@ -173,15 +174,16 @@ model_SIR_multiseason = function( params=NULL,
     
     fit00=rstan::stan(
       file='./stan/SIR_multiseason_age_vax.stan',
-      chains=1 ,thin=1,iter=400,
-      seed=12, cores = getOption("mc.cores", 1L),
+      chains=1 ,thin=1,iter=150, # a "debug run"
+      # chains=4 ,thin=4,iter=500, # a "long run" 
+      seed=13, cores = getOption("mc.cores", 1L),
       control=list(
-        # adapt_delta=0.97,
-        # max_treedepth=14
+        # adapt_delta=0.95, # look into increasing this, 0.98 or 0.99
+        # max_treedepth=10 # look into increasing this to, 15, 20 ect
       ),
       data=stan_list
       #init = init_fun
-    ) # 8.5 hrs
+    ) # 8.5 hrs, run time will scale with  inter, and is a funciton of adapt_delta and max_treedepth, and is a function of luck
     
     
     save(fit00,stan_list,file = path_fit)
@@ -190,13 +192,25 @@ model_SIR_multiseason = function( params=NULL,
   }
   pr=paste("> Fitting:",target_input,"for",country_short_input,"Done \n"); cleancat(green(pr))
   
-  # ---- |-Extract parameters and plot ----
+  # ---- |-Block to sense check etc, Extract parameters and plot, see convergence ----
   if (F){
-    precis(fit00,pars=c("SIR_ini_mu"),depth = 3)
-    precis(fit00,pars=c("Rnull_eff"),depth = 2)
-    precis(fit00,pars=c("prop_severe"),depth = 2)
-    precis(fit00,pars=c("sigma_i"),depth = 2) # 3.66
-    precis(fit00,pars=c("SIR_ini"),depth = 3)
+    # plot without Rethinking package
+    fit00@model_pars # see which parameters are there
+    # see parameter names with dimensions
+    fit_means = get_posterior_mean(fit00) # extract mean estimates
+    row.names(fit_means)[1:32]
+    mp="SIR_ini[3,1,1]";mcmc_areas(fit00,mp)
+    
+    
+    # https://rstudio.github.io/cheatsheets/bayesplot.pdf
+    # for quick convergence check: n_eff Rhat ( see other packages than Rethinking)
+    # using Rethinkingp akcage
+    
+    # precis(fit00,pars=c("SIR_ini_mu"),depth = 3)
+    # precis(fit00,pars=c("Rnull_eff"),depth = 2)
+    # precis(fit00,pars=c("prop_severe"),depth = 2)
+    # precis(fit00,pars=c("sigma_i"),depth = 2) # 3.66
+    # precis(fit00,pars=c("SIR_ini"),depth = 3) 
   }
   
   # extract fit
