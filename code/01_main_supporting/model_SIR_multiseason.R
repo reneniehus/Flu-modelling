@@ -167,9 +167,12 @@ model_SIR_multiseason = function( params=NULL,
       if (save_as_general) save(init_fun,file="output/ini_SIR__multiseason_age_vax.Rdata")
     }
     if (ini_tune==F) {
-      load_which = "general"
-      if (load_which == "general") load(file="output/ini_SIR__multiseason_age_vax.Rdata")
-      if (load_which == "specific") load(file=paste0("output/ini_SIR__multiseason_age_vax",target_input,country_short_input,".Rdata"))
+      # a specific country run will look for a country-specfic initial contition function file, if that does not exist, it loads a general one
+      if (file.exists(paste0("output/ini_SIR__multiseason_age_vax",target_input,country_short_input,".Rdata"))){
+        load(file=paste0("output/ini_SIR__multiseason_age_vax",target_input,country_short_input,".Rdata"))  
+      } else{
+        load(file="output/ini_SIR__multiseason_age_vax.Rdata")
+      }
     }
     
     fit00=rstan::stan(
