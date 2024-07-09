@@ -161,7 +161,7 @@ model {
     logit( SIR_ini[,1,3] )   ~ normal( logit( SIR_ini_mu[1,3] )   , sigma_i );
   }
   // more priors: put priors on things that we want to fixate more
-  logit(prop_ili_mu) ~ normal( logit(0.7) , 0.2 );// check in R: rnorm(2000,logit(0.7),0.2) %>% inv_logit() %>% dens()
+  logit(prop_ili_mu) ~ normal( logit(0.1) , 3 );// check in R: rnorm(2000,logit(0.1), 3) %>% inv_logit() %>% dens()
   // I_ini determined the season timing and certainly be a very low value
   // R and S we want to keep free to allow learning about immunity
   logit(SIR_ini_mu[1,2]) ~ normal( logit(0.0015) , 0.4 ); // check in R: rnorm(2000,logit(0.0015),0.4) %>% inv_logit() %>% dens()
@@ -323,3 +323,4 @@ generated quantities {
   }
   
 }
+
