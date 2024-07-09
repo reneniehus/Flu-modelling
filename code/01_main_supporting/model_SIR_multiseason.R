@@ -37,7 +37,7 @@ model_SIR_multiseason = function( params=NULL,
     ungroup() %>% select(-h) -> all_season_fit_daily
   
   crossing( country_short=country_short_input,
-            nesting(data_w=all_season_project$date,season=all_season_project$season), 
+            nesting(data_w=all_season_project$date_mon,season=all_season_project$season), 
             d_shift=c(-6:0) ) %>% 
     mutate(date=data_w+d_shift) %>% select(country_short,season,date) -> all_season_project_daily
   # plotting
@@ -84,7 +84,8 @@ model_SIR_multiseason = function( params=NULL,
     pop = sum(pop_age_group), 
     #
     pop_age_group=matrix(pop_age_group ,nrow=n_age_groups,ncol=1),
-    contact_matrix=matrix(data=rep(1/n_age_groups,n_age_groups^2),nrow=n_age_groups,ncol=n_age_groups),
+    #contact_matrix=matrix(data=rep(1/n_age_groups,n_age_groups^2),nrow=n_age_groups,ncol=n_age_groups),
+    contact_matrix=matrix(data=rep(1,n_age_groups^2),nrow=n_age_groups,ncol=n_age_groups),
     delta_vax=tibble( A=z_fit,B=z_fit,C=z_fit,D=z_fit) %>% mnaming(age_groups),
     # data relevant for projected scenarios
     n_week_project = nrow(all_season_project),
@@ -109,6 +110,14 @@ model_SIR_multiseason = function( params=NULL,
   stan_list$delta_vax_opti$age_65_99[ind_vax] = vax_country$higher_vax_coverage
   stan_list$delta_vax_pess$age_65_99[ind_vax] = vax_country$lower_vax_coverage
   stan_list$delta_vax_null$age_65_99[ind_vax] = 0
+  
+  
+  ############## Add artifically generated ili values ###############
+  
+  stan_list = generate_ili_epi_test(stan_list)
+  
+  
+  ###################################################################
   
   ### for debugging: make it 2 age groups
   if (F) {
@@ -177,8 +186,8 @@ model_SIR_multiseason = function( params=NULL,
     
     fit00=rstan::stan(
       file='./stan/SIR_multiseason_age_vax.stan',
-      chains=1 ,thin=1,iter=150, # a "debug run"
-      # chains=4 ,thin=4,iter=500, # a "long run" 
+      #chains=1 ,thin=1,iter=150, # a "debug run"
+      chains=4, thin=4, iter=1000, # a "long run" 
       seed=13, cores = getOption("mc.cores", 1L),
       control=list(
         # adapt_delta=0.95, # look into increasing this, 0.98 or 0.99
@@ -186,7 +195,7 @@ model_SIR_multiseason = function( params=NULL,
       ),
       data=stan_list
       #init = init_fun
-    ) # 8.5 hrs, run time will scale with  inter, and is a funciton of adapt_delta and max_treedepth, and is a function of luck
+    ) # 8.5 hrs, run time will scale with  inter, and is a function of adapt_delta and max_treedepth, and is a function of luck
     
     
     save(fit00,stan_list,file = path_fit)
@@ -202,7 +211,8 @@ model_SIR_multiseason = function( params=NULL,
     # see parameter names with dimensions
     fit_means = get_posterior_mean(fit00) # extract mean estimates
     row.names(fit_means)[1:32]
-    mp="SIR_ini[3,1,1]";mcmc_areas(fit00,mp)
+    mp="SIR_ini[3,1,1]"; mcmc_areas(fit00,mp)
+    mp="reciprocal_phi"; summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary
     
     
     # https://rstudio.github.io/cheatsheets/bayesplot.pdf
@@ -222,7 +232,8 @@ model_SIR_multiseason = function( params=NULL,
     select(-.chain,-.iteration) %>% ungroup() %>% 
     right_join(all_season_fit_wide,by = join_by(n)) 
   modelled_fit %>% ggplot(aes(date,age_total)) + geom_line() + 
-    geom_line(aes(y=.value,group=.draw),col="lightblue")
+    geom_line(aes(y=.value,group=.draw),col="lightblue") +
+    coord_cartesian(ylim = c(0,2*modelled_fit$age_total %>% max(na.rm=T)))
   
   # extract projections
   modelled_proj = fit00 %>% 
