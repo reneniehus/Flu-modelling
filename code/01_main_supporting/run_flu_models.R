@@ -49,7 +49,7 @@ run_flu_models = function( params=NULL , data=NULL ){
     for ( target_input in target_input_v ) { # target_input=target_input_v[1]
       for (country_short_input in country_short_input_v ) { # country_short_input=country_short_input_v[1]
         
-        # COuntry specific data
+        # Country specific data
         pop_country = data$demography_respicast$population_pyramid %>% 
           filter(country==EU_long(country_short_input)) %>% pull(population) %>% sum()
         
