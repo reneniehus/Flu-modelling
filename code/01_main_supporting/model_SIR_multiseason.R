@@ -102,7 +102,9 @@ model_SIR_multiseason = function( params=NULL,
     rate_infectious = params$rate_infectious,
     ve_spread = params$ve_spread,
     ve_inf = params$ve_inf,
-    ve_ili_cond_inf = params$ve_ili_cond_inf
+    ve_ili_cond_inf = params$ve_ili_cond_inf,
+    # daily steps
+    n_daily_time_steps = 10
   )
   # Add vaccination to Oct 1st to the second age group
   ind_vax = which(date_v == paste0(year(min(date_v)),"-10-01"))
@@ -110,12 +112,13 @@ model_SIR_multiseason = function( params=NULL,
   stan_list$delta_vax_opti$age_65_99[ind_vax] = vax_country$higher_vax_coverage
   stan_list$delta_vax_pess$age_65_99[ind_vax] = vax_country$lower_vax_coverage
   stan_list$delta_vax_null$age_65_99[ind_vax] = 0
+  stan_list$delta_vax$age_65_99[ind_vax] = (vax_country$higher_vax_coverage + vax_country$lower_vax_coverage)/2
+  stan_list$daily_counter_fit = rep(1:stan_list$n_day_fit, each=stan_list$n_daily_time_steps)
   
+  ############## Add artificially generated ili values ###############
   
-  ############## Add artifically generated ili values ###############
-  
-  stan_list = generate_ili_epi_test(stan_list)
-  
+  #stan_list = generate_ili_epi_test(stan_list)
+  #stan_list$ili_obs_notna = data.frame(stan_list$ili_obs_fit>0)
   
   ###################################################################
   
@@ -142,19 +145,27 @@ model_SIR_multiseason = function( params=NULL,
     stan_list$n_age_groups = 1
     stan_list$contact_matrix = matrix(data=c(1),nrow=1,ncol=1)
     stan_list$pop_age_group = matrix(c(pop_country) ,nrow=1,ncol=1)
-    stan_list$ili_obs_notna =  all_season_fit_wide %>% transmute(
-      age_1=as.integer(!is.na(age_00_04+age_05_14+age_15_64+age_65_99))
+    # stan_list$ili_obs_notna =  all_season_fit_wide %>% transmute(
+    #   age_1=as.integer(!is.na(age_00_04+age_05_14+age_15_64+age_65_99))
+    # )
+    # stan_list$ili_obs_fit =  all_season_fit_wide %>% transmute(
+    #   age_1=replace_na(age_00_04+age_05_14+age_15_64+age_65_99,0) %>% as.integer()
+    # )
+    stan_list$ili_obs_notna =  stan_list$ili_obs_notna %>% transmute(
+      age_1=as.integer(age_00_04+age_05_14+age_15_64+age_65_99>0)
     )
-    stan_list$ili_obs_fit =  all_season_fit_wide %>% transmute(
-      age_1=replace_na(age_00_04+age_05_14+age_15_64+age_65_99,0) %>% as.integer()
+    stan_list$ili_obs_fit =  stan_list$ili_obs_fit %>% transmute(
+      age_1= age_00_04+age_05_14+age_15_64+age_65_99
     )
     stan_list$delta_vax_real = tibble( val1=rep(0,nrow(all_season_project_daily)) )
     stan_list$delta_vax_opti = tibble( val1=rep(0,nrow(all_season_project_daily)) )
     stan_list$delta_vax_pess = tibble( val1=rep(0,nrow(all_season_project_daily)) )
     stan_list$delta_vax_null = tibble( val1=rep(0,nrow(all_season_project_daily)) )
+    stan_list$delta_vax = tibble( val1=rep(0,nrow(all_season_fit_daily)) )
   }
   
   p2 = NULL
+  #path_fit = paste0("../Big data/multiseason_age_vax",target_input,country_short_input,"test_fakeData.Rdata")
   path_fit = paste0("../Big data/multiseason_age_vax",target_input,country_short_input,".Rdata")
   pr=paste("> Now fitting:",target_input,"for",country_short_input,"... "); cleancat(green(pr))
   if (T) {
@@ -186,17 +197,24 @@ model_SIR_multiseason = function( params=NULL,
     
     fit00=rstan::stan(
       file='./stan/SIR_multiseason_age_vax.stan',
-      #chains=1 ,thin=1,iter=150, # a "debug run"
-      chains=4, thin=4, iter=1000, # a "long run" 
-      seed=13, cores = getOption("mc.cores", 1L),
+      chains=1 ,thin=1,iter=100, # a "debug run"
+      #chains=2, thin=2, iter=300, # a "long run" 
+      seed=5, cores = getOption("mc.cores", 1L),
       control=list(
         # adapt_delta=0.95, # look into increasing this, 0.98 or 0.99
-        # max_treedepth=10 # look into increasing this to, 15, 20 ect
+        max_treedepth=15 # look into increasing this to, 15, 20 ect
       ),
-      data=stan_list
-      #init = init_fun
-    ) # 8.5 hrs, run time will scale with  inter, and is a function of adapt_delta and max_treedepth, and is a function of luck
+      data=stan_list,
+      init = init_fun
+    ) # 8.5 hrs, run time will scale with iter, and is a function of adapt_delta and max_treedepth, and is a function of luck
     
+    # Get only a point estimate, such as the Maximum A Posteriori (MAP) estimate or the mean of the posterior
+    # stan_model <- stan_model(file = './stan/SIR_multiseason_age_vax.stan')
+    # fit <- rstan::optimizing(stan_model, 
+    #                          data = stan_list,
+    #                          iter = 100,
+    #                          init = init_fun)
+    #
     
     save(fit00,stan_list,file = path_fit)
   } else {
@@ -214,6 +232,8 @@ model_SIR_multiseason = function( params=NULL,
     mp="SIR_ini[3,1,1]"; mcmc_areas(fit00,mp)
     mp="reciprocal_phi"; summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary
     
+    mp="prop_ili_mu"; summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary
+    
     
     # https://rstudio.github.io/cheatsheets/bayesplot.pdf
     # for quick convergence check: n_eff Rhat ( see other packages than Rethinking)
@@ -226,14 +246,32 @@ model_SIR_multiseason = function( params=NULL,
     # precis(fit00,pars=c("SIR_ini"),depth = 3) 
   }
   
+  
   # extract fit
   modelled_fit = fit00 %>% gather_draws(gen_ili_obs_fit_sum[n]) %>% 
-    filter(.draw%in%c(1:20)) %>% # filter a number of posterior draws
+    #filter(.value>0) %>%
+    #filter(.draw%in%c(1:10)) %>% # filter a number of posterior draws
     select(-.chain,-.iteration) %>% ungroup() %>% 
-    right_join(all_season_fit_wide,by = join_by(n)) 
+    right_join(all_season_fit_wide,by = join_by(n)) %>%
+    group_by(date) %>%
+    mutate(mean_value = mean(.value)) %>%
+    ungroup()
   modelled_fit %>% ggplot(aes(date,age_total)) + geom_line() + 
-    geom_line(aes(y=.value,group=.draw),col="lightblue") +
-    coord_cartesian(ylim = c(0,2*modelled_fit$age_total %>% max(na.rm=T)))
+    #geom_line(aes(y=.value/50,group=.draw),col="lightblue") +
+    geom_line(aes(y=mean_value),col="lightblue") +
+    coord_cartesian(ylim = c(0,1.2*modelled_fit$age_total %>% max(na.rm=T)))
+  
+  # Plot mean fitted sampled with sythetic data
+  df = stan_list$ili_obs_fit %>%
+    mutate(date=modelled_fit$date%>%unique()%>%sort()) %>%
+    mutate(age_total = age_00_04 + age_05_14 + age_15_64 +age_65_99)
+  modelled_fit %>% 
+    group_by(date) %>%
+    mutate(mean_value = mean(.value)) %>%
+    ungroup() %>% 
+    ggplot() + geom_line(aes(x=date,y=mean_value, group=.draw), col="lightblue") +
+    geom_line(data=df, aes(x=date, y=age_total), linetype="dotted", alpha=0.5, col="black") 
+
   
   # extract projections
   modelled_proj = fit00 %>% 
