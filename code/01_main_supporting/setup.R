@@ -26,7 +26,7 @@ library(readxl)
 library(purrr)
 library(tidybayes)
 library(bayesplot)
-library(rethinking)
+#library(rethinking)
 library(patchwork)
 library(viridis)
 library(wrapr) # in wavefeature #
@@ -39,7 +39,7 @@ library(ISOweek)
 library(EpiEstim)
 library(fst)
 library(tictoc)
-library( "EcdcColors" )
+#library( "EcdcColors" )
 library(cmdstanr)
 library( scoringutils )
 library(crayon)
@@ -58,7 +58,7 @@ date <- lubridate::date
 intersect <- base::intersect
 setdiff <- base::setdiff
 union <- base::union
-rstudent <- rethinking::rstudent
+#rstudent <- rethinking::rstudent
 expand <- tidyr::expand
 map <- purrr::map
 discard <- purrr::discard
@@ -66,7 +66,7 @@ col_factor <- readr::col_factor
 combine <- gridExtra::combine
 area <- patchwork::area
 view <- summarytools::view
-compare <- rethinking::compare
+#compare <- rethinking::compare
 # keeping only select functions from tidy_log 
 . %>% dfSummary %>% view() -> viewsummary
 filter_log <- tidylog::filter
