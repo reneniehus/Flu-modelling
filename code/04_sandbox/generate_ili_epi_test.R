@@ -139,12 +139,13 @@ generate_ili_epi_test= function(stan_list){
     
   }
   
+  delta_ili_abs_weekly = round(delta_ili_abs_weekly, digits = 2)
   # Output
-  stan_list$all_season_fit$age_00_04 = delta_ili_abs_weekly[,1]
-  stan_list$all_season_fit$age_05_14 = delta_ili_abs_weekly[,2]
-  stan_list$all_season_fit$age_15_64 = delta_ili_abs_weekly[,3]
-  stan_list$all_season_fit$age_65_99 = delta_ili_abs_weekly[,4]
-  stan_list$all_season_fit$age_total = rowSums(delta_ili_abs_weekly)
+  stan_list$ili_obs_fit$age_00_04 = delta_ili_abs_weekly[,1] %>% as.integer()
+  stan_list$ili_obs_fit$age_05_14 = delta_ili_abs_weekly[,2] %>% as.integer()
+  stan_list$ili_obs_fit$age_15_64 = delta_ili_abs_weekly[,3] %>% as.integer()
+  stan_list$ili_obs_fit$age_65_99 = delta_ili_abs_weekly[,4] %>% as.integer()
+  #stan_list$ili_obs_fit$age_total = rowSums(delta_ili_abs_weekly) %>% as.integer()
 
   return(stan_list)
   
