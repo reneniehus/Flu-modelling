@@ -89,7 +89,7 @@ transformed parameters {
       prop_ili[i, j] = prop_ili_scaled[i, j] * 0.2;
     }
     SIR_ini[i,1,1] = SIR_ini_scaled[i,1,1];
-    SIR_ini[i,1,2] = SIR_ini_scaled[i,1,2] * 0.01;
+    SIR_ini[i,1,2] = SIR_ini_scaled[i,1,2] * 0.05;
     SIR_ini[i,1,3] = SIR_ini_scaled[i,1,3];
     sum_val = SIR_ini[i,1,1] + SIR_ini[i,1,2] + SIR_ini[i,1,3];
     SIR_ini[i,1,1] = SIR_ini[i,1,1] / sum_val;
@@ -461,21 +461,21 @@ model {
 generated quantities {
   // --------------------------------declare generated variables
   // we give generated quantities the prefix "gen_"
-  matrix<lower=0,upper=1>[n_multi_day_project, n_age_groups] gen_S_u;
-  matrix<lower=0,upper=1>[n_multi_day_project, n_age_groups] gen_I_u;
-  matrix<lower=0,upper=1>[n_multi_day_project, n_age_groups] gen_R_u;
-  matrix<lower=0,upper=1>[n_multi_day_project, n_age_groups] gen_S_v;
-  matrix<lower=0,upper=1>[n_multi_day_project, n_age_groups] gen_I_v;
-  matrix<lower=0,upper=1>[n_multi_day_project, n_age_groups] gen_R_v;
+  matrix<lower=0,upper=1>[n_day_project, n_age_groups] gen_S_u;
+  matrix<lower=0,upper=1>[n_day_project, n_age_groups] gen_I_u;
+  matrix<lower=0,upper=1>[n_day_project, n_age_groups] gen_R_u;
+  matrix<lower=0,upper=1>[n_day_project, n_age_groups] gen_S_v;
+  matrix<lower=0,upper=1>[n_day_project, n_age_groups] gen_I_v;
+  matrix<lower=0,upper=1>[n_day_project, n_age_groups] gen_R_v;
   array[n_week_fit] real<lower=0> delta_ili_abs_weekly_sum;
   array[n_week_fit, n_age_groups] int<lower=0> gen_ili_obs_fit;
   array[n_week_fit] int<lower=0> gen_ili_obs_fit_sum;
   // note: stan does not have 3-dimensional matrices, thus opting for arrays or 2-dimensional matrixes
   // note: matrix[n,m] M[o] creates an array of length o, each element contraining an nxm matrix, M CONFUSINGLY has then dimension [o,n,m]
-  matrix<lower=0>[n_multi_day_project, n_age_groups] gen_delta_ili_u[n_scenario];
-  matrix<lower=0>[n_multi_day_project, n_age_groups] gen_delta_ili_v[n_scenario];
-  matrix<lower=0>[n_multi_day_project, n_age_groups] gen_delta_ili_u_abs[n_scenario];
-  matrix<lower=0>[n_multi_day_project, n_age_groups] gen_delta_ili_v_abs[n_scenario];
+  matrix<lower=0>[n_day_project, n_age_groups] gen_delta_ili_u[n_scenario];
+  matrix<lower=0>[n_day_project, n_age_groups] gen_delta_ili_v[n_scenario];
+  matrix<lower=0>[n_day_project, n_age_groups] gen_delta_ili_u_abs[n_scenario];
+  matrix<lower=0>[n_day_project, n_age_groups] gen_delta_ili_v_abs[n_scenario];
   array[n_scenario, n_week_project, n_age_groups ] int<lower=0> gen_ili_u_obs_project; // unvaccinated
   array[n_scenario, n_week_project, n_age_groups ] int<lower=0> gen_ili_v_obs_project; // vaccinated
   array[n_scenario, n_week_project, n_age_groups ] int<lower=0> gen_ili_t_obs_project; // total
@@ -509,7 +509,7 @@ generated quantities {
   //print("simulate fitted observations");
   for (t in 1:n_week_fit) {
     for (a in 1:n_age_groups) {
-
+      
       gen_ili_obs_fit[t,a] = neg_binomial_2_rng( delta_ili_abs_weekly[t,a]+1e-6, phi );
       //print("simulate fitted observations 2");
     }
@@ -521,6 +521,7 @@ generated quantities {
   
   // --------------------------------simulate projected observations
   for (j in 1:n_scenario) {
+  //for (j in 1:1) {
     // settings for the scenarios
     // define 2 local variables
     real beta_j; // scenario-specific beta
@@ -535,19 +536,19 @@ generated quantities {
     int daily_counter;
     
     // Declare temporary variables outside the loop
-    real prev_S_u[n_age_groups];
-    real prev_I_u[n_age_groups];
-    real prev_R_u[n_age_groups];
-    real prev_S_v[n_age_groups];
-    real prev_I_v[n_age_groups];
-    real prev_R_v[n_age_groups];
+    real gen_prev_S_u[n_age_groups];
+    real gen_prev_I_u[n_age_groups];
+    real gen_prev_R_u[n_age_groups];
+    real gen_prev_S_v[n_age_groups];
+    real gen_prev_I_v[n_age_groups];
+    real gen_prev_R_v[n_age_groups];
     //
-    real curr_S_u[n_age_groups];
-    real curr_I_u[n_age_groups];
-    real curr_R_u[n_age_groups];
-    real curr_S_v[n_age_groups];
-    real curr_I_v[n_age_groups];
-    real curr_R_v[n_age_groups];
+    real gen_curr_S_u[n_age_groups];
+    real gen_curr_I_u[n_age_groups];
+    real gen_curr_R_u[n_age_groups];
+    real gen_curr_S_v[n_age_groups];
+    real gen_curr_I_v[n_age_groups];
+    real gen_curr_R_v[n_age_groups];
     //
     real curr_delta_ili_u[n_age_groups];
     real curr_delta_ili_v[n_age_groups];
@@ -561,6 +562,9 @@ generated quantities {
     daily_counter = 0;
     for (t in 1:n_multi_day_project) {
       
+      // if (t>50) {
+      //   continue;
+      // }
       if ((t-1)%n_daily_time_steps == 0){
         daily_counter = daily_counter+1;
       }
@@ -579,12 +583,14 @@ generated quantities {
         if (t==1) { // set initial conditions
         
         //print("main time loop t==1");
-        curr_S_u[a] = SIR_ini_mu[1,1];
-        curr_I_u[a] = SIR_ini_mu[1,2];
-        curr_R_u[a] = 1 - (curr_S_u[t,a] + curr_I_u[t,a]);
-        curr_S_v[a] = 0;  // Adding a small number to avoid dividing by 0
-        curr_I_v[a] = 0;  // Adding a small number to avoid dividing by 0
-        curr_R_v[a] = 0;  // Adding a small number to avoid dividing by 0
+        // gen_curr_S_u[a] = SIR_ini_mu[1,1];
+        // gen_curr_I_u[a] = SIR_ini_mu[1,2];
+        gen_curr_S_u[a] = SIR_ini[1,1,1];
+        gen_curr_I_u[a] = SIR_ini[1,1,2];
+        gen_curr_R_u[a] = 1 - (gen_curr_S_u[a] + gen_curr_I_u[a]);
+        gen_curr_S_v[a] = 0;  // Adding a small number to avoid dividing by 0
+        gen_curr_I_v[a] = 0;  // Adding a small number to avoid dividing by 0
+        gen_curr_R_v[a] = 0;  // Adding a small number to avoid dividing by 0
         
         // old time variables - can delete
         // //print("main time loop t==1");
@@ -600,8 +606,8 @@ generated quantities {
         //print("main time loop 2");
         // delta_infective_exposures_u = dt * beta_j * gen_S_u[t-1,a] *sum(contact_matrix[ : , a]' .* (gen_I_u[t-1,] + gen_I_v[t-1,]*(1-ve_spread)));
         // delta_infective_exposures_v = dt * beta_j * gen_S_v[t-1,a] *sum(contact_matrix[ : , a]' .* (gen_I_u[t-1,] + gen_I_v[t-1,]*(1-ve_spread))) * (1-ve_inf);
-        delta_infective_exposures_u = dt * beta_j * prev_S_u[a] * sum(to_vector(contact_matrix[ : , a]') .* (to_vector(prev_I_u)*1 + to_vector(prev_I_v)*(1-ve_spread)) );
-        delta_infective_exposures_v = dt * beta_j * prev_S_v[a] * sum(to_vector(contact_matrix[ : , a]') .* (to_vector(prev_I_u)*1 + to_vector(prev_I_v)*(1-ve_spread)) ) * (1 - ve_inf);
+        delta_infective_exposures_u = dt * beta_j * gen_prev_S_u[a] * sum(to_vector(contact_matrix[ : , a]') .* (to_vector(gen_prev_I_u)*1 + to_vector(gen_prev_I_v)*(1-ve_spread)) );
+        delta_infective_exposures_v = dt * beta_j * gen_prev_S_v[a] * sum(to_vector(contact_matrix[ : , a]') .* (to_vector(gen_prev_I_u)*1 + to_vector(gen_prev_I_v)*(1-ve_spread)) ) * (1 - ve_inf);
         
         
         delta_S_u = -delta_infective_exposures_u;
@@ -609,14 +615,14 @@ generated quantities {
         //print("aa");
         // delta_I_u = delta_infective_exposures_u - gen_I_u[t-1,a] * rate_infectious*dt;
         // delta_I_v = delta_infective_exposures_v - gen_I_v[t-1,a] * rate_infectious*dt;
-        delta_I_u = delta_infective_exposures_u - prev_I_u[a] * rate_infectious*dt;
-        delta_I_v = delta_infective_exposures_v - prev_I_v[a] * rate_infectious*dt;
+        delta_I_u = delta_infective_exposures_u - gen_prev_I_u[a] * rate_infectious*dt;
+        delta_I_v = delta_infective_exposures_v - gen_prev_I_v[a] * rate_infectious*dt;
         
         //print("aa2");
         // delta_R_u = gen_I_u[t-1,a] * rate_infectious*dt;
         // delta_R_v = gen_I_v[t-1,a] * rate_infectious*dt;
-        delta_R_u = prev_I_u[a]*rate_infectious*dt;
-        delta_R_v = prev_I_v[a]*rate_infectious*dt;
+        delta_R_u = gen_prev_I_u[a]*rate_infectious*dt;
+        delta_R_v = gen_prev_I_v[a]*rate_infectious*dt;
         //
         //print("aa3");
         //print(t);
@@ -626,12 +632,12 @@ generated quantities {
         //print(gen_S_u[t-1,a]);
         //print(gen_R_u[t-1,a]);
         //print("aa3a");
-        curr_S_u[a] = prev_S_u[a] + delta_S_u - (delta_vax_j[daily_counter[t-1],a]/n_daily_time_steps) * prev_S_u[a] / (prev_S_u[a] + prev_R_u[a]);
-        curr_S_v[a] = prev_S_v[a] + delta_S_v + (delta_vax_j[daily_counter[t-1],a]/n_daily_time_steps) * prev_S_u[a] / (prev_S_u[a] + prev_R_u[a]);
-        curr_I_u[a] = prev_I_u[a] + delta_I_u;
-        curr_I_v[a] = prev_I_v[a] + delta_I_v;
-        curr_R_u[a] = prev_R_u[a] + delta_R_u - (delta_vax_j[daily_counter[t-1],a]/n_daily_time_steps) * prev_R_u[a] / (prev_S_u[a] + prev_R_u[a]);
-        curr_R_v[a] = prev_R_v[a] + delta_R_v + (delta_vax_j[daily_counter[t-1],a]/n_daily_time_steps) * prev_R_u[a] / (prev_S_u[a] + prev_R_u[a]);
+        gen_curr_S_u[a] = gen_prev_S_u[a] + delta_S_u - (delta_vax_j[daily_counter,a]/n_daily_time_steps) * gen_prev_S_u[a] / (gen_prev_S_u[a] + gen_prev_R_u[a]);
+        gen_curr_S_v[a] = gen_prev_S_v[a] + delta_S_v + (delta_vax_j[daily_counter,a]/n_daily_time_steps) * gen_prev_S_u[a] / (gen_prev_S_u[a] + gen_prev_R_u[a]);
+        gen_curr_I_u[a] = gen_prev_I_u[a] + delta_I_u;
+        gen_curr_I_v[a] = gen_prev_I_v[a] + delta_I_v;
+        gen_curr_R_u[a] = gen_prev_R_u[a] + delta_R_u - (delta_vax_j[daily_counter,a]/n_daily_time_steps) * gen_prev_R_u[a] / (gen_prev_S_u[a] + gen_prev_R_u[a]);
+        gen_curr_R_v[a] = gen_prev_R_v[a] + delta_R_v + (delta_vax_j[daily_counter,a]/n_daily_time_steps) * gen_prev_R_u[a] / (gen_prev_S_u[a] + gen_prev_R_u[a]);
         
         
         // gen_S_u[t,a] = gen_S_u[t-1,a] + delta_S_u - (delta_vax_j[daily_counter,a]/n_daily_time_steps) * gen_S_u[t-1,a] / (gen_S_u[t-1,a] + gen_R_u[t-1,a]);
@@ -651,23 +657,40 @@ generated quantities {
         
         // gen_delta_ili_u[j,t,a] = (delta_infective_exposures_u * (1-0) ) * prop_ili_mu[a];
         // gen_delta_ili_v[j,t,a] = (delta_infective_exposures_v * (1-ve_ili_cond_inf)) * prop_ili_mu[a];
-        // 
+        //
         // gen_delta_ili_u_abs[ j,t,a] = gen_delta_ili_u[j,t,a] * pop_age_group[a,1] ;
         // gen_delta_ili_v_abs[ j,t,a] = gen_delta_ili_v[j,t,a] * pop_age_group[a,1] ;
         //
         //print("aa7");
         
         if (t % n_daily_time_steps == 0) { // Only store every n_daily_time_steps-th iteration
-        gen_S_u[t/n_daily_time_steps, a] = curr_S_u[a];
-        gen_S_v[t/n_daily_time_steps, a] = curr_S_v[a];
-        gen_I_u[t/n_daily_time_steps, a] = curr_I_u[a];
-        gen_I_v[t/n_daily_time_steps, a] = curr_I_v[a];
-        gen_R_u[t/n_daily_time_steps, a] = curr_R_u[a];
-        gen_R_v[t/n_daily_time_steps, a] = curr_R_v[a];
-        gen_delta_ili_u[n_scenario, t/n_daily_time_steps, a] = curr_delta_ili_u[a];
-        gen_delta_ili_v[n_scenario, t/n_daily_time_steps, a] = curr_delta_ili_v[a];
-        gen_delta_ili_u_abs[n_scenario, t/n_daily_time_steps, a] = curr_delta_ili_u_abs[a];
-        gen_delta_ili_v_abs[n_scenario, t/n_daily_time_steps, a] = curr_delta_ili_v_abs[a];
+        gen_S_u[t/n_daily_time_steps, a] = gen_curr_S_u[a];
+        gen_S_v[t/n_daily_time_steps, a] = gen_curr_S_v[a];
+        gen_I_u[t/n_daily_time_steps, a] = gen_curr_I_u[a];
+        gen_I_v[t/n_daily_time_steps, a] = gen_curr_I_v[a];
+        gen_R_u[t/n_daily_time_steps, a] = gen_curr_R_u[a];
+        gen_R_v[t/n_daily_time_steps, a] = gen_curr_R_v[a];
+        gen_delta_ili_u[j, t/n_daily_time_steps, a] = curr_delta_ili_u[a];
+        gen_delta_ili_v[j, t/n_daily_time_steps, a] = curr_delta_ili_v[a];
+        gen_delta_ili_u_abs[j, t/n_daily_time_steps, a] = curr_delta_ili_u_abs[a];
+        gen_delta_ili_v_abs[j, t/n_daily_time_steps, a] = curr_delta_ili_v_abs[a];
+        // print("--!!--");
+        // print(t);
+        // print(j);
+        // print(gen_curr_S_u);
+        // print(gen_curr_I_u);
+        // print(gen_curr_R_u);
+        // print("-a");
+        // print(gen_curr_S_v);
+        // print(gen_curr_I_v);
+        // print(gen_curr_R_v);
+        // print("-b");
+        // print(curr_delta_ili_u);
+        // print(curr_delta_ili_v);
+        // print(curr_delta_ili_u_abs);
+        // print(curr_delta_ili_v_abs);
+        // print("-c");
+        // print(gen_delta_ili_u_abs[j, t/n_daily_time_steps, a]);
         }
         
         
@@ -682,45 +705,56 @@ generated quantities {
         }
       } // n_age_groups loop
       // Update previous values with current values for next iteration
-      prev_S_u = curr_S_u;
-      prev_I_u = curr_I_u;
-      prev_R_u = curr_R_u;
-      prev_S_v = curr_S_v;
-      prev_I_v = curr_I_v;
-      prev_R_v = curr_R_v;
+      gen_prev_S_u = gen_curr_S_u;
+      gen_prev_I_u = gen_curr_I_u;
+      gen_prev_R_u = gen_curr_R_u;
+      gen_prev_S_v = gen_curr_S_v;
+      gen_prev_I_v = gen_curr_I_v;
+      gen_prev_R_v = gen_curr_R_v;
     } // n_day_project loop
   } // n_scenario loop
   
-  // convert projections multi-daily into daily
-  for (j in 1:n_scenario) {
-    for (i in 1:n_day_project) {
-      for (a in 1:n_age_groups) {
-        // define 2 local variables
-        int day_start = (i-1)*n_daily_time_steps+1; // f(i=1)=1 , f(i=2)=8
-        int day_end = day_start+(n_daily_time_steps-1);
-        gen_delta_ili_u_abs_daily[j,i,a] = sum( gen_delta_ili_u_abs[j,day_start:day_end,a] );
-        gen_delta_ili_v_abs_daily[j,i,a] = sum( gen_delta_ili_v_abs[j,day_start:day_end,a] );
-      }
-    }
-  }
+  // // convert projections multi-daily into daily
+  // for (j in 1:n_scenario) {
+  //   print("--00--");
+  //   print(j);
+  //   print(gen_delta_ili_u_abs[j,,]);
+  //   for (i in 1:n_day_project) {
+  //     for (a in 1:n_age_groups) {
+  //       // define 2 local variables
+  //       int day_start = (i-1)*n_daily_time_steps+1; // f(i=1)=1 , f(i=2)=8
+  //       int day_end = day_start+(n_daily_time_steps-1);
+  //       gen_delta_ili_u_abs_daily[j,i,a] = sum( gen_delta_ili_u_abs[j,day_start:day_end,a] );
+  //       gen_delta_ili_v_abs_daily[j,i,a] = sum( gen_delta_ili_v_abs[j,day_start:day_end,a] );
+  //     }
+  //   }
+  // }
   
   // convert projections daily into weekly
   for (j in 1:n_scenario) {
+  //for (j in 1:1) {
+    // print("--11--");
+    // print(j);
+    // print(gen_delta_ili_u_abs[j,,]);
     for (i in 1:n_week_project) {
       for (a in 1:n_age_groups) {
         // define 2 local variables
         int day_start = (i-1)*7+1; // f(i=1)=1 , f(i=2)=8
         int day_end = day_start+6;
-        gen_delta_ili_u_abs_weekly[j,i,a] = sum( gen_delta_ili_u_abs_daily[j,day_start:day_end,a] );
-        gen_delta_ili_v_abs_weekly[j,i,a] = sum( gen_delta_ili_v_abs_daily[j,day_start:day_end,a] );
+        gen_delta_ili_u_abs_weekly[j,i,a] = sum( gen_delta_ili_u_abs[j,day_start:day_end,a] );
+        gen_delta_ili_v_abs_weekly[j,i,a] = sum( gen_delta_ili_v_abs[j,day_start:day_end,a] );
       }
     }
   }
   
   // simulate projections
   for (j in 1:n_scenario) {
+  //for (j in 1:1) {
     for (t in 1:n_week_project) {
       for (a in 1:n_age_groups) {
+        // print("--22--");
+        // print(gen_delta_ili_u_abs_weekly[j,,]);
+        // print(gen_delta_ili_v_abs_weekly[j,,]);
         gen_ili_u_obs_project[j,t,a] = neg_binomial_2_rng( gen_delta_ili_u_abs_weekly[j,t,a]+1e-6 , phi ); // add small value to location parameter to avoid it being zero
         gen_ili_v_obs_project[j,t,a] = neg_binomial_2_rng( gen_delta_ili_v_abs_weekly[j,t,a]+1e-6 , phi ); // add small value to location parameter to avoid it being zero
         gen_ili_t_obs_project[j,t,a] = gen_ili_u_obs_project[j,t,a] + gen_ili_v_obs_project[j,t,a];
