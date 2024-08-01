@@ -157,10 +157,14 @@ model_SIR_multiseason = function( params=NULL,
     stan_list$ili_obs_fit =  stan_list$ili_obs_fit %>% transmute(
       age_1= age_00_04+age_05_14+age_15_64+age_65_99
     )
-    stan_list$delta_vax_real = tibble( val1=rep(0,nrow(all_season_project_daily)) )
-    stan_list$delta_vax_opti = tibble( val1=rep(0,nrow(all_season_project_daily)) )
-    stan_list$delta_vax_pess = tibble( val1=rep(0,nrow(all_season_project_daily)) )
-    stan_list$delta_vax_null = tibble( val1=rep(0,nrow(all_season_project_daily)) )
+    # stan_list$delta_vax_real = tibble( val1=rep(0,nrow(all_season_project_daily)) )
+    # stan_list$delta_vax_opti = tibble( val1=rep(0,nrow(all_season_project_daily)) )
+    # stan_list$delta_vax_pess = tibble( val1=rep(0,nrow(all_season_project_daily)) )
+    # stan_list$delta_vax_null = tibble( val1=rep(0,nrow(all_season_project_daily)) )
+    stan_list$delta_vax_real = stan_list$delta_vax_real %>% select(age_65_99) %>% rename(age_1=age_65_99)
+    stan_list$delta_vax_opti = stan_list$delta_vax_opti %>% select(age_65_99) %>% rename(age_1=age_65_99)
+    stan_list$delta_vax_pess = stan_list$delta_vax_pess %>% select(age_65_99) %>% rename(age_1=age_65_99)
+    stan_list$delta_vax_null = stan_list$delta_vax_null %>% select(age_65_99) %>% rename(age_1=age_65_99)
     stan_list$delta_vax = tibble( val1=rep(0,nrow(all_season_fit_daily)) )
   }
   
@@ -197,7 +201,7 @@ model_SIR_multiseason = function( params=NULL,
     
     fit00=rstan::stan(
       file='./stan/SIR_multiseason_age_vax.stan',
-      chains=1 ,thin=1,iter=100, # a "debug run"
+      chains=1 ,thin=1,iter=200, # a "debug run"
       #chains=2, thin=2, iter=300, # a "long run" 
       seed=5, cores = getOption("mc.cores", 1L),
       control=list(
@@ -248,6 +252,7 @@ model_SIR_multiseason = function( params=NULL,
   
   
   # extract fit
+  #modelled_fit = fit00 %>% gather_draws(gen_ili_obs_fit_sum[n]) %>%
   modelled_fit = fit00 %>% gather_draws(gen_ili_obs_fit_sum[n]) %>% 
     #filter(.value>0) %>%
     #filter(.draw%in%c(1:10)) %>% # filter a number of posterior draws
@@ -272,6 +277,19 @@ model_SIR_multiseason = function( params=NULL,
     ggplot() + geom_line(aes(x=date,y=mean_value, group=.draw), col="lightblue") +
     geom_line(data=df, aes(x=date, y=age_total), linetype="dotted", alpha=0.5, col="black") 
 
+  # extract and plot projections
+  modelled_projections = fit00 %>% gather_draws(gen_ili_t_obs_project_sum) %>% 
+    #filter(.value>0) %>%
+    #filter(.draw%in%c(1:10)) %>% # filter a number of posterior draws
+    select(-.chain,-.iteration) %>% ungroup() %>% 
+    right_join(all_season_fit_wide,by = join_by(n)) %>%
+    group_by(date) %>%
+    mutate(mean_value = mean(.value)) %>%
+    ungroup()
+  modelled_fit %>% ggplot(aes(date,age_total)) + geom_line() + 
+    #geom_line(aes(y=.value/50,group=.draw),col="lightblue") +
+    geom_line(aes(y=mean_value),col="lightblue") +
+    coord_cartesian(ylim = c(0,1.2*modelled_fit$age_total %>% max(na.rm=T)))
   
   # extract projections
   modelled_proj = fit00 %>% 
