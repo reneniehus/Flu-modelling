@@ -11,6 +11,7 @@ model_SIR_multiseason = function( params=NULL,
   all_season_fit_wide = wrangle_fit_df(all_season,params,country_short_input,target_input)
   
   # ---- |-Project df ----
+  # helpers for the dataframes
   start_year = year(today())
   season     = paste0(start_year,"/",start_year+1)
   start_date = ymd(paste0(start_year,params$season_start_monthday))
@@ -18,6 +19,8 @@ model_SIR_multiseason = function( params=NULL,
   date_v = seq(from=start_date,to=end_date,by="day")
   date_v_wed = date_v[weekdays(date_v)=="Wednesday"][1:52]
   date_v_mon = date_v[weekdays(date_v)=="Monday"][1:52]
+  
+  # dataframe for projections
   all_season_project = tibble(country_short=country_short_input,
                               season=season,
                               date_mon=date_v_mon,
@@ -26,7 +29,6 @@ model_SIR_multiseason = function( params=NULL,
     mutate(week_id=1:n()) %>% 
     left_join(data$helpers_respicompass$iso_weeks,by=c("date_mon"="start_week_day"))
   
-  data$helpers_respicompass$iso_weeks
   # make daily version of the data frame - from some daily indicators that the model needs
   crossing( country_short=country_short_input,
             nesting(data_w=all_season_fit_wide$date,season=all_season_fit_wide$season), 
@@ -43,10 +45,8 @@ model_SIR_multiseason = function( params=NULL,
   # plotting
   p1 = all_season_fit_wide %>% ggplot(aes(date,age_total)) + geom_line() + geom_rug()
   
-  
   # helpers for stan list
   df_scenarios = params$scenarios
-  
   pop_pyramid = data$demography_respicast$population_pyramid %>% filter(country==EU_long(country_short_input))
   pop_age_group = pop_pyramid$population 
   age_groups = params$SIR_multiseason$age_groups
@@ -58,6 +58,7 @@ model_SIR_multiseason = function( params=NULL,
   df_agegroups = df_agegroups_ecdc %>% left_join(df_age_translate,by = join_by(age_group_ecdc))
   z_proj = rep(0,nrow(all_season_project_daily))
   z_fit  = rep(0,nrow(all_season_fit_daily))
+  
   # ---- |-Stan list and fit----
   stan_list = list(
     ## EXTRA stuff good to carry forward

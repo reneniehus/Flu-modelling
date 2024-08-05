@@ -32,7 +32,7 @@ run_flu_models = function( params=NULL , data=NULL ){
     contacts = transform_contracts(data,params) # transform the contact matrixes for model requirements
     
     if (T) {
-    figs$prefit$fit_seasons_countries <<- all_season %>% 
+      figs$prefit$fit_seasons_countries <<- all_season %>% 
         filter(season%in%c(params$SIR_multiseason$seasons_include) ) %>% 
         unnest(respicompass_ili_plus) %>% 
         ggplot(aes(date,value,color=season)) + geom_line() + 
@@ -46,27 +46,26 @@ run_flu_models = function( params=NULL , data=NULL ){
     modl = list()
     start_time <- Sys.time()
     # ---- |-Run model for each target and each country ----
-    for ( target_input in target_input_v ) { # target_input=target_input_v[1]
-      for (country_short_input in country_short_input_v ) { # country_short_input=country_short_input_v[1]
-        
-        # Country specific data
-        pop_country = data$demography_respicast$population_pyramid %>% 
-          filter(country==EU_long(country_short_input)) %>% pull(population) %>% sum()
-        
-        pr=paste(target_input,"for",country_short_input,"with population:",pop_country,"\n"); cat(yellow(pr))
-        
-        vax_country = data$vax$data_vax %>% filter( location_name == EU_long(country_short_input) ) # vaccination data for a country
-        if (nrow(vax_country) != 1) stop("Vaccination data is wrong format: either no data or too many rows")
-        
-        # run model
-        modl[[target_input]][[country_short_input]] = model_SIR_multiseason( params , 
-                                                                             all_season=all_season , 
-                                                                             target_input, 
-                                                                             country_short_input,
-                                                                             pop_country,
-                                                                             vax_country,
-                                                                             contacts)
-      }
+    target_input=target_input_v[1]
+    for (country_short_input in country_short_input_v ) { # country_short_input=country_short_input_v[1]
+      
+      # Country specific data
+      pop_country = data$demography_respicast$population_pyramid %>% 
+        filter(country==EU_long(country_short_input)) %>% pull(population) %>% sum()
+      
+      pr=paste(target_input,"for",country_short_input,"with population:",pop_country,"\n"); cat(yellow(pr))
+      
+      vax_country = data$vax$data_vax %>% filter( location_name == EU_long(country_short_input) ) # vaccination data for a country
+      if (nrow(vax_country) != 1) stop("Vaccination data is wrong format: either no data or too many rows")
+      
+      # run model
+      modl[[target_input]][[country_short_input]] = model_SIR_multiseason( params , 
+                                                                           all_season=all_season , 
+                                                                           target_input, 
+                                                                           country_short_input,
+                                                                           pop_country,
+                                                                           vax_country,
+                                                                           contacts)
     }
     end_time <- Sys.time() # 5 hrs
     pr=paste("> Method run:",round(end_time - start_time,2),"sec \n"); cat(green(pr))

@@ -38,8 +38,8 @@ data {
 transformed data {
   // epi parameters
   real beta = rate_infectious * Rnull;
-  int n_multi_day_project = n_day_project * n_daily_time_steps;
-  int n_multi_day_fit = n_day_fit * n_daily_time_steps;
+  int n_multi_day_project = n_day_project * n_daily_time_steps; // time steps for projections = number of days for projections x sub-daily steps
+  int n_multi_day_fit = n_day_fit * n_daily_time_steps; // time steps for fit = number of days for fitting period x sub-daily steps
   real dt = 1.0/n_daily_time_steps;
 }
 
