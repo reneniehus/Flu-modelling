@@ -20,11 +20,11 @@ source("code/04_sandbox/generate_ili_epi_test.R")
 data = load_flu_data( params, regenerate = F, new_from_online = F) # loads the data
 # regenerate=T recreates the data lists, new_from_online=T uses the online versions for recreation
 
-# ---- |-run models (i.e. fitting and projections) ----
+# ---- |-run flu models (i.e. fitting and projections) ----
 models_out = run_flu_models( params, data ) # runs the model scripts
 
-# ---- |-save final output including basic figures ----
-process_and_save( params, models_out ) # processing the model output, with figures and saves
+# ---- |-save output ----
+if (F) process_and_save( params, models_out ) # processing the model output, with figures and saves
 
 # ---- |- Run special analyses
 if (F) source("code/03_special_analyses/season_country_var_rt.R")

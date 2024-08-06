@@ -164,7 +164,7 @@ wrangle_fit_df = function(params,data,all_season_country,country_short_input,tar
   return(all_season_fit_wide)
 } 
 
-make_stan_list = function(data,all_season_fit_wide,country_short_input){
+make_stan_list = function(params,data,all_season_fit_wide,country_short_input,vax_country,pop_country){
   # helpers for the dataframes
   start_year = year(today())
   season     = paste0(start_year,"/",start_year+1)

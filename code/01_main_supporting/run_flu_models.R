@@ -35,7 +35,8 @@ run_flu_models = function( params=NULL , data=NULL ){
     start_time <- Sys.time()
     # ---- |-Run model for each target and each country ----
     target_input=target_input_v[1]
-    for (country_short_input in country_short_input_v ) { # country_short_input=country_short_input_v[1]
+    country_short_input_v = c("IT","AT")
+    for (country_short_input in country_short_input_v ) { # country_short_input="IT"
       
       # Country specific data (have it early on, to allow easy debugging)
       pop_country = data$demography_respicast$population_pyramid %>% 
@@ -49,14 +50,14 @@ run_flu_models = function( params=NULL , data=NULL ){
       # ---- |-Obtain the fitting dataframe from data ----
       all_season_fit_wide = wrangle_fit_df(params,data,all_season_country,country_short_input,target_input)
       # ---- |-Make stan list ----
-      stan_list = make_stan_list(data,all_season_fit_wide,country_short_input)
+      stan_list = make_stan_list(params,data,all_season_fit_wide,country_short_input,vax_country,pop_country)
       # ---- |-Fit stan model ----
       path_fit = paste0("../Big data/multiseason_age_vax",target_input,country_short_input,".Rdata")
       
       pr=paste("> Now fitting:",target_input,"for",country_short_input,"... "); cleancat(green(pr))
       fit00=rstan::stan(
         file='./stan/SIR_multiseason_age_vax.stan',
-        chains=1 ,thin=1,iter=200, # a "debug run"
+        chains=1 ,thin=1,iter=300, # a "debug run"
         #chains=2, thin=2, iter=300, # a "long run" 
         seed=5, cores = getOption("mc.cores", 1L),
         control=list(
