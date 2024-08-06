@@ -1,5 +1,3 @@
-# main script that outlines the work flow for BOTH flu forecasting and scenario modelling
-
 # ---- |-Set up ----
 source("code/01_main_supporting/setup.R")
 
@@ -15,6 +13,8 @@ source("code/01_main_supporting/run_flu_models.R")
 source("code/01_main_supporting/process_and_save.R")
 source("code/01_main_supporting/model_SIR_simple.R")
 source("code/01_main_supporting/model_last_year_burden.R")
+source("code/01_main_supporting/model_SIR_multiseason.R")
+source("code/04_sandbox/generate_ili_epi_test.R")
 
 # ---- |-load flu data ----
 data = load_flu_data( params, regenerate = F, new_from_online = F) # loads the data

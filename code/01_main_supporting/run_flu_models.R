@@ -1,17 +1,6 @@
 run_flu_models = function( params=NULL , data=NULL ){
   
   # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  ### Notes on output requirements ##########
-  # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  
-  # Required columns in df_for_submission (as per: https://docs.google.com/document/d/13adcxpPdlDvJM5eiFSkMzlWMTcwsx6lVjY25JA26iS4/edit):
-  # model_id
-  # round_id ["2024_2025_1_FLU1"]
-  # scenario_id ["A","B"], target [allowed targets], location ["DE","FR"] 
-  # pop_group ["0-12","13-65"], horizon [week integer], target_end_date [Date string ('YYYY-MM-DD')]
-  # output_type ["sample"], output_type_id [string: "1","2","3",...], value [float limited to 2 decimals]
-  
-  # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   ### Initiating desired output list ##########
   # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   df_out = list(
@@ -39,9 +28,8 @@ run_flu_models = function( params=NULL , data=NULL ){
         facet_wrap(~country_short,scales="free_y") 
     }
     
-    country_short_input_v = all_season %>% filter_log(ili_plus_sum>0) %>% pull(country_short) %>% unique()
     target_input_v = params$SIR_simple_multi_season$target
-    scenario_tag = "A"
+    country_short_input_v = all_season %>% filter_log(ili_plus_sum>0) %>% pull(country_short) %>% unique()
     
     modl = list()
     start_time <- Sys.time()
@@ -49,29 +37,50 @@ run_flu_models = function( params=NULL , data=NULL ){
     target_input=target_input_v[1]
     for (country_short_input in country_short_input_v ) { # country_short_input=country_short_input_v[1]
       
-      # Country specific data
+      # Country specific data (have it early on, to allow easy debugging)
       pop_country = data$demography_respicast$population_pyramid %>% 
         filter(country==EU_long(country_short_input)) %>% pull(population) %>% sum()
+      vax_country = data$vax$data_vax %>% filter( location_name == EU_long(country_short_input) ); if (nrow(vax_country) != 1) stop("Vaccination data is wrong format: either no data or too many rows")
+      all_season_country = all_season %>% filter( country_short == country_short_input )
       
       pr=paste(target_input,"for",country_short_input,"with population:",pop_country,"\n"); cat(yellow(pr))
       
-      vax_country = data$vax$data_vax %>% filter( location_name == EU_long(country_short_input) ) # vaccination data for a country
-      if (nrow(vax_country) != 1) stop("Vaccination data is wrong format: either no data or too many rows")
-      
       # run model
-      modl[[target_input]][[country_short_input]] = model_SIR_multiseason( params , 
-                                                                           all_season=all_season , 
-                                                                           target_input, 
-                                                                           country_short_input,
-                                                                           pop_country,
-                                                                           vax_country,
-                                                                           contacts)
+      # ---- |-Obtain the fitting dataframe from data ----
+      all_season_fit_wide = wrangle_fit_df(params,data,all_season_country,country_short_input,target_input)
+      # ---- |-Make stan list ----
+      stan_list = make_stan_list(data,all_season_fit_wide,country_short_input)
+      # ---- |-Fit stan model ----
+      path_fit = paste0("../Big data/multiseason_age_vax",target_input,country_short_input,".Rdata")
+      
+      pr=paste("> Now fitting:",target_input,"for",country_short_input,"... "); cleancat(green(pr))
+      fit00=rstan::stan(
+        file='./stan/SIR_multiseason_age_vax.stan',
+        chains=1 ,thin=1,iter=200, # a "debug run"
+        #chains=2, thin=2, iter=300, # a "long run" 
+        seed=5, cores = getOption("mc.cores", 1L),
+        control=list(
+          # adapt_delta=0.95, # look into increasing this, 0.98 or 0.99
+          max_treedepth=15 # look into increasing this to, 15, 20 ect
+        ),
+        data=stan_list #,init = init_fun
+      ) # 8.5 hrs, run time will scale with iter, and is a function of adapt_delta and max_treedepth, and is a function of luck
+      save(fit00,stan_list,file = path_fit)
+      pr=paste("> Fitting:",target_input,"for",country_short_input,"Done \n"); cleancat(green(pr))
+      
+      modelled_proj = extract_projections(params,fit00,n_iter=20,
+                                          stan_list$df_scenarios,
+                                          stan_list$df_agegroups,
+                                          stan_list$all_season_project)
+      
+      modl[[target_input]][[country_short_input]] = modelled_proj
     }
     end_time <- Sys.time() # 5 hrs
     pr=paste("> Method run:",round(end_time - start_time,2),"sec \n"); cat(green(pr))
-    
     save(modl,file = "../Big data/modl.Rdata")
     
+    # add stuff to the output list
+    df_out$df_for_submission$SIR_simple_multi_season = my_df_for_submission
     df_out$output_other$SIR_simple_multi_season = modl
   }
   
@@ -163,6 +172,6 @@ run_flu_models = function( params=NULL , data=NULL ){
     df = arima_simple( params, data, country_short_input, scenario_tag)
     df_out %<>% bind_rows(df) # Add DK model to the df_out
   }
-  
+  #### output 
   return(df_out)
 }
