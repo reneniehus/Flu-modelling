@@ -25,6 +25,8 @@ settings = function() {
   params$season_start_monthday = "-09-01"
   params$season_end_monthday = "-08-31"
   
+  params$simulation_seed = 12
+  
   # ---- |-Countries ----
   
   # ---- |-Model-specific  settings ----

@@ -1,44 +1,19 @@
-generate_ili_epi_test= function(stan_list){
-  # daily stuff
-  # SIR compartments unvaccinated and vaccinated
-  # variables starting with delta_ are incidence variables that are daily, unless it is specificed otherwise (e.g. through _weekly )
-  #matrix<lower=0, upper=1>[n_day_fit,n_age_groups] S_u; // susceptible compartment, relative to population size, unvaccinated
-  #matrix<lower=0, upper=1>[n_day_fit,n_age_groups] I_u; // infetious compartment,   relative to population size, unvaccinated
-  #matrix<lower=0, upper=1>[n_day_fit,n_age_groups] R_u; // recovered compartment,   relative to population size, unvaccinated
-  #matrix<lower=0, upper=1>[n_day_fit,n_age_groups] S_v; // susceptible compartment, relative to population size, vaccinated
-  #matrix<lower=0, upper=1>[n_day_fit,n_age_groups] I_v; // infetious compartment,   relative to population size, vaccinated
-  #matrix<lower=0, upper=1>[n_day_fit,n_age_groups] R_v; // recovered compartment,   relative to population size, vaccinated
-  #array[n_day_fit,n_age_groups] real<lower=0, upper=1> delta_ili; // ili/detectable incidence relative to population size
-  #array[n_day_fit,n_age_groups] real<lower=0> delta_ili_abs; // ili/detectable incidence in absolute numbers
-  #real phi; // dispersion parameter, var=mu+reciprocal_phi*mu^2
-  #// weekly stuff
-  #array[n_week_fit,n_age_groups] real<lower=0> delta_ili_abs_weekly; // ili/detectable incidence in absolute numbers, weekly aggregate
-  
-  # Data
+generate_ili_epi_test= function(par,stan_list){
+  # ---- |-DATA BLOCK ----
   # data relevated for the fit 
   n_season = stan_list$n_season # number of seasons
   n_week_fit =  stan_list$n_week_fit # number of observable values, weekly
   n_day_fit = stan_list$n_day_fit # number of obervatble values, daily
   n_age_groups = stan_list$n_age_groups # number of age groups
-  ####ili_obs_fit[n_week_fit, n_age_groups]; // observed hospitalisations
-  ili_obs_notna = stan_list$ili_obs_notna # indicating non-missing data with 1, otherwise 0
+  ili_obs_fit = stan_list$ili_obs_fit*0; # observed hospitalisations
+  ili_obs_notna = stan_list$ili_obs_notna*0+1 # indicating non-missing data with 1, otherwise 0
+  stan_list$ili_obs_notna = ili_obs_notna
   season_start = stan_list$season_start # indicating first week of a season with 1, the second week with 2, otherwise 0
   season_id = stan_list$season_id # indicating which seasn each obervable day belongs to
   pop = stan_list$pop # population size
   pop_age_group = stan_list$pop_age_group # population size per age group, requires to be a matrix 
   contact_matrix = stan_list$contact_matrix #contact matrix
   delta_vax = stan_list$delta_vax # daily fraction of newly vaccinated individuals per age group
-  # data relevant for projected scenarios
-  n_week_project = stan_list$n_week_project # number of projected weeks
-  n_day_project = stan_list$n_day_project # number of projected days
-  #n_scenario = stan_list$n_scenario # number of projected scenarios
-  #axis_transmission = stan_list$axis_transmission # indicator for the transmission scenario axis
-  #axis_vax = stan_list$axis_vax # indicator for the vaccine scenario axis
-  #delta_vax_real = stan_list$delta_vax_real # daily assumed vax uptake in projection period
-  #delta_vax_opti = stan_list$delta_vax_opti # daily assumed vax uptake in projection period
-  #delta_vax_pess = stan_list$delta_vax_pess # daily assumed vax uptake in projection period
-  #delta_vax_null = stan_list$delta_vax_null # daily assumed vax uptake in projection period
-  
   # epi parameters
   Rnull = stan_list$Rnull
   rate_infectious = stan_list$rate_infectious # infectious rate, such that beta = Rnull*rate_infectious
@@ -46,24 +21,35 @@ generate_ili_epi_test= function(stan_list){
   ve_spread = stan_list$ve_spread # vaccine effectiveness on onward transmission/infectiousness
   ve_inf = stan_list$ve_inf # vaccine effectiveness on susceptability
   ve_ili_cond_inf = stan_list$ve_ili_cond_inf # vaccine effectiveness on severity, given infection
-  # epi parameters
+  # data relevant for projected scenarios
+  n_week_project = stan_list$n_week_project # number of projected weeks
+  n_day_project = stan_list$n_day_project # number of projected days
+  n_scenario = stan_list$n_scenario # number of projected scenarios
+  axis_transmission = stan_list$axis_transmission # indicator for the transmission scenario axis
+  axis_vax = stan_list$axis_vax # indicator for the vaccine scenario axis
+  delta_vax_real = stan_list$delta_vax_real # daily assumed vax uptake in projection period
+  delta_vax_opti = stan_list$delta_vax_opti # daily assumed vax uptake in projection period
+  delta_vax_pess = stan_list$delta_vax_pess # daily assumed vax uptake in projection period
+  delta_vax_null = stan_list$delta_vax_null # daily assumed vax uptake in projection period
+  
+  # ---- |-TRANSFORMED DATA BLOCK ----
   beta = rate_infectious * Rnull
   
-  
-  # parameters to be 'fitted'
+  # ---- |-PARAMETER BLOCK ----
   # note: a simplex of length 3, has 2 free parameters
-  # note: simplex[n] X[m,o] creates an m x o sized array of simplex, each of size n
-  SIR_ini = t(matrix(c(c(0.85, 0.000001, 0.149999), 
-              c(0.84, 0.000003, 0.159997),
-              c(0.87, 0.000002, 0.129998)), nrow=3)) # S I R initial values per season, 1 can be replaced by n_age_groups
+  SIR_ini = t(matrix(c(c(par[2], 0.000001, NA), 
+              c(0.84, 0.000003, NA),
+              c(0.87, 0.000002, NA)), nrow=3)) # S I R initial values per season, 1 can be replaced by n_age_groups
+  SIR_ini[,3] = 1 - (SIR_ini[,1] + SIR_ini[,2] )
   #SIR_ini_mu = c(0.78, 0.02, 0.2) # overall season mean 
   prop_ili = t(matrix(rep(0.01,16), nrow=4))
   prop_ili_mu = rep(0.01,4)
   #prop_ili = t(matrix(rep(c(0.05, 0.01, 0.002, 0.002),4), nrow=4)) # proportion of infections that are ili 
   #prop_ili_mu = c(0.05, 0.01, 0.002, 0.002) # overall mean over season 
 
-  reciprocal_phi = 0.98 # overdipersion parameter for ili obs fit, var=mu+reciprocal_phi*mu^2
+  reciprocal_phi = 0.10 # overdipersion parameter for ili obs fit, var=mu+reciprocal_phi*mu^2
   
+  # ---- |-TRANSFORMED PARAMETER BLOCK ----
   # Overdispersion
   phi = 1 / reciprocal_phi # dispersion parameter: var=mu+reciprocal_phi*mu^2
   
@@ -138,16 +124,23 @@ generate_ili_epi_test= function(stan_list){
     }
     
   }
-  
   delta_ili_abs_weekly = round(delta_ili_abs_weekly, digits = 2)
-  # Output
-  stan_list$ili_obs_fit$age_00_04 = delta_ili_abs_weekly[,1] %>% as.integer()
-  stan_list$ili_obs_fit$age_05_14 = delta_ili_abs_weekly[,2] %>% as.integer()
-  stan_list$ili_obs_fit$age_15_64 = delta_ili_abs_weekly[,3] %>% as.integer()
-  stan_list$ili_obs_fit$age_65_99 = delta_ili_abs_weekly[,4] %>% as.integer()
-  #stan_list$ili_obs_fit$age_total = rowSums(delta_ili_abs_weekly) %>% as.integer()
+  
+  # ---- |-LIKELIHOOD/PRIOR BLOCK ----
+  set.seed(seed= par[1])
+  for (t in 1:n_week_fit) {
+    for (a in 1:n_age_groups) {
+      if (ili_obs_notna[t,a]==1) ili_obs_fit[t,a] = rnbinom(1, mu=delta_ili_abs_weekly[t,a]+1e-6, size=phi )
+    }
+  }
+  # reciprocal_phi=0.2;phi=1/reciprocal_phi;mu=100; x=rnbinom(1000,mu=mu,size=(1/reciprocal_phi)); var(x); mu+reciprocal_phi*mu^2
+  
+  # ---- |-GENERATED QUANTITIES BLOCK ----
+  for (age_group_i in 1:n_age_groups){
+    stan_list$ili_obs_fit[,age_group_i] = ili_obs_fit[,age_group_i]
+  }
+  
 
   return(stan_list)
-  
 }
 

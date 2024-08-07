@@ -33,51 +33,41 @@ run_flu_models = function( params=NULL , data=NULL ){
     
     modl = list()
     start_time <- Sys.time()
-    # ---- |-Run model for each target and each country ----
+    
+    # ---- |-Run model for each country ----
     target_input=target_input_v[1]
-    country_short_input_v = c("IT","AT")
+    country_short_input_v = c("IT") # c("IT","AT")
     for (country_short_input in country_short_input_v ) { # country_short_input="IT"
       
-      # Country specific data (have it early on, to allow easy debugging)
+      # ---- |-Prepare country specific data ----
       pop_country = data$demography_respicast$population_pyramid %>% 
         filter(country==EU_long(country_short_input)) %>% pull(population) %>% sum()
       vax_country = data$vax$data_vax %>% filter( location_name == EU_long(country_short_input) ); if (nrow(vax_country) != 1) stop("Vaccination data is wrong format: either no data or too many rows")
       all_season_country = all_season %>% filter( country_short == country_short_input )
-      
       pr=paste(target_input,"for",country_short_input,"with population:",pop_country,"\n"); cat(yellow(pr))
       
-      # run model
       # ---- |-Obtain the fitting dataframe from data ----
       all_season_fit_wide = wrangle_fit_df(params,data,all_season_country,country_short_input,target_input)
       # ---- |-Make stan list ----
       stan_list = make_stan_list(params,data,all_season_fit_wide,country_short_input,vax_country,pop_country)
-      # ---- |-Fit stan model ----
+      # replace by fake data
+      stan_list = generate_ili_epi_test(par = c(1,0.85),stan_list)
       path_fit = paste0("../Big data/multiseason_age_vax",target_input,country_short_input,".Rdata")
-      
       pr=paste("> Now fitting:",target_input,"for",country_short_input,"... "); cleancat(green(pr))
-      fit00=rstan::stan(
-        file='./stan/SIR_multiseason_age_vax.stan',
-        chains=1 ,thin=1,iter=300, # a "debug run"
-        #chains=2, thin=2, iter=300, # a "long run" 
-        seed=5, cores = getOption("mc.cores", 1L),
-        control=list(
-          # adapt_delta=0.95, # look into increasing this, 0.98 or 0.99
-          max_treedepth=15 # look into increasing this to, 15, 20 ect
-        ),
-        data=stan_list #,init = init_fun
-      ) # 8.5 hrs, run time will scale with iter, and is a function of adapt_delta and max_treedepth, and is a function of luck
-      save(fit00,stan_list,file = path_fit)
+      
+      
+      # ---- |-Fit ----
+      if (T) fitout=fit_with_eabc(params,stan_list)
+      if (F) fitout=fit_with_stan(params,stan_list,mod_path='./stan/SIR_multiseason_age_vax.stan')
+      
+      save(fitout,stan_list,file = path_fit)
       pr=paste("> Fitting:",target_input,"for",country_short_input,"Done \n"); cleancat(green(pr))
       
-      modelled_proj = extract_projections(params,fit00,n_iter=20,
-                                          stan_list$df_scenarios,
-                                          stan_list$df_agegroups,
-                                          stan_list$all_season_project)
-      
-      modl[[target_input]][[country_short_input]] = modelled_proj
+      modl[[target_input]][[country_short_input]] = fitout$modelled_proj
     }
     end_time <- Sys.time() # 5 hrs
     pr=paste("> Method run:",round(end_time - start_time,2),"sec \n"); cat(green(pr))
+    
     save(modl,file = "../Big data/modl.Rdata")
     
     # add stuff to the output list
@@ -85,94 +75,8 @@ run_flu_models = function( params=NULL , data=NULL ){
     df_out$output_other$SIR_simple_multi_season = modl
   }
   
-  if ( "SIR_simple" %in% params$models_to_run ){ 
-    # prepare for model
-    country_short_input = "AT"
-    date_v_fit = seq(from=ymd("2022-10-05"),to=ymd("2023-05-01"),by="day")
-    # Run SIR_simple model
-    df = model_SIR_simple( params, dat=data$epi$erviss_ili_ari, country_short_input, date_v_fit )
-    # add data
-    df_out$df_for_submission[["SIR_simple"]] = df
-    df_out$output_other[["SIR_simple"]] = list(
-      date_v_fit = date_v_fit
-    )
-  }
+  if (F) source("code/01_main_supporting/calling_other_models.R") # once you want to call additional models
   
-  if ( "SIR_simple_r0_variation" %in% params$models_to_run ){ 
-    
-    # data
-    all_season = data_into_all_season(data,params,withforce=F)
-    
-    # prepare model input
-    df_collect = list()
-    df_i = 1
-    scenario_tag = "A"
-    target_input = "ili_typing_sentinel"
-    
-    country_short_input_v = unique(dat$country_short) # country_short_input_v = "AT" # for quick run
-    start_time <- Sys.time()
-    for (country_short_input_i in country_short_input_v) {
-      
-      pop_country = data$demography$population_pyramid %>% 
-        filter(country==country_short_input_i) %>% pull(population) %>% sum()
-      if (country_short_input_i=="GR") pop_country = 10.43*1e6
-      
-      start_year = dat %>% filter(country_short==country_short_input_i) %>% pull(date) %>% min() %>% year() %>% as.numeric()
-      while(start_year<=2022) {
-        season = paste0(start_year,"/",start_year+1)
-        start_date = ymd(paste0(start_year,"-07-01"))
-        end_date = ymd(paste0(start_year+1,"-05-01"))
-        start_year = start_year +1 
-        date_v_fit = seq(from=start_date,to=end_date,by="day")
-        
-        # test filtering
-        dat %>% 
-          filter(country_short == country_short_input_i, 
-                 target == params$SIR_simple$target, 
-                 agegroup == params$SIR_simple$agegroup) %>% 
-          filter( date%in%date_v_fit ) -> xinc_iliari
-        xinc_iliari %>% ggplot(aes(date,value))+geom_line()
-        if ( nrow(xinc_iliari) < 10 ) next;
-        sum_inc = sum(xinc_iliari$value) ; if ( sum_inc < 300 ) next;
-        pr=paste("> Running:",country_short_input_i,"| season:",season,"| sum inc:",sum_inc,"\n"); cat(green(pr))
-        df_collect[[df_i]] = model_SIR_simple_r0( params, all_season=all_season , target_input, pop_country, country_short_input=country_short_input_i, date_v_fit,season )
-        df_i = df_i + 1
-        
-      } # season loop
-    } # 
-    end_time <- Sys.time()
-    (end_time - start_time) # 1.6 hours
-    
-    
-    if (T){
-      df_collect %>% bind_rows -> x
-      write_csv(x,file="code/03_special_analyses/rt_season_country.csv")
-    }
-    x = read_csv(file="code/03_special_analyses/rt_season_country.csv")
-    x = df_collect %>% bind_rows()
-    (x$Rnull_eff) %>% min()
-    rnull_mu = x$Rnull_eff %>% median()
-    rnull_quant = x$Rnull_eff %>% quantile(probs=c(0.2,0.8))
-    ((rnull_quant/rnull_mu )-1)*100 # -11.960425   9.747009 
-  }
-  
-  if ( "last_year_burden" %in% params$models_to_run ){ # 
-    # prepare for run
-    country_short_input = "AT"
-    scenario_tag = "A"
-    # run last_year_burden model
-    df = last_year_burden( params, data, country_short_input, scenario_tag)
-    df_out %<>% bind_rows(df) # Add DK model to the df_out
-  }
-  
-  if ( "arima_simple" %in% params$models_to_run ){ # 
-    # prepare for run
-    country_short_input = "AT"
-    scenario_tag = "A"
-    # run last_year_burden model
-    df = arima_simple( params, data, country_short_input, scenario_tag)
-    df_out %<>% bind_rows(df) # Add DK model to the df_out
-  }
   #### output 
   return(df_out)
 }
