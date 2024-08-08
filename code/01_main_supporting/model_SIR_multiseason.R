@@ -1,53 +1,5 @@
-fit_with_eabc = function(params,stan_list,mod_path) {
-  
-  # Define priors
-  myPriors <- list('S01' = c("unif",0,0.5),
-                   'S02' = c("unif",0,0.5),
-                   'S03' = c("unif",0,0.5))
-  myPriors <- list('S01' = c("unif",0,0.5))
-  
-  if (T){
-    tic()
-    x<-generate_ili_epi_test( c(1,0.3),stan_list) 
-    toc()
-  }
-  
-  # Wrap up model in function that outputs summary stats
-  myModel <- function(par){
-    
-    stan_list_f = generate_ili_epi_test(par,stan_list)
-    
-    return( stan_list_f$ili_obs_fit$age_1[stan_list_f$ili_obs_notna$age_1==1] ) 
-  }
-  
-  # Define targets 
-  myTarget <- c( stan_list$ili_obs_fit$age_1[stan_list$ili_obs_notna$age_1==1] )
-  
-  # 
-  dist_euc <- function(vect1, vect2) sqrt(sum((vect1 - vect2)^2))
-  dist_euc(myTarget,myModel( c(1,0.3)))
-  
-  # Run ABC-SMC (this should be parallelised, see package help)
-  rval <- ABC_sequential(method = "Beaumont", 
-                         model = myModel, 
-                         prior = myPriors, 
-                         nb_simul = 2, 
-                         summary_stat_target = myTarget,
-                         #n_cluster=8,
-                         tolerance_tab = c(188000,185000),
-                         use_seed=TRUE,
-                         progress_bar=T
-  )
-  
-  # Plot posteriors
-  hist(rval$param[,1])
-  hist(rval$param[,2])
-  plot(rval$param[,1], rval$param[,2])
-  
-}
-
-
 fit_with_stan = function(params,stan_list,mod_path) {
+  
   mout=list()
   
   m <- stan_model(file=mod_path)
@@ -153,6 +105,56 @@ fit_with_stan = function(params,stan_list,mod_path) {
                                            stan_list$all_season_project)
   mout$plot_fit = p1
   return(mout)
+}
+
+fit_with_eabc = function(params,stan_list,mod_path) {
+  
+  # Define priors
+  myPriors <- list('S01' = c("unif",0,0.5),
+                   'S02' = c("unif",0,0.5),
+                   'S03' = c("unif",0,0.5))
+  myPriors <- list('S01' = c("unif",0,0.5))
+  
+  if (T){
+    tic()
+    x<-generate_ili_epi_test( c(1,0.3),stan_list) 
+    toc()
+  }
+  
+  # Wrap up model in function that outputs summary stats
+  myModel <- function(par){
+    
+    stan_list_f = generate_ili_epi_test(par,stan_list)
+    
+    return( stan_list_f$ili_obs_fit$age_1[stan_list_f$ili_obs_notna$age_1==1] ) 
+  }
+  
+  # Define targets 
+  myTarget <- c( stan_list$ili_obs_fit$age_1[stan_list$ili_obs_notna$age_1==1] )
+  
+  # 
+  dist_euc <- function(vect1, vect2) sqrt(sum((vect1 - vect2)^2))
+  dist_euc(myTarget,myModel( c(1,0.1)))
+  
+  # Run ABC-SMC (this should be parallelised, see package help)
+  library(EasyABC)
+  
+  rval <- ABC_sequential(method = "Beaumont", 
+                         model = myModel, 
+                         prior = myPriors, 
+                         nb_simul = 5, 
+                         summary_stat_target = myTarget,
+                         #n_cluster=8,
+                         tolerance_tab = c(188521,188520),
+                         use_seed=TRUE,
+                         progress_bar=T
+  )
+  
+  # Plot posteriors
+  hist(rval$param[,1])
+  hist(rval$param[,2])
+  plot(rval$param[,1], rval$param[,2])
+  
 }
 
 # functions supporting model_SIR_multiseason()
@@ -298,7 +300,7 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
     ve_inf = params$ve_inf,
     ve_ili_cond_inf = params$ve_ili_cond_inf,
     # daily steps
-    n_daily_time_steps = 10
+    n_daily_time_steps = 1
   )
   # Add vaccination to Oct 1st to the second age group
   ind_vax = which(date_v == paste0(year(min(date_v)),"-10-01"))

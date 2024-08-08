@@ -1,5 +1,8 @@
 run_flu_models = function( params=NULL , data=NULL ){
   
+  if (F){
+    source("./code/00_main.R")
+  }
   # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   ### Initiating desired output list ##########
   # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -38,7 +41,7 @@ run_flu_models = function( params=NULL , data=NULL ){
     target_input=target_input_v[1]
     country_short_input_v = c("IT") # c("IT","AT")
     for (country_short_input in country_short_input_v ) { # country_short_input="IT"
-      
+      country_short_input="IT"
       # ---- |-Prepare country specific data ----
       pop_country = data$demography_respicast$population_pyramid %>% 
         filter(country==EU_long(country_short_input)) %>% pull(population) %>% sum()
@@ -57,8 +60,9 @@ run_flu_models = function( params=NULL , data=NULL ){
       
       
       # ---- |-Fit ----
-      if (T) fitout=fit_with_eabc(params,stan_list)
-      if (F) fitout=fit_with_stan(params,stan_list,mod_path='./stan/SIR_multiseason_age_vax.stan')
+      if (F) fitout=fit_with_eabc(params,stan_list)
+      mod_path='./stan/SIR_multiseason_age_vax.stan'
+      if (T) fitout=fit_with_stan(params,stan_list,mod_path=mod_path)
       
       save(fitout,stan_list,file = path_fit)
       pr=paste("> Fitting:",target_input,"for",country_short_input,"Done \n"); cleancat(green(pr))

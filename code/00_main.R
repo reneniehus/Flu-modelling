@@ -1,3 +1,5 @@
+rm(list = ls(all.names = TRUE))
+gc() #free up memory 
 # ---- |-Set up ----
 source("code/01_main_supporting/setup.R")
 
@@ -21,7 +23,7 @@ data = load_flu_data( params, regenerate = F, new_from_online = F) # loads the d
 # regenerate=T recreates the data lists, new_from_online=T uses the online versions for recreation
 
 # ---- |-run flu models (i.e. fitting and projections) ----
-models_out = run_flu_models( params, data ) # runs the model scripts
+if (F) models_out = run_flu_models( params, data ) # runs the model scripts
 
 # ---- |-save output ----
 if (F) process_and_save( params, models_out ) # processing the model output, with figures and saves
