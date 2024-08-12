@@ -54,7 +54,8 @@ run_flu_models = function( params=NULL , data=NULL ){
       # ---- |-Make stan list ----
       stan_list = make_stan_list(params,data,all_season_fit_wide,country_short_input,vax_country,pop_country)
       # replace by fake data
-      stan_list = generate_ili_epi_test(par = c(1,0.85),stan_list)
+      stan_list = generate_ili_epi_test(par = c(NA),stan_list)
+      stan_list$ili_obs_fit %>% sum() # 7879760
       path_fit = paste0("../Big data/multiseason_age_vax",target_input,country_short_input,".Rdata")
       pr=paste("> Now fitting:",target_input,"for",country_short_input,"... "); cleancat(green(pr))
       

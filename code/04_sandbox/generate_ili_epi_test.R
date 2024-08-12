@@ -1,5 +1,8 @@
 generate_ili_epi_test= function(par,stan_list){
-  # ---- |-DATA BLOCK ----
+  
+  # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  ### DATA BLOCK  ##########
+  # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   # data relevated for the fit 
   n_season = stan_list$n_season # number of seasons
   n_week_fit =  stan_list$n_week_fit # number of observable values, weekly
@@ -32,24 +35,60 @@ generate_ili_epi_test= function(par,stan_list){
   delta_vax_pess = stan_list$delta_vax_pess # daily assumed vax uptake in projection period
   delta_vax_null = stan_list$delta_vax_null # daily assumed vax uptake in projection period
   
-  # ---- |-TRANSFORMED DATA BLOCK ----
+  # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  ### TRANSFORMED DATA BLOCK  ##########
+  # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   beta = rate_infectious * Rnull
   
-  # ---- |-PARAMETER BLOCK ----
-  # note: a simplex of length 3, has 2 free parameters
-  SIR_ini = t(matrix(c(c(par[2], 0.000001, NA), 
-              c(0.84, 0.000003, NA),
-              c(0.87, 0.000002, NA)), nrow=3)) # S I R initial values per season, 1 can be replaced by n_age_groups
+  # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  ### PARAMETER BLOCK ##########
+  # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  SIR_ini_mu = c(0.77, 0.000003 , 1 - 0.77 - 0.000003) # overall season mean 
+  SIR_ini = t(matrix(c(
+    c(0.77, 0.000003, NA), 
+    c(0.77, 0.000003, NA),
+    c(0.77, 0.000003, NA)), nrow=3)) # S I R initial values per season, 1 can be replaced by n_age_groups
   SIR_ini[,3] = 1 - (SIR_ini[,1] + SIR_ini[,2] )
-  #SIR_ini_mu = c(0.78, 0.02, 0.2) # overall season mean 
-  prop_ili = t(matrix(rep(0.01,16), nrow=4))
-  prop_ili_mu = rep(0.01,4)
-  #prop_ili = t(matrix(rep(c(0.05, 0.01, 0.002, 0.002),4), nrow=4)) # proportion of infections that are ili 
-  #prop_ili_mu = c(0.05, 0.01, 0.002, 0.002) # overall mean over season 
-
-  reciprocal_phi = 0.10 # overdipersion parameter for ili obs fit, var=mu+reciprocal_phi*mu^2
+  #
+  prop_ili_mu = c(0.10)
+  prop_ili = t(matrix(rep(0.10,n_age_groups*n_season), nrow=n_age_groups))
+  # Hyper parameter structure
+  set.seed(seed=params$simulation_seed)
+  sigma_prop_ili_age = 2
+  sigma_prop_ili_season = 0.5
+  sigma_i_season = 2
+  if (F) {
+    prop_ili_age_factor = rnorm(n=n_age_groups,0,sd=sigma_prop_ili_age) %>% exp()
+    prop_ili_season_factor = rnorm(n=n_season,0,sd=sigma_prop_ili_season) %>% exp()
+    for (age_i in 1:n_age_groups) {
+      for (season_i in 1:n_season) {
+        prop_ili[season_i, age_i] = prop_ili_mu * prop_ili_season_factor[season_i] * prop_ili_age_factor[age_i] 
+      }
+    }
+    #
+    i_season_factor = rnorm(n=n_season,0,sd=sigma_i_season) %>% exp()
+    for (season_i in 1:n_season) SIR_ini[season_i,2] = SIR_ini_mu[2] * i_season_factor[season_i]
+    SIR_ini[,3] = 1 - (SIR_ini[,1] + SIR_ini[,2] ) # the R compartment absorbs the change in I
+  }
+  #
+  reciprocal_phi = 0.05 # overdipersion parameter for ili obs fit, var=mu+reciprocal_phi*mu^2
+  sim_par = 
+    list(
+      SIR_ini_mu=SIR_ini_mu,
+      SIR_ini = SIR_ini,
+      prop_ili_mu = prop_ili_mu,
+      prop_ili = prop_ili,
+      sigma_prop_ili_age = sigma_prop_ili_age,
+      sigma_prop_ili_season = sigma_prop_ili_season,
+      sigma_i_season = sigma_i_season,
+      reciprocal_phi = reciprocal_phi
+      
+    )
   
-  # ---- |-TRANSFORMED PARAMETER BLOCK ----
+  # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  ### TRANSFORMED PARAMETER BLOCK  ##########
+  # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  
   # Overdispersion
   phi = 1 / reciprocal_phi # dispersion parameter: var=mu+reciprocal_phi*mu^2
   
@@ -75,9 +114,8 @@ generate_ili_epi_test= function(par,stan_list){
         I_u[t,a] = SIR_ini[season_id[t], 2] * pop_age_group[a, 1] / pop # rescaling
         R_u[t,a] = SIR_ini[season_id[t], 3] * pop_age_group[a, 1] / pop # rescaling
         S_v[t,a] = 0  # at start of season, no one is vaccinated
-        I_v[t,a] = 0 
-        R_v[t,a] = 0 
-        
+        I_v[t,a] = 0  # at start of season, no one is vaccinated
+        R_v[t,a] = 0  # at start of season, no one is vaccinated
       }
       
     } else {
@@ -99,7 +137,6 @@ generate_ili_epi_test= function(par,stan_list){
         R_u[t,a] = R_u[t-1,a] + delta_R_u - data.frame(delta_vax)[t-1,a] * R_u[t-1,a] #/ (S_u[t-1,a] + R_u[t-1,a])
         R_v[t,a] = R_v[t-1,a] + delta_R_v + data.frame(delta_vax)[t-1,a] * R_u[t-1,a] #/ (S_u[t-1,a] + R_u[t-1,a])
         
-        #
         delta_ili[t,a] = (delta_infective_exposures_u * 1 + delta_infective_exposures_v * (1-ve_ili_cond_inf) ) * prop_ili[season_id[t], a]
         delta_ili_abs[t,a] = delta_ili[t,a] * pop_age_group[a,1]
         
@@ -109,38 +146,39 @@ generate_ili_epi_test= function(par,stan_list){
           delta_ili[t-1,a] = delta_ili[t,a]
         }
       }
-      
-      
-    } # end of daily loop
-    
-    # convert daily to weekly
-    for (i in 1:n_week_fit) {
-      for (a in 1:n_age_groups) {
-        # define 2 local variables
-        day_start = (i-1)*7+1; 
-        day_end = day_start+6;
-        delta_ili_abs_weekly[i,a] = sum( delta_ili_abs[day_start:day_end,a] );
-      }
     }
     
-  }
-  delta_ili_abs_weekly = round(delta_ili_abs_weekly, digits = 2)
+  } # end of daily loop
   
-  # ---- |-LIKELIHOOD/PRIOR BLOCK ----
-  set.seed(seed= par[1])
+  # convert daily to weekly
+  for (i in 1:n_week_fit) {
+    for (a in 1:n_age_groups) {
+      # define 2 local variables
+      day_start = (i-1)*7+1; 
+      day_end = day_start+6;
+      delta_ili_abs_weekly[i,a] = sum( delta_ili_abs[day_start:day_end,a] );
+    }
+  }
+  
+  # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  ### LIKELIHOOD/PRIOR BLOCK  ##########
+  # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  set.seed(seed= params$simulation_seed)
   for (t in 1:n_week_fit) {
     for (a in 1:n_age_groups) {
       if (ili_obs_notna[t,a]==1) ili_obs_fit[t,a] = rnbinom(1, mu=delta_ili_abs_weekly[t,a]+1e-6, size=phi )
     }
   }
-  # reciprocal_phi=0.2;phi=1/reciprocal_phi;mu=100; x=rnbinom(1000,mu=mu,size=(1/reciprocal_phi)); var(x); mu+reciprocal_phi*mu^2
   
-  # ---- |-GENERATED QUANTITIES BLOCK ----
+  # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  ### GENERATED QUANTITIES BLOCK   ##########
+  # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  stan_list$sim_par = sim_par
   for (age_group_i in 1:n_age_groups){
     stan_list$ili_obs_fit[,age_group_i] = ili_obs_fit[,age_group_i]
   }
   
-
+  
   return(stan_list)
 }
 
