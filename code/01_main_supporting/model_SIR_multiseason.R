@@ -5,7 +5,6 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide) {
   
   # compile the stan model 
   m <- stan_model(file=mod_path)
-  browser()
   # run the model fit
   if (T) {
     start_time <- Sys.time()
@@ -23,7 +22,6 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide) {
     end_time <- Sys.time(); end_time - start_time
   } # 1.6 min
   
-  browser()
   # plot the fit against fitted data
   modelled_fit = fit00 %>% gather_draws(gen_ili_obs_fit_sum[n]) %>% 
     filter(.draw%in%c(1:20)) %>% # filter a number of posterior draws
@@ -47,9 +45,6 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide) {
     geom_line(data=modelled_proj,aes(col=as.factor(scen),y=mean_value)) +
     coord_cartesian(ylim = c(0,2*modelled_fit$age_total %>% max(na.rm=T))) ; p1
   
-  library(rethinking)
-  precis(fit00, pars="prop_ili_mu",depth=2) # prop_ili_mu
-  stan_list$cum_ili_obs_log
   
   if (F) source("code/01_main_supporting/old_stan_fit_code.R")
   
@@ -269,24 +264,29 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
     # daily steps
     n_daily_time_steps = 1,
     # priors
-    sigma_cum_ili = 5,
-    prior_sigma_prop_ili = 2,
+    sigma_cum_ili = 4,
+    prior_sigma_prop_ili = 5,
     prior_sigma_i = 5,
-    prior_sigma_s = 1
+    prior_sigma_s = 2
   )
-  # Add vaccination to Oct 1st to the second age group
-  ind_vax = which(date_v == paste0(year(min(date_v)),"-10-01"))
+  # Add vaccination to Oct 1st to the oldest age group
+  # for fitting
+  my_date_v = all_season_fit_daily$date
+  ind_vax = ( month(my_date_v)==10 & day(my_date_v)==1 )
+  stan_list$delta_vax$age_65_99[ind_vax] = (vax_country$higher_vax_coverage + vax_country$lower_vax_coverage)/2
+  # for projections
+  my_date_v = all_season_project_daily$date
+  ind_vax = which( my_date_v == paste0( year(min(my_date_v)),"-10-01" ) )
   stan_list$delta_vax_real$age_65_99[ind_vax] = (vax_country$higher_vax_coverage + vax_country$lower_vax_coverage)/2
   stan_list$delta_vax_opti$age_65_99[ind_vax] = vax_country$higher_vax_coverage
   stan_list$delta_vax_pess$age_65_99[ind_vax] = vax_country$lower_vax_coverage
   stan_list$delta_vax_null$age_65_99[ind_vax] = 0
-  stan_list$delta_vax$age_65_99[ind_vax] = (vax_country$higher_vax_coverage + vax_country$lower_vax_coverage)/2
+  
   stan_list$daily_counter_fit = rep(1:stan_list$n_day_fit, each=stan_list$n_daily_time_steps)
   stan_list$daily_counter_proj = rep(1:stan_list$n_day_project, each=stan_list$n_daily_time_steps)
   
   stan_list$daily_daystart_fit = rep(1:stan_list$n_daily_time_steps, each=stan_list$n_day_fit)
   stan_list$daily_daystart_proj = rep(1:stan_list$n_daily_time_steps, each=stan_list$n_day_proj)
-  
   # summary targets
   stan_list$cum_ili_obs_log = rowsum(x=stan_list$ili_obs_fit,group=stan_list$season_id_week,na.rm = T) %>% rowSums() %>% log()
   stan_list$n_ili_obs_notna = rowsum(x=stan_list$ili_obs_notna,group=stan_list$season_id_week,na.rm = T) %>% rowSums()
@@ -295,23 +295,29 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
   
   ###################################################################
   
-  ### for debugging: make it 2 age groups
+  ### for debugging: make it 2 age groups: <65 and above
   if (F) {
     stan_list$n_age_groups = 2
     stan_list$contact_matrix = matrix(data=c(1,1,1,1),nrow=2,ncol=2)
-    stan_list$pop_age_group = matrix(c(1315044,7789728) ,nrow=2,ncol=1)
+    stan_list$pop_age_group = c(sum(stan_list$pop_age_group[1:3,1]),stan_list$pop_age_group[4,1])
     stan_list$ili_obs_fit =  all_season_fit_wide %>% transmute(
-      age_1=replace_na(age_00_04+age_05_14,0) %>% as.integer(),
-      age_2=replace_na(age_15_64+age_65_99,0) %>% as.integer()
+      age_1=replace_na(age_00_04+age_05_14+age_15_64,0) %>% as.integer(),
+      age_2=replace_na(age_65_99,0) %>% as.integer()
     )
     stan_list$ili_obs_notna = all_season_fit_wide %>% transmute(
-      age_1=as.integer((age_00_04+age_05_14)==2),
-      age_2=as.integer((age_15_64+age_65_99)==2)
+      age_1=as.integer((age_00_04+age_05_14+age_15_64)==3),
+      age_2=as.integer((age_65_99)==1)
     )
-    stan_list$delta_vax_real = tibble( age_1=rep(0,nrow(all_season_project_daily)) )
-    stan_list$delta_vax_opti = tibble( age_1=rep(0,nrow(all_season_project_daily)) )
-    stan_list$delta_vax_pess = tibble( age_1=rep(0,nrow(all_season_project_daily)) )
-    stan_list$delta_vax_null = tibble( age_1=rep(0,nrow(all_season_project_daily)) )
+    stan_list$delta_vax_real = stan_list$delta_vax_real %>% 
+      transmute(age_1=rowSums(across(age_00_04:age_15_64)), age_2=age_65_99)
+    stan_list$delta_vax_opti = stan_list$delta_vax_opti %>% 
+      transmute(age_1=rowSums(across(age_00_04:age_15_64)), age_2=age_65_99)
+    stan_list$delta_vax_pess = stan_list$delta_vax_pess %>% 
+      transmute(age_1=rowSums(across(age_00_04:age_15_64)), age_2=age_65_99)
+    stan_list$delta_vax_null = stan_list$delta_vax_null %>% 
+      transmute(age_1=rowSums(across(age_00_04:age_15_64)), age_2=age_65_99)
+    stan_list$delta_vax = stan_list$delta_vax %>% 
+      transmute(age_1=rowSums(across(age_00_04:age_15_64)), age_2=age_65_99)
   }
   ### for debugging: make it 1 age group
   if (T) {
@@ -328,7 +334,7 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
     stan_list$delta_vax_opti = stan_list$delta_vax_opti %>% select(age_65_99) %>% rename(age_1=age_65_99)
     stan_list$delta_vax_pess = stan_list$delta_vax_pess %>% select(age_65_99) %>% rename(age_1=age_65_99)
     stan_list$delta_vax_null = stan_list$delta_vax_null %>% select(age_65_99) %>% rename(age_1=age_65_99)
-    stan_list$delta_vax = tibble( age_1=rep(0,nrow(all_season_fit_daily)) )
+    stan_list$delta_vax = stan_list$delta_vax %>% select(age_65_99) %>% rename(age_1=age_65_99)
   }
   return(stan_list)
 }

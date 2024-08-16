@@ -31,7 +31,7 @@ run_flu_models = function( params=NULL , data=NULL ){
     
     # ---- |-Run model for each country ----
     target_input=target_input_v[1]
-    country_short_input_v = params$run_countries # c("IT","AT")
+    country_short_input_v = country_short_input_v # params$run_countries # c("IT","AT")
     for (country_short_input in country_short_input_v ) { # country_short_input="IT"
       # ---- |-Prepare country specific data ----
       pop_country = data$demography_respicast$population_pyramid %>% 
@@ -47,7 +47,6 @@ run_flu_models = function( params=NULL , data=NULL ){
       # replace by fake data
       if (F) stan_list = generate_ili_epi_test(par = c(NA),stan_list)
       stan_list$ili_obs_fit %>% sum() # sim:7879760 (nonoise: 8385360), IT:106110
-      browser()
       path_fit = paste0("../Big data/multiseason_age_vax",target_input,country_short_input,".Rdata")
       pr=paste("> Now fitting:",target_input,"for",country_short_input,"... "); cleancat(green(pr))
       

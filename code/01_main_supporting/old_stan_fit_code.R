@@ -11,6 +11,11 @@ if (F) {
     ),
     data=stan_list #,init = init_fun
   ) # , run time will scale with iter, and is a function of adapt_delta and max_treedepth, and is a function of luck
+  
+  library(rethinking)
+  precis(fit00, pars="prop_ili_mu",depth=2) # prop_ili_mu
+  stan_list$cum_ili_obs_log
+  
   if (F) { # setting initial conditions for stan fit & checking fits
     # using a previous fit, set initial conditions
     ini_tune = F

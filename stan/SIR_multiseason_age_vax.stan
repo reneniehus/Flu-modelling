@@ -397,9 +397,9 @@ generated quantities {
       
       for (a in 1:n_age_groups) {
         
-        gen_curr_S_u[a] = SIR_ini[1,1,1];
-        gen_curr_I_u[a] = SIR_ini[1,1,2];
-        gen_curr_R_u[a] = 1 - (gen_curr_S_u[a] + gen_curr_I_u[a]);
+        gen_curr_S_u[a] = SIR_ini_mu[1];
+        gen_curr_I_u[a] = SIR_ini_mu[2];
+        gen_curr_R_u[a] = SIR_ini_mu[3];
         gen_curr_S_v[a] = 0;  // Adding a small number to avoid dividing by 0
         gen_curr_I_v[a] = 0;  // Adding a small number to avoid dividing by 0
         gen_curr_R_v[a] = 0;  // Adding a small number to avoid dividing by 0
