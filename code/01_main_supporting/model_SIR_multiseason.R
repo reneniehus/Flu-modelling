@@ -28,7 +28,7 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide) {
   modelled_fit = fit00 %>% gather_draws(gen_ili_obs_fit_sum[n]) %>% 
     filter(.draw%in%c(1:20)) %>% # filter a number of posterior draws
     select(-.chain,-.iteration) %>% ungroup() %>% 
-    right_join( all_season_fit_wide %>% mutate(age_total = stan_list$ili_obs_fit$age_1 ),
+    right_join( stan_list$all_season_fit %>% mutate(age_total = stan_list$ili_obs_fit$age_1 ),
                 by = join_by(n)) %>%
     group_by(date) %>%
     mutate(mean_value = mean(.value)) %>%
