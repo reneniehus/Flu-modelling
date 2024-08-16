@@ -24,10 +24,19 @@ settings = function() {
   params$latest_start_year = 2023 # if the last full season is 2023/24, put 2023
   params$season_start_monthday = "-09-01"
   params$season_end_monthday = "-08-31"
+  # summer low-activity ()
+  low_start = "-06-01"
+  low_stop  = "-09-01"
+  date_v = NULL
+  for (year_i in 2010:2026){
+    date_v = c(date_v,seq( from=paste0(year_i,low_start) %>% ymd(), to=paste0(year_i,low_stop) %>% ymd(), by="day" ))
+  }
+  params$summer_low_dates = date_v %>% as_date() 
   
   params$simulation_seed = 12
   
   # ---- |-Countries ----
+  params$run_countries = "IT"
   
   # ---- |-Model-specific  settings ----
   params$models_to_run = c("SIR_simple_multi_season") # "SIR_simple","SIR_simple_r0_variation","SIR_simple_multi_season

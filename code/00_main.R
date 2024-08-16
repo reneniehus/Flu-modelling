@@ -1,5 +1,5 @@
-rm(list = ls(all.names = TRUE))
-gc() #free up memory 
+rm(list = ls(all.names = TRUE)) # clear environment
+gc() # clear memory 
 # ---- |-Set up ----
 source("code/01_main_supporting/setup.R")
 
@@ -23,7 +23,7 @@ data = load_flu_data( params, regenerate = F, new_from_online = F) # loads the d
 # regenerate=T recreates the data lists, new_from_online=T uses the online versions for recreation
 
 # ---- |-run flu models (i.e. fitting and projections) ----
-if (F) models_out = run_flu_models( params, data ) # runs the model scripts
+models_out = run_flu_models( params, data ) # runs the model scripts
 
 # ---- |-save output ----
 if (F) process_and_save( params, models_out ) # processing the model output, with figures and saves
@@ -35,6 +35,5 @@ if (F) source("code/03_special_analyses/exploring_SIR/SIR_paras_explore.R") # ex
 if (F) source("code/03_special_analyses/forecasting/norrsken.R") # forecasting modelling
 
 # (temporary code for any quick checking)
-
-
-  
+models_out$figs_prefit$fit_seasons_countries
+models_out$other$IT$plot_fit

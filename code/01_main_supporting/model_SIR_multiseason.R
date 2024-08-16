@@ -1,108 +1,61 @@
-fit_with_stan = function(params,stan_list,mod_path) {
+fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide) {
   
   # initiate output list
   mout=list()
-  # compile the model 
+  
+  # compile the stan model 
   m <- stan_model(file=mod_path)
+  browser()
   # run the model fit
   if (T) {
     start_time <- Sys.time()
     fit00=rstan::vb(
       m,
       algorithm = "meanfield", # variational inference algorithm
-      grad_samples=5 , # number of samples to determine the gradient
+      grad_samples=5 , # samples to determine the gradient ( 2 is slower than 5, )
       tol_rel_obj = 0.01,
       iter=1000, # 
+      output_samples = 500,
       #chains=2, thin=2, iter=300, # a "long run" 
-      seed=10, # seed for pseudo-random numbers to ensure reproducibility
+      seed=12, # seed for pseudo-random numbers to ensure reproducibility
       data=stan_list # data input into the model
     ) # 
     end_time <- Sys.time(); end_time - start_time
-  } # 1 min
+  } # 1.6 min
   
+  browser()
   # plot the fit against fitted data
   modelled_fit = fit00 %>% gather_draws(gen_ili_obs_fit_sum[n]) %>% 
-    #filter(.value>0) %>%
-    filter(.draw%in%c(1:1)) %>% # filter a number of posterior draws
+    filter(.draw%in%c(1:20)) %>% # filter a number of posterior draws
     select(-.chain,-.iteration) %>% ungroup() %>% 
-    right_join( all_season_fit_wide %>% mutate(age_total = stan_list$ili_obs_fit$age_1),
+    right_join( all_season_fit_wide %>% mutate(age_total = stan_list$ili_obs_fit$age_1 ),
                 by = join_by(n)) %>%
     group_by(date) %>%
     mutate(mean_value = mean(.value)) %>%
     ungroup()
-  p1 = modelled_fit %>% ggplot(aes(date,age_total)) + geom_line() + 
-    #geom_line(aes(y=.value/50,group=.draw),col="lightblue") +
-    geom_line(aes(y=mean_value),col="lightblue") +
-    coord_cartesian(ylim = c(0,1.2*modelled_fit$age_total %>% max(na.rm=T)));p1
-  
-  
-  if (F) {
-    # the original stan sampling
-    fit00=rstan::stan(
-      file='./stan/SIR_multiseason_age_vax.stan',
-      chains=1 ,thin=1,iter=300, # a "debug run"
-      #chains=2, thin=2, iter=300, # a "long run" 
-      seed=5, cores = getOption("mc.cores", 1L),
-      control=list(
-        # adapt_delta=0.95, # look into increasing this, 0.98 or 0.99
-        max_treedepth=15 # look into increasing this to, 15, 20 ect
-      ),
-      data=stan_list #,init = init_fun
-    ) # 8.5 hrs, run time will scale with iter, and is a function of adapt_delta and max_treedepth, and is a function of luck
-    if (F) { # setting initial conditions for stan fit & checking fits
-      # using a preious fit, set initial conditions
-      ini_tune = F
-      if (ini_tune==T) {
-        load(path_fit) # loading fit00
-        fit_means = get_posterior_mean(fit00) # extract mean estimates
-        row.names(fit_means)[1:32] # print parameter names
-        # mp="sigma_i";mcmc_areas(fit00,mp);precis(fit00,depth=3,mp)
-        #
-        myl = vector(mode = "list", length = 32)
-        myl[1:32] = fit_means[1:32]
-        names(myl) = row.names(fit_means)[1:32]
-        init_fun = function(...) myl
-        save(init_fun,file=paste0("output/ini_SIR__multiseason_age_vax",target_input,country_short_input,".Rdata") )
-        save_as_general = T
-        if (save_as_general) save(init_fun,file="output/ini_SIR__multiseason_age_vax.Rdata")
-      }
-      if (ini_tune==F) {
-        # a specific country run will look for a country-specfic initial contition function file, if that does not exist, it loads a general one
-        if (file.exists(paste0("output/ini_SIR__multiseason_age_vax",target_input,country_short_input,".Rdata"))){
-          load(file=paste0("output/ini_SIR__multiseason_age_vax",target_input,country_short_input,".Rdata"))  
-        } else{
-          load(file="output/ini_SIR__multiseason_age_vax.Rdata")
-        }
-      }
-      
-    } else {
-      load(path_fit)
-    }
-    # ---- |-Block to sense check etc, Extract parameters and plot, see convergence ----
-    if (F){
-      # plot without Rethinking package
-      fit00@model_pars # see which parameters are there
-      # see parameter names with dimensions
-      fit_means = get_posterior_mean(fit00) # extract mean estimates
-      row.names(fit_means)[1:17]
-      fit_means[1:17,] %>% enframe()
-      mp="SIR_ini[3,1,1]"; mcmc_areas(fit00,mp)
-      mp="reciprocal_phi"; summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary
-      
-      mp="prop_ili_mu"; summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary
-      # https://rstudio.github.io/cheatsheets/bayesplot.pdf
-      # for quick convergence check: n_eff Rhat ( see other packages than Rethinking)
-      # using Rethinkingp akcage
-      # precis(fit00,pars=c("SIR_ini_mu"),depth = 3)
-      # precis(fit00,pars=c("Rnull_eff"),depth = 2)
-      # precis(fit00,pars=c("prop_severe"),depth = 2)
-      # precis(fit00,pars=c("sigma_i"),depth = 2) # 3.66
-      # precis(fit00,pars=c("SIR_ini"),depth = 3) 
-    }
+  modelled_proj = fit00 %>% gather_draws(gen_ili_t_obs_project_sum[scen,week_id]) %>% 
+    filter(.draw%in%c(1:50)) %>%
+    select(-.chain,-.iteration) %>% ungroup() %>% 
+    right_join( stan_list$all_season_project ,
+                by = join_by(week_id)) %>% 
+    group_by(date=date_wed,scen) %>%
+    mutate(mean_value = mean(.value)) %>%
+    ungroup()
     
-  }
+  p1 = modelled_fit %>% ggplot(aes(date,age_total)) + geom_line() + 
+    geom_line(aes(y=mean_value),col="lightblue") +
+    geom_line(data=modelled_proj,aes(col=as.factor(scen),y=mean_value)) +
+    coord_cartesian(ylim = c(0,2*modelled_fit$age_total %>% max(na.rm=T))) ; p1
+  
+  library(rethinking)
+  precis(fit00, pars="prop_ili_mu",depth=2) # prop_ili_mu
+  stan_list$cum_ili_obs_log
+  
+  if (F) source("code/01_main_supporting/old_stan_fit_code.R")
   
   # add into output list 
+  mout$stan_list = stan_list
+  mout$fit = fit00
   mout$modelled_proj = extract_projections(params,fit00,n_iter=20,
                                            stan_list$df_scenarios,
                                            stan_list$df_agegroups,
@@ -173,6 +126,11 @@ wrangle_fit_df = function(params,data,all_season_country,country_short_input,tar
       unnest(respicompass_ili_plus) %>% 
       filter(season%in%params$SIR_multiseason$seasons_include) %>% 
       select(country_short,date,season,agegroup,value)-> all_season_fit
+    # impute summer low-activity
+    all_season_fit %>% mutate(
+      value=ifelse( date%in%params$summer_low_dates, 0 , value )
+    ) -> all_season_fit
+    
   }
   
   if (target_input=="ili") {
@@ -283,7 +241,8 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
       mutate_all(~ !is.na(.) ) %>% mutate_all(~as.integer(.) ),
     #
     season_start = as.integer(all_season_fit_daily$season_start),
-    season_id = fct_inorder(all_season_fit_daily$season) %>% as.integer(),
+    season_id_day = fct_inorder(all_season_fit_daily$season) %>% as.integer(),
+    season_id_week = fct_inorder(all_season_fit_wide$season) %>% as.integer(),
     #
     pop = sum(pop_age_group), 
     #
@@ -308,7 +267,12 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
     ve_inf = params$ve_inf,
     ve_ili_cond_inf = params$ve_ili_cond_inf,
     # daily steps
-    n_daily_time_steps = 1
+    n_daily_time_steps = 1,
+    # priors
+    sigma_cum_ili = 5,
+    prior_sigma_prop_ili = 2,
+    prior_sigma_i = 5,
+    prior_sigma_s = 1
   )
   # Add vaccination to Oct 1st to the second age group
   ind_vax = which(date_v == paste0(year(min(date_v)),"-10-01"))
@@ -323,11 +287,11 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
   stan_list$daily_daystart_fit = rep(1:stan_list$n_daily_time_steps, each=stan_list$n_day_fit)
   stan_list$daily_daystart_proj = rep(1:stan_list$n_daily_time_steps, each=stan_list$n_day_proj)
   
-  
-  ############## Add artificially generated ili values ###############
-  
-  #stan_list = generate_ili_epi_test(stan_list)
-  #stan_list$ili_obs_notna = data.frame(stan_list$ili_obs_fit>0)
+  # summary targets
+  stan_list$cum_ili_obs_log = rowsum(x=stan_list$ili_obs_fit,group=stan_list$season_id_week,na.rm = T) %>% rowSums() %>% log()
+  stan_list$n_ili_obs_notna = rowsum(x=stan_list$ili_obs_notna,group=stan_list$season_id_week,na.rm = T) %>% rowSums()
+  stan_list$weight_obs_epi =  1.0 #1/mean( stan_list$n_ili_obs_notna ) 
+  stan_list$weight_cum_ili =  1.0 # 
   
   ###################################################################
   

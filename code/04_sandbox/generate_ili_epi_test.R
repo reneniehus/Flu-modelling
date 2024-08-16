@@ -12,7 +12,7 @@ generate_ili_epi_test= function(par,stan_list){
   ili_obs_notna = stan_list$ili_obs_notna*0+1 # indicating non-missing data with 1, otherwise 0
   stan_list$ili_obs_notna = ili_obs_notna
   season_start = stan_list$season_start # indicating first week of a season with 1, the second week with 2, otherwise 0
-  season_id = stan_list$season_id # indicating which seasn each obervable day belongs to
+  season_id_day = stan_list$season_id_day # indicating which seasn each obervable day belongs to
   pop = stan_list$pop # population size
   pop_age_group = stan_list$pop_age_group # population size per age group, requires to be a matrix 
   contact_matrix = stan_list$contact_matrix #contact matrix
@@ -110,9 +110,9 @@ generate_ili_epi_test= function(par,stan_list){
       # initiate the compartments based on current season\
       # S I R initial values age dist corrected
       for(a in 1:n_age_groups){
-        S_u[t,a] = SIR_ini[season_id[t], 1] * pop_age_group[a, 1] / pop # rescaling 
-        I_u[t,a] = SIR_ini[season_id[t], 2] * pop_age_group[a, 1] / pop # rescaling
-        R_u[t,a] = SIR_ini[season_id[t], 3] * pop_age_group[a, 1] / pop # rescaling
+        S_u[t,a] = SIR_ini[season_id_day[t], 1] * pop_age_group[a, 1] / pop # rescaling 
+        I_u[t,a] = SIR_ini[season_id_day[t], 2] * pop_age_group[a, 1] / pop # rescaling
+        R_u[t,a] = SIR_ini[season_id_day[t], 3] * pop_age_group[a, 1] / pop # rescaling
         S_v[t,a] = 0  # at start of season, no one is vaccinated
         I_v[t,a] = 0  # at start of season, no one is vaccinated
         R_v[t,a] = 0  # at start of season, no one is vaccinated
@@ -137,7 +137,7 @@ generate_ili_epi_test= function(par,stan_list){
         R_u[t,a] = R_u[t-1,a] + delta_R_u - data.frame(delta_vax)[t-1,a] * R_u[t-1,a] #/ (S_u[t-1,a] + R_u[t-1,a])
         R_v[t,a] = R_v[t-1,a] + delta_R_v + data.frame(delta_vax)[t-1,a] * R_u[t-1,a] #/ (S_u[t-1,a] + R_u[t-1,a])
         
-        delta_ili[t,a] = (delta_infective_exposures_u * 1 + delta_infective_exposures_v * (1-ve_ili_cond_inf) ) * prop_ili[season_id[t], a]
+        delta_ili[t,a] = (delta_infective_exposures_u * 1 + delta_infective_exposures_v * (1-ve_ili_cond_inf) ) * prop_ili[season_id_day[t], a]
         delta_ili_abs[t,a] = delta_ili[t,a] * pop_age_group[a,1]
         
         if (season_start[t]==2){
@@ -164,10 +164,12 @@ generate_ili_epi_test= function(par,stan_list){
   ### LIKELIHOOD/PRIOR BLOCK  ##########
   # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   set.seed(seed= params$simulation_seed)
+  # nonoise = T
   for (t in 1:n_week_fit) {
     for (a in 1:n_age_groups) {
       if (ili_obs_notna[t,a]==1) ili_obs_fit[t,a] = rnbinom(1, mu=delta_ili_abs_weekly[t,a]+1e-6, size=phi )
-    }
+      # if (nonoise) if (ili_obs_notna[t,a]==1) ili_obs_fit[t,a] = round(delta_ili_abs_weekly[t,a])
+      }
   }
   
   # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -177,7 +179,9 @@ generate_ili_epi_test= function(par,stan_list){
   for (age_group_i in 1:n_age_groups){
     stan_list$ili_obs_fit[,age_group_i] = ili_obs_fit[,age_group_i]
   }
-  
+  # summary stats
+  stan_list$cum_ili_obs_log = rowsum(x=stan_list$ili_obs_fit,group=stan_list$season_id_week,na.rm = T) %>% rowSums() %>% log()
+  stan_list$n_ili_obs_notna = rowsum(x=stan_list$ili_obs_notna,group=stan_list$season_id_week,na.rm = T) %>% rowSums()
   
   return(stan_list)
 }

@@ -7,10 +7,12 @@ data {
   int n_day_fit;     // number of obervatble values, daily
   int n_age_groups;  // number of age groups
   int ili_obs_fit[n_week_fit, n_age_groups]; // observed ili
+  real<lower=0> cum_ili_obs_log[ n_season ]; // observed cumulative ili (log-scale)
   int n_daily_time_steps; // number of daily steps
   array[n_week_fit,n_age_groups]int<lower=0,upper=1> ili_obs_notna; // indicating non-missing data with 1, otherwise 0
   array[n_day_fit] int<lower=0,upper=2> season_start; // indicating first week of a season with 1, the second week with 2, otherwise 0
-  array[n_day_fit] int<lower=1,upper=n_season> season_id; // indicating which seasn each obervable day belongs to
+  array[n_day_fit] int<lower=1,upper=n_season> season_id_day; // indicating which seasn each obervable day belongs to
+  array[n_week_fit] int<lower=1,upper=n_season> season_id_week; // indicating which seasn each obervable day belongs to
   real pop; // total population size
   matrix[n_age_groups,1] pop_age_group; // population size per age group, required to be a matrix 
   matrix[n_age_groups, n_age_groups] contact_matrix; // contact matrix
@@ -37,7 +39,13 @@ data {
   real ve_inf; // vaccine effectiveness on susceptability
   real ve_ili_cond_inf; // vaccine effectiveness on severity, given infection
   //
-  
+  real<lower=0> sigma_cum_ili; // variability of observed cumulative ili (log-scale)
+  real<lower=0> prior_sigma_prop_ili;
+  real<lower=0> prior_sigma_i; 
+  real<lower=0> prior_sigma_s;
+  //
+  real weight_obs_epi; // give a weight to the observed epi likelihood
+  real weight_cum_ili; // give a weight to the observed cumulative burden likelihood
 }
 
 transformed data {
@@ -50,55 +58,58 @@ transformed data {
 }
 
 parameters {
+  // real mock_para; // can be actived when all other parameters are fitted
   // note: a simplex of length 3, has 2 free parameters
   // note: simplex[n] X[m,o] creates an m x o sized array of simplex, each of size n
   
   // initial state
-  simplex[3] SIR_ini_mu[1]; // overall season mean 
+  simplex[3] SIR_ini_mu; // overall season mean
+  // real i_season[n_season];
+  // real r_season[n_season];
   // ratio between observed and immunising
-  real<lower=0, upper=1> prop_ili_mu[n_age_groups]; // overall mean over season 
+  real<lower=0> prop_ili_mu; // overall mean over season
+  
+  // real prop_ili_season[n_season];
+  // real prop_ili_age[n_age_groups];
+  
   // dispersion parameters
-  real<lower=0> sigma_prop_ili;
-  real<lower=0> sigma_s;
-  real<lower=0> sigma_i;
+  // real<lower=0> sigma_prop_ili_age;
+  // real<lower=0> sigma_prop_ili_season;
+  // real<lower=0> sigma_i;
   
 }
 
 transformed parameters {
   //
-  real<lower=0, upper=1> reciprocal_phi = 0.05; // overdipersion parameter for ili obs fit, var=mu+reciprocal_phi*mu^2
-  real<lower=0, upper=1> prop_ili[n_season, n_age_groups]; // proportion of infections that are ili 
-  simplex[3] SIR_ini[n_season, 1]; // S I R initial values per season, 1 can be replaced by n_age_groups
+  real<lower=0, upper=1> reciprocal_phi = 0.75; // overdipersion parameter for ili obs fit, var=mu+reciprocal_phi*mu^2
   // 
-  prop_ili[1,1] = 0.1;
-  prop_ili[2,1] = 0.1;
-  prop_ili[3,1] = 0.1;
-  SIR_ini[1,1,1] = 0.77;
-  SIR_ini[1,1,2] = 0.000003;
-  SIR_ini[1,1,3] = 1 - 0.77 - 0.000003;
-  SIR_ini[2,1,1] = 0.77;
-  SIR_ini[2,1,2] = 0.000003;
-  SIR_ini[2,1,3] = 1 - 0.77 - 0.000003;
-  SIR_ini[3,1,1] = 0.77;
-  SIR_ini[3,1,2] = 0.000003;
-  SIR_ini[3,1,3] = 1 - 0.77 - 0.000003;
-  
-  // daily stuff
-  // SIR compartments unvaccinated and vaccinated
   matrix<lower=0, upper=1>[n_day_fit,n_age_groups] S_u; // susceptible compartment, relative to population size, unvaccinated
   matrix<lower=0, upper=1>[n_day_fit,n_age_groups] I_u; // infetious compartment,   relative to population size, unvaccinated
   matrix<lower=0, upper=1>[n_day_fit,n_age_groups] R_u; // recovered compartment,   relative to population size, unvaccinated
   matrix<lower=0, upper=1>[n_day_fit,n_age_groups] S_v; // susceptible compartment, relative to population size, vaccinated
   matrix<lower=0, upper=1>[n_day_fit,n_age_groups] I_v; // infetious compartment,   relative to population size, vaccinated
   matrix<lower=0, upper=1>[n_day_fit,n_age_groups] R_v; // recovered compartment,   relative to population size, vaccinated
-  array[n_day_fit,n_age_groups] real<lower=0, upper=1> delta_ili; // ili/detectable incidence relative to population size
+  array[n_day_fit,n_age_groups] real<lower=0> delta_ili; // ili/detectable incidence relative to population size
   array[n_day_fit,n_age_groups] real<lower=0> delta_ili_abs; // ili/detectable incidence in absolute numbers
-  real phi; // dispersion parameter of the observeation process, var=mu+reciprocal_phi*mu^2
-  // weekly stuff
   array[n_week_fit,n_age_groups] real<lower=0> delta_ili_abs_weekly; // ili/detectable incidence in absolute numbers, weekly aggregate
-  
-  // Overdispersion
+  vector[n_season] cum_ili_log ; // to store the sum of ili for each season
+  real phi; // dispersion parameter of the observeation process, var=mu+reciprocal_phi*mu^2
+  simplex[3] SIR_ini[n_season, 1]; // how to access: SIR_ini[season,age,compartment] // S I R initial values per season, 1 can be replaced by n_age_groups
+  real<lower=0> prop_ili[n_season, 1]; // proportion of infections that are ili 
   phi = 1 / reciprocal_phi; // dispersion parameter: var=mu+reciprocal_phi*mu^2
+  for (s in 1:n_season) cum_ili_log[ s ] = 0 ; // reset the counter
+  
+  // --------------------------------parameter hierarchical architecture
+  for (s in 1:n_season) { // season effect
+  for (a in 1:n_age_groups) { // age effect
+  SIR_ini[s,a,1] = SIR_ini_mu[1] * 1 * 1; // S
+  SIR_ini[s,a,2] = SIR_ini_mu[2] * 1 * 1; // I // * 2^(i_season[s]) *2^(i_age[a])
+  SIR_ini[s,a,3] = SIR_ini_mu[3] * 1 * 1; // R // 2^(r_season[s]) *2^(r_age[a])
+  prop_ili[s,a]  = prop_ili_mu   * 1 * 1; // 2^(prop_ili_season[s]) *2^(prop_ili_age[a])
+  }
+  }
+  
+  // --------------------------------SIR model architecture
   
   {
     // local variables (only used within these curly brackets and then forgotten, cannot be constrained)
@@ -142,9 +153,9 @@ transformed parameters {
       if ( season_start[curr_day]==1 && daily_daystart_fit[t]==1 ){
         // initiate the compartments based on current country/season/agegroup
         for(a in 1:n_age_groups){
-          curr_S_u[a] = SIR_ini[season_id[curr_day], 1, 1] * pop_age_group[a, 1] / pop; // rescaling
-          curr_I_u[a] = SIR_ini[season_id[curr_day], 1, 2] * pop_age_group[a, 1] / pop; // rescaling
-          curr_R_u[a] = SIR_ini[season_id[curr_day], 1, 3] * pop_age_group[a, 1] / pop; // rescaling
+          curr_S_u[a] = SIR_ini[season_id_day[curr_day], 1, 1] * pop_age_group[a, 1] / pop; // rescaling
+          curr_I_u[a] = SIR_ini[season_id_day[curr_day], 1, 2] * pop_age_group[a, 1] / pop; // rescaling
+          curr_R_u[a] = SIR_ini[season_id_day[curr_day], 1, 3] * pop_age_group[a, 1] / pop; // rescaling
           curr_S_v[a] = 0;  // at start of season, no one is vaccinated
           curr_I_v[a] = 0;  // at start of season, no one is vaccinated
           curr_R_v[a] = 0;  // at start of season, no one is vaccinated
@@ -182,7 +193,7 @@ transformed parameters {
         curr_R_u[a] = prev_R_u[a] + delta_R_u - (delta_vax[daily_counter_fit[t-1],a]/n_daily_time_steps) * prev_R_u[a] / (prev_S_u[a] + prev_R_u[a]);
         curr_R_v[a] = prev_R_v[a] + delta_R_v + (delta_vax[daily_counter_fit[t-1],a]/n_daily_time_steps) * prev_R_u[a] / (prev_S_u[a] + prev_R_u[a]);
         //
-        curr_delta_ili[a] = (delta_infective_exposures_u * 1 + delta_infective_exposures_v * (1-ve_ili_cond_inf) ) * prop_ili[season_id[daily_counter_fit[t]], a];
+        curr_delta_ili[a] = (delta_infective_exposures_u * 1 + delta_infective_exposures_v * (1-ve_ili_cond_inf) ) * prop_ili[ season_id_day[daily_counter_fit[t]], a ];
         curr_delta_ili_abs[a] = curr_delta_ili[a] * pop_age_group[a,1];
         
         // Only store once per day
@@ -214,21 +225,33 @@ transformed parameters {
       
       prev_delta_ili = curr_delta_ili;
       prev_delta_ili_abs = curr_delta_ili_abs;
+      
     } // end of multi-daily loop
     
   }
   
   
   // convert daily to weekly
-  for (i in 1:n_week_fit) {
+  for (t in 1:n_week_fit) {
     for (a in 1:n_age_groups) {
       // define 2 local variables
-      int day_start = (i-1)*7+1;
+      int day_start = (t-1)*7+1;
       int day_end = day_start+6;
-      delta_ili_abs_weekly[i,a] = sum( delta_ili_abs[day_start:day_end,a] );
+      delta_ili_abs_weekly[t,a] = sum( delta_ili_abs[day_start:day_end,a] );
+      // save summary stats
+      if (ili_obs_notna[t,a]==1) cum_ili_log[ season_id_week[t] ] = cum_ili_log[ season_id_week[t] ] + delta_ili_abs_weekly[t,a] ;
     }
   }
   
+  // convert to log scale
+  for (s in 1:n_season) cum_ili_log[s] = log(cum_ili_log[s]);
+  
+  // for (s in 1:n_season) {
+    //   for (a in 1:n_age_groups) {
+      //     logit( prop_ili[s,a] ) = logit( prop_ili_mu ) + prop_ili_season[s] + prob_ili_age[a]; 
+      //   }
+      // }
+      
 }
 
 model {
@@ -237,26 +260,37 @@ model {
   
   for (t in 1:n_week_fit) {
     for (a in 1:n_age_groups) {
-      if (ili_obs_notna[t,a]==1) ili_obs_fit[t,a] ~ neg_binomial_2( delta_ili_abs_weekly[t,a]+1e-6, phi ) ; // TODO: remove this line and see if you get priors back
+      if (ili_obs_notna[t,a]==1) target += weight_obs_epi*neg_binomial_2_lpmf( ili_obs_fit[t,a] | delta_ili_abs_weekly[t,a]+1e-6, phi ) ; // TODO: remove this line and see if you get priors back
     }
   }
   
-  // --------------------------------prior part
+  for (s in 1:n_season) {
+    target += weight_cum_ili*normal_lpdf( cum_ili_obs_log[s] | cum_ili_log[s] , sigma_cum_ili ) ; 
+  }
   
-  // more priors: put priors on things that we want to fixate more
-  logit(prop_ili_mu) ~ normal( logit(0.015) , 0.5 );// check in R: rnorm(2000,logit(0.1), 3) %>% inv_logit() %>% dens()
+  // --------------------------------prior part
+  // mock_para ~ normal(0,1);
+  // target += normal_lpdf( i_season        | 0 , 0.0001 ) ;
+  // target += normal_lpdf( r_season        | 0 , 0.0001 ) ;
+  // target += normal_lpdf( prop_ili_season | 0 , 0.0001 ) ;
+  
+  
+  target += normal_lpdf( log(prop_ili_mu) | log(0.10) , prior_sigma_prop_ili );// check in R: rnorm(2000,logit(0.1), 3) %>% inv_logit() %>% dens()
+  
+  // prop_ili_season ~ normal( 0 , sigma_prop_ili_season);
+  // prop_ili_age ~    normal( 0 , sigma_prop_ili_age);
   
   // I_ini determined the season timing and certainly be a very low value
-  logit(SIR_ini_mu[1,2]) ~ normal( logit(0.000002) , 0.7 ); // check in R: rnorm(2000,logit(0.000002),0.4) %>% inv_logit() %>% dens()
-  logit(SIR_ini_mu[1,1]) ~ normal( logit(0.85) , 0.2 ); // check in R: rnorm(2000,logit(0.85),0.2) %>% inv_logit() %>% dens()
-  logit(SIR_ini_mu[1,3]) ~ normal( logit(0.15) , 0.2 ); // check in R: rnorm(2000,logit(0.0015),0.4) %>% inv_logit() %>% dens()
+  logit(SIR_ini_mu[2]) ~ normal( logit(0.000003) , prior_sigma_i ); // check in R: rnorm(2000,logit(0.000002),0.4) %>% inv_logit() %>% dens()
+  logit(SIR_ini_mu[1]) ~ normal( logit(0.77) , prior_sigma_s ); // check in R: rnorm(2000,logit(0.85),0.2) %>% inv_logit() %>% dens()
+  // logit(SIR_ini_mu[1,3]) ~ normal( logit(0.15) , 0.2 ); // check in R: rnorm(2000,logit(0.0015),0.4) %>% inv_logit() %>% dens()
   
-  logit(reciprocal_phi) ~ normal( logit(0.99) , 0.1 ); // check in R: rnorm(2000,logit(0.99),0.1) %>% inv_logit() %>% dens()
+  // logit(reciprocal_phi) ~ normal( logit(0.05) , 0.1 ); // check in R: rnorm(2000,logit(0.99),0.1) %>% inv_logit() %>% dens()
   
   // priors on dispersion parameters
-  sigma_prop_ili       ~ exponential(0.5); // parameter is the exponential RATE, so BIG numbers mean LOW mean
-  sigma_s              ~ exponential(0.5); // parameter is the exponential RATE, so BIG numbers mean low mean
-  sigma_i              ~ exponential(0.5); // parameter is the exponential RATE, so BIG numbers mean low mean
+  // sigma_prop_ili_age   ~ exponential(0.5); // parameter is the exponential RATE, so BIG numbers mean LOW mean
+  // sigma_prop_ili_season~ exponential(0.5); // parameter is the exponential RATE, so BIG numbers mean LOW mean
+  // sigma_i              ~ exponential(0.5); // parameter is the exponential RATE, so BIG numbers mean low mean
   
 }
 
@@ -398,8 +432,8 @@ generated quantities {
         gen_curr_R_u[a] = gen_prev_R_u[a] + delta_R_u - (delta_vax_j[daily_counter_proj[t-1],a]/n_daily_time_steps) * gen_prev_R_u[a] / (gen_prev_S_u[a] + gen_prev_R_u[a]);
         gen_curr_R_v[a] = gen_prev_R_v[a] + delta_R_v + (delta_vax_j[daily_counter_proj[t-1],a]/n_daily_time_steps) * gen_prev_R_u[a] / (gen_prev_S_u[a] + gen_prev_R_u[a]);
         //
-        curr_delta_ili_u[a] = (delta_infective_exposures_u * 1) * prop_ili_mu[a];
-        curr_delta_ili_v[a] = (delta_infective_exposures_v * (1-ve_ili_cond_inf) ) * prop_ili_mu[a];
+        curr_delta_ili_u[a] = (delta_infective_exposures_u * 1) * prop_ili[1,a];
+        curr_delta_ili_v[a] = (delta_infective_exposures_v * (1-ve_ili_cond_inf) ) * prop_ili[ 1,a];
         curr_delta_ili_u_abs[a] = curr_delta_ili_u[a] * pop_age_group[a,1];
         curr_delta_ili_v_abs[a] = curr_delta_ili_v[a] * pop_age_group[a,1];
         
