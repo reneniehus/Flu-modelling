@@ -110,9 +110,9 @@ generate_ili_epi_test= function(par,stan_list){
       # initiate the compartments based on current season\
       # S I R initial values age dist corrected
       for(a in 1:n_age_groups){
-        S_u[t,a] = SIR_ini[season_id_day[t], 1] * pop_age_group[a, 1] / pop # rescaling 
-        I_u[t,a] = SIR_ini[season_id_day[t], 2] * pop_age_group[a, 1] / pop # rescaling
-        R_u[t,a] = SIR_ini[season_id_day[t], 3] * pop_age_group[a, 1] / pop # rescaling
+        S_u[t,a] = SIR_ini[season_id_day[t], 1] # * pop_age_group[a, 1] / pop # rescaling 
+        I_u[t,a] = SIR_ini[season_id_day[t], 2] # * pop_age_group[a, 1] / pop # rescaling
+        R_u[t,a] = SIR_ini[season_id_day[t], 3] # * pop_age_group[a, 1] / pop # rescaling
         S_v[t,a] = 0  # at start of season, no one is vaccinated
         I_v[t,a] = 0  # at start of season, no one is vaccinated
         R_v[t,a] = 0  # at start of season, no one is vaccinated
@@ -120,8 +120,8 @@ generate_ili_epi_test= function(par,stan_list){
       
     } else {
       for(a in 1:n_age_groups){  
-        delta_infective_exposures_u = beta * S_u[t-1,a]  * sum(contact_matrix[ , a] * ( I_u[t-1,]*1 + I_v[t-1,]*(1-ve_spread)) )
-        delta_infective_exposures_v = beta * S_v[t-1,a]  * sum(contact_matrix[ , a] * ( I_u[t-1,]*1 + I_v[t-1,]*(1-ve_spread)) ) * (1 - ve_inf)
+        delta_infective_exposures_u = beta * S_u[t-1,a]  * sum( contact_matrix[ ,a] * ( I_u[t-1,]*1 + I_v[t-1,]*(1-ve_spread)) )
+        delta_infective_exposures_v = beta * S_v[t-1,a]  * sum( contact_matrix[ ,a] * ( I_u[t-1,]*1 + I_v[t-1,]*(1-ve_spread)) ) * (1 - ve_inf)
         
         delta_S_u = -delta_infective_exposures_u
         delta_S_v = -delta_infective_exposures_v
@@ -130,12 +130,18 @@ generate_ili_epi_test= function(par,stan_list){
         delta_R_u = I_u[t-1,a]*rate_infectious
         delta_R_v = I_v[t-1,a]*rate_infectious 
         
-        S_u[t,a] = S_u[t-1,a] + delta_S_u - data.frame(delta_vax)[t-1,a] * S_u[t-1,a] #/ (S_u[t-1,a] + R_u[t-1,a])
-        S_v[t,a] = S_v[t-1,a] + delta_S_v + data.frame(delta_vax)[t-1,a] * S_u[t-1,a] #/ (S_u[t-1,a] + R_u[t-1,a])
+        # infection
+        S_u[t,a] = S_u[t-1,a] + delta_S_u 
+        S_v[t,a] = S_v[t-1,a] + delta_S_v 
         I_u[t,a] = I_u[t-1,a] + delta_I_u
         I_v[t,a] = I_v[t-1,a] + delta_I_v
-        R_u[t,a] = R_u[t-1,a] + delta_R_u - data.frame(delta_vax)[t-1,a] * R_u[t-1,a] #/ (S_u[t-1,a] + R_u[t-1,a])
-        R_v[t,a] = R_v[t-1,a] + delta_R_v + data.frame(delta_vax)[t-1,a] * R_u[t-1,a] #/ (S_u[t-1,a] + R_u[t-1,a])
+        R_u[t,a] = R_u[t-1,a] + delta_R_u
+        R_v[t,a] = R_v[t-1,a] + delta_R_v 
+        # vaccination
+        S_u[t,a] = S_u[t,a] - data.frame(delta_vax)[t,a] * S_u[t,a] 
+        S_v[t,a] = S_v[t,a] + data.frame(delta_vax)[t,a] * S_u[t,a] 
+        R_u[t,a] = R_u[t,a] - data.frame(delta_vax)[t,a] * R_u[t,a] 
+        R_v[t,a] = R_v[t,a] + data.frame(delta_vax)[t,a] * R_u[t,a] 
         
         delta_ili[t,a] = (delta_infective_exposures_u * 1 + delta_infective_exposures_v * (1-ve_ili_cond_inf) ) * prop_ili[season_id_day[t], a]
         delta_ili_abs[t,a] = delta_ili[t,a] * pop_age_group[a,1]

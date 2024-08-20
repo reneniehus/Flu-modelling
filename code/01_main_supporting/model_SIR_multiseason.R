@@ -1,10 +1,11 @@
-fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide) {
+fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_short_input) {
   
   # initiate output list
   mout=list()
   
   # compile the stan model 
   m <- stan_model(file=mod_path)
+  browser()
   # run the model fit
   if (T) {
     start_time <- Sys.time()
@@ -21,7 +22,7 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide) {
     ) # 
     end_time <- Sys.time(); end_time - start_time
   } # 1.6 min
-  
+  browser()
   # plot the fit against fitted data
   modelled_fit = fit00 %>% gather_draws(gen_ili_obs_fit_sum[n]) %>% 
     filter(.draw%in%c(1:20)) %>% # filter a number of posterior draws
@@ -39,11 +40,12 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide) {
     group_by(date=date_wed,scen) %>%
     mutate(mean_value = mean(.value)) %>%
     ungroup()
-    
+  browser()
   p1 = modelled_fit %>% ggplot(aes(date,age_total)) + geom_line() + 
     geom_line(aes(y=mean_value),col="lightblue") +
     geom_line(data=modelled_proj,aes(col=as.factor(scen),y=mean_value)) +
-    coord_cartesian(ylim = c(0,2*modelled_fit$age_total %>% max(na.rm=T))) ; p1
+    coord_cartesian(ylim = c(0,2*modelled_fit$age_total %>% max(na.rm=T))) +
+    labs(subtitle = paste( EU_long(country_short_input)," (",country_short_input,")") ); p1
   
   
   if (F) source("code/01_main_supporting/old_stan_fit_code.R")
@@ -163,7 +165,7 @@ wrangle_fit_df = function(params,data,all_season_country,country_short_input,tar
 } 
 
 # computing a list with all input required by the model
-make_stan_list = function(params,data,all_season_fit_wide,country_short_input,vax_country,pop_country){
+make_stan_list = function(params,data,all_season_fit_wide,country_short_input,vax_country,pop_country,age_collapse="all"){
   # helpers for the dataframes
   start_year = year(today())
   season     = paste0(start_year,"/",start_year+1)
@@ -292,19 +294,19 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
   stan_list$n_ili_obs_notna = rowsum(x=stan_list$ili_obs_notna,group=stan_list$season_id_week,na.rm = T) %>% rowSums()
   stan_list$weight_obs_epi =  1.0 #1/mean( stan_list$n_ili_obs_notna ) 
   stan_list$weight_cum_ili =  1.0 # 
-  
   ###################################################################
   
   ### for debugging: make it 2 age groups: <65 and above
-  if (F) {
+  if (age_collapse=="two") {
     stan_list$n_age_groups = 2
     stan_list$contact_matrix = matrix(data=c(1,1,1,1),nrow=2,ncol=2)
-    stan_list$pop_age_group = c(sum(stan_list$pop_age_group[1:3,1]),stan_list$pop_age_group[4,1])
-    stan_list$ili_obs_fit =  all_season_fit_wide %>% transmute(
+    stan_list$pop_age_group = matrix(data=c(sum(stan_list$pop_age_group[1:3,1]),stan_list$pop_age_group[4,1]),
+                                            nrow=2,ncol=1)
+    stan_list$ili_obs_fit =  stan_list$ili_obs_fit %>% transmute(
       age_1=replace_na(age_00_04+age_05_14+age_15_64,0) %>% as.integer(),
       age_2=replace_na(age_65_99,0) %>% as.integer()
     )
-    stan_list$ili_obs_notna = all_season_fit_wide %>% transmute(
+    stan_list$ili_obs_notna = stan_list$ili_obs_notna %>% transmute(
       age_1=as.integer((age_00_04+age_05_14+age_15_64)==3),
       age_2=as.integer((age_65_99)==1)
     )
@@ -320,7 +322,7 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
       transmute(age_1=rowSums(across(age_00_04:age_15_64)), age_2=age_65_99)
   }
   ### for debugging: make it 1 age group
-  if (T) {
+  if (age_collapse=="one") {
     stan_list$n_age_groups = 1
     stan_list$contact_matrix = matrix(data=c(1),nrow=1,ncol=1)
     stan_list$pop_age_group = matrix(c(pop_country) ,nrow=1,ncol=1)

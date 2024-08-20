@@ -94,8 +94,8 @@ transformed parameters {
   array[n_week_fit,n_age_groups] real<lower=0> delta_ili_abs_weekly; // ili/detectable incidence in absolute numbers, weekly aggregate
   vector[n_season] cum_ili_log ; // to store the sum of ili for each season
   real phi; // dispersion parameter of the observeation process, var=mu+reciprocal_phi*mu^2
-  simplex[3] SIR_ini[n_season, 1]; // how to access: SIR_ini[season,age,compartment] // S I R initial values per season, 1 can be replaced by n_age_groups
-  real<lower=0> prop_ili[n_season, 1]; // proportion of infections that are ili 
+  simplex[3] SIR_ini[n_season, n_age_groups]; // how to access: SIR_ini[season,age,compartment] // S I R initial values per season, 1 can be replaced by n_age_groups
+  real<lower=0> prop_ili[n_season, n_age_groups]; // proportion of infections that are ili 
   phi = 1 / reciprocal_phi; // dispersion parameter: var=mu+reciprocal_phi*mu^2
   for (s in 1:n_season) cum_ili_log[ s ] = 0 ; // reset the counter
   
@@ -153,9 +153,9 @@ transformed parameters {
       if ( season_start[curr_day]==1 && daily_daystart_fit[t]==1 ){
         // initiate the compartments based on current country/season/agegroup
         for(a in 1:n_age_groups){
-          curr_S_u[a] = SIR_ini[season_id_day[curr_day], 1, 1] * pop_age_group[a, 1] / pop; // rescaling
-          curr_I_u[a] = SIR_ini[season_id_day[curr_day], 1, 2] * pop_age_group[a, 1] / pop; // rescaling
-          curr_R_u[a] = SIR_ini[season_id_day[curr_day], 1, 3] * pop_age_group[a, 1] / pop; // rescaling
+          curr_S_u[a] = SIR_ini[season_id_day[curr_day], 1, 1] ; 
+          curr_I_u[a] = SIR_ini[season_id_day[curr_day], 1, 2] ; 
+          curr_R_u[a] = SIR_ini[season_id_day[curr_day], 1, 3] ; 
           curr_S_v[a] = 0;  // at start of season, no one is vaccinated
           curr_I_v[a] = 0;  // at start of season, no one is vaccinated
           curr_R_v[a] = 0;  // at start of season, no one is vaccinated
@@ -185,13 +185,18 @@ transformed parameters {
         delta_R_u = prev_I_u[a]*rate_infectious*dt;
         delta_R_v = prev_I_v[a]*rate_infectious*dt;
         
-        //
-        curr_S_u[a] = prev_S_u[a] + delta_S_u - (delta_vax[daily_counter_fit[t-1],a]/n_daily_time_steps) * prev_S_u[a] / (prev_S_u[a] + prev_R_u[a]);
-        curr_S_v[a] = prev_S_v[a] + delta_S_v + (delta_vax[daily_counter_fit[t-1],a]/n_daily_time_steps) * prev_S_u[a] / (prev_S_u[a] + prev_R_u[a]);
+        // infection
+        curr_S_u[a] = prev_S_u[a] + delta_S_u ;
+        curr_S_v[a] = prev_S_v[a] + delta_S_v ;
         curr_I_u[a] = prev_I_u[a] + delta_I_u;
         curr_I_v[a] = prev_I_v[a] + delta_I_v;
-        curr_R_u[a] = prev_R_u[a] + delta_R_u - (delta_vax[daily_counter_fit[t-1],a]/n_daily_time_steps) * prev_R_u[a] / (prev_S_u[a] + prev_R_u[a]);
-        curr_R_v[a] = prev_R_v[a] + delta_R_v + (delta_vax[daily_counter_fit[t-1],a]/n_daily_time_steps) * prev_R_u[a] / (prev_S_u[a] + prev_R_u[a]);
+        curr_R_u[a] = prev_R_u[a] + delta_R_u;
+        curr_R_v[a] = prev_R_v[a] + delta_R_v;
+        // vaccination
+        curr_S_u[a] = curr_S_u[a] - (delta_vax[daily_counter_fit[t-1],a]/n_daily_time_steps) * curr_S_u[a] / (1);
+        curr_S_v[a] = curr_S_v[a] + (delta_vax[daily_counter_fit[t-1],a]/n_daily_time_steps) * curr_S_u[a] / (1);
+        curr_R_u[a] = curr_R_u[a] - (delta_vax[daily_counter_fit[t-1],a]/n_daily_time_steps) * curr_R_u[a] / (1);
+        curr_R_v[a] = curr_R_v[a] + (delta_vax[daily_counter_fit[t-1],a]/n_daily_time_steps) * curr_R_u[a] / (1);
         //
         curr_delta_ili[a] = (delta_infective_exposures_u * 1 + delta_infective_exposures_v * (1-ve_ili_cond_inf) ) * prop_ili[ season_id_day[daily_counter_fit[t]], a ];
         curr_delta_ili_abs[a] = curr_delta_ili[a] * pop_age_group[a,1];
@@ -425,12 +430,19 @@ generated quantities {
         delta_R_u = gen_prev_I_u[a]*rate_infectious*dt;
         delta_R_v = gen_prev_I_v[a]*rate_infectious*dt;
         //
-        gen_curr_S_u[a] = gen_prev_S_u[a] + delta_S_u - (delta_vax_j[daily_counter_proj[t-1],a]/n_daily_time_steps) * gen_prev_S_u[a] / (gen_prev_S_u[a] + gen_prev_R_u[a]);
-        gen_curr_S_v[a] = gen_prev_S_v[a] + delta_S_v + (delta_vax_j[daily_counter_proj[t-1],a]/n_daily_time_steps) * gen_prev_S_u[a] / (gen_prev_S_u[a] + gen_prev_R_u[a]);
+        // infection
+        gen_curr_S_u[a] = gen_prev_S_u[a] + delta_S_u ;
+        gen_curr_S_v[a] = gen_prev_S_v[a] + delta_S_v ;
         gen_curr_I_u[a] = gen_prev_I_u[a] + delta_I_u;
         gen_curr_I_v[a] = gen_prev_I_v[a] + delta_I_v;
-        gen_curr_R_u[a] = gen_prev_R_u[a] + delta_R_u - (delta_vax_j[daily_counter_proj[t-1],a]/n_daily_time_steps) * gen_prev_R_u[a] / (gen_prev_S_u[a] + gen_prev_R_u[a]);
-        gen_curr_R_v[a] = gen_prev_R_v[a] + delta_R_v + (delta_vax_j[daily_counter_proj[t-1],a]/n_daily_time_steps) * gen_prev_R_u[a] / (gen_prev_S_u[a] + gen_prev_R_u[a]);
+        gen_curr_R_u[a] = gen_prev_R_u[a] + delta_R_u;
+        gen_curr_R_v[a] = gen_prev_R_v[a] + delta_R_v;
+        // vaccination
+        gen_curr_S_u[a] = gen_curr_S_u[a] - (delta_vax_j[daily_counter_proj[t-1],a]/n_daily_time_steps) * gen_curr_S_u[a] / (1);
+        gen_curr_S_v[a] = gen_curr_S_v[a] + (delta_vax_j[daily_counter_proj[t-1],a]/n_daily_time_steps) * gen_curr_S_u[a] / (1);
+        gen_curr_R_u[a] = gen_curr_R_u[a] - (delta_vax_j[daily_counter_proj[t-1],a]/n_daily_time_steps) * gen_curr_R_u[a] / (1);
+        gen_curr_R_v[a] = gen_curr_R_v[a] + (delta_vax_j[daily_counter_proj[t-1],a]/n_daily_time_steps) * gen_curr_R_u[a] / (1);
+        
         //
         curr_delta_ili_u[a] = (delta_infective_exposures_u * 1) * prop_ili[1,a];
         curr_delta_ili_v[a] = (delta_infective_exposures_v * (1-ve_ili_cond_inf) ) * prop_ili[ 1,a];

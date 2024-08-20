@@ -35,5 +35,34 @@ if (F) source("code/03_special_analyses/exploring_SIR/SIR_paras_explore.R") # ex
 if (F) source("code/03_special_analyses/forecasting/norrsken.R") # forecasting modelling
 
 # (temporary code for any quick checking)
-models_out$figs_prefit$fit_seasons_countries
-models_out$other$IT$plot_fit
+# models_out$figs_prefit$fit_seasons_countries
+# models_out$other$IT$plot_fit
+models_out$other$DK$plot_fit
+
+
+# 4 age groups
+stan_list$contact_matrix = matrix(data=rep(4,each=16),nrow=4)
+stan_list = generate_ili_epi_test(par = c(NA),stan_list)
+stan_list$ili_obs_fit %>% sum() # 6376188 (2 age groups, no noise)
+
+# 2 age groups
+stan_list = make_stan_list(params,data,all_season_fit_wide,country_short_input,vax_country,pop_country,age_collapse="two")
+stan_list$contact_matrix = matrix(data=c(1/2,1/2,1/2,1/2),nrow=2)
+stan_list$delta_vax = stan_list$delta_vax*0 
+stan_list$pop_age_group = stan_list$pop_age_group*0 + stan_list$pop/2
+stan_list = generate_ili_epi_test(par = c(NA),stan_list)
+stan_list$n_age_groups
+stan_list$contact_matrix
+x2 = stan_list$ili_obs_fit
+stan_list$ili_obs_fit %>% sum() # 8385366
+
+# 1 age groups
+stan_list = make_stan_list(params,data,all_season_fit_wide,country_short_input,vax_country,pop_country,age_collapse="one")
+stan_list$delta_vax = stan_list$delta_vax*0 
+stan_list$pop_age_group
+stan_list = generate_ili_epi_test(par = c(NA),stan_list)
+stan_list$n_age_groups
+stan_list$contact_matrix
+x1 = stan_list$ili_obs_fit
+stan_list$ili_obs_fit %>% sum() # 8385360
+

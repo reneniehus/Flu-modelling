@@ -25,14 +25,17 @@ run_flu_models = function( params=NULL , data=NULL ){
     all_season = data_into_all_season(data,params,withforce=F); df_out$figs_prefit$fit_seasons_countries <- plot_add_season(all_season)
     contacts = transform_contracts(data,params) # transform the contact matrixes for model requirements
     target_input_v = params$SIR_simple_multi_season$target
-    country_short_input_v = all_season %>% filter_log(ili_plus_sum>0) %>% pull(country_short) %>% unique()
+    country_short_input_v = all_season %>% 
+      filter(season%in%params$SIR_multiseason$seasons_include, ili_plus_sum>0) %>% group_by(country_short) %>% 
+      mutate(n_season=n()) %>% filter(n_season==3) %>% 
+      pull(country_short) %>% unique()
     
-    modl = list()
+    modl <<- list()
     
     # ---- |-Run model for each country ----
     target_input=target_input_v[1]
     country_short_input_v = country_short_input_v # params$run_countries # c("IT","AT")
-    for (country_short_input in country_short_input_v ) { # country_short_input="IT"
+    for (country_short_input in country_short_input_v[5] ) { # country_short_input="IT"
       # ---- |-Prepare country specific data ----
       pop_country = data$demography_respicast$population_pyramid %>% 
         filter(country==EU_long(country_short_input)) %>% pull(population) %>% sum()
@@ -53,12 +56,12 @@ run_flu_models = function( params=NULL , data=NULL ){
       # ---- |-Fit ----
       if (F) fitout=fit_with_eabc(params,stan_list)
       mod_path='./stan/SIR_multiseason_age_vax.stan'
-      if (T) fitout=fit_with_stan(params,stan_list,mod_path=mod_path,all_season_fit_wide)
+      if (T) fitout=fit_with_stan(params,stan_list,mod_path=mod_path,all_season_fit_wide,country_short_input)
       
       save(fitout,stan_list,file = path_fit)
       pr=paste("> Fitting:",target_input,"for",country_short_input,"Done \n"); cleancat(green(pr))
       
-      modl[[country_short_input]] = fitout
+      modl[[country_short_input]] <<- fitout
     }
     end_time <- Sys.time() # 
     
