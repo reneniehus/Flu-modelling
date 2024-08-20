@@ -43,6 +43,7 @@ data {
   real<lower=0> prior_sigma_prop_ili;
   real<lower=0> prior_sigma_i; 
   real<lower=0> prior_sigma_s;
+  real<lower=0> sigma_prop_ili_age;
   //
   real weight_obs_epi; // give a weight to the observed epi likelihood
   real weight_cum_ili; // give a weight to the observed cumulative burden likelihood
@@ -70,7 +71,7 @@ parameters {
   real<lower=0> prop_ili_mu; // overall mean over season
   
   // real prop_ili_season[n_season];
-  // real prop_ili_age[n_age_groups];
+  real prop_ili_age[n_age_groups];
   
   // dispersion parameters
   // real<lower=0> sigma_prop_ili_age;
@@ -89,6 +90,7 @@ transformed parameters {
   matrix<lower=0, upper=1>[n_day_fit,n_age_groups] S_v; // susceptible compartment, relative to population size, vaccinated
   matrix<lower=0, upper=1>[n_day_fit,n_age_groups] I_v; // infetious compartment,   relative to population size, vaccinated
   matrix<lower=0, upper=1>[n_day_fit,n_age_groups] R_v; // recovered compartment,   relative to population size, vaccinated
+  matrix<lower=0, upper=1>[n_season,n_age_groups] ar; // attack rate
   array[n_day_fit,n_age_groups] real<lower=0> delta_ili; // ili/detectable incidence relative to population size
   array[n_day_fit,n_age_groups] real<lower=0> delta_ili_abs; // ili/detectable incidence in absolute numbers
   array[n_week_fit,n_age_groups] real<lower=0> delta_ili_abs_weekly; // ili/detectable incidence in absolute numbers, weekly aggregate
@@ -99,13 +101,16 @@ transformed parameters {
   phi = 1 / reciprocal_phi; // dispersion parameter: var=mu+reciprocal_phi*mu^2
   for (s in 1:n_season) cum_ili_log[ s ] = 0 ; // reset the counter
   
+  
   // --------------------------------parameter hierarchical architecture
   for (s in 1:n_season) { // season effect
   for (a in 1:n_age_groups) { // age effect
   SIR_ini[s,a,1] = SIR_ini_mu[1] * 1 * 1; // S
   SIR_ini[s,a,2] = SIR_ini_mu[2] * 1 * 1; // I // * 2^(i_season[s]) *2^(i_age[a])
   SIR_ini[s,a,3] = SIR_ini_mu[3] * 1 * 1; // R // 2^(r_season[s]) *2^(r_age[a])
-  prop_ili[s,a]  = prop_ili_mu   * 1 * 1; // 2^(prop_ili_season[s]) *2^(prop_ili_age[a])
+  prop_ili[s,a]  = prop_ili_mu   * 1 * 2^(prop_ili_age[a]); // 2^(prop_ili_season[s]) *2^(prop_ili_age[a])
+  
+  ar[s,a] = 0 ; // set attack rate to zero
   }
   }
   
@@ -177,29 +182,31 @@ transformed parameters {
         //
         delta_infective_exposures_u = dt * beta * prev_S_u[a] * sum(to_vector(contact_matrix[ : , a]') .* (to_vector(prev_I_u)*1 + to_vector(prev_I_v)*(1-ve_spread)) );
         delta_infective_exposures_v = dt * beta * prev_S_v[a] * sum(to_vector(contact_matrix[ : , a]') .* (to_vector(prev_I_u)*1 + to_vector(prev_I_v)*(1-ve_spread)) ) * (1 - ve_inf);
-        //
+        // compute changes due to infections and curing
         delta_S_u = -delta_infective_exposures_u;
         delta_S_v = -delta_infective_exposures_v;
         delta_I_u = delta_infective_exposures_u - prev_I_u[a] * rate_infectious*dt;
         delta_I_v = delta_infective_exposures_v - prev_I_v[a] * rate_infectious*dt;
         delta_R_u = prev_I_u[a]*rate_infectious*dt;
         delta_R_v = prev_I_v[a]*rate_infectious*dt;
-        
-        // infection
+        // apply infection/curing changes
         curr_S_u[a] = prev_S_u[a] + delta_S_u ;
         curr_S_v[a] = prev_S_v[a] + delta_S_v ;
         curr_I_u[a] = prev_I_u[a] + delta_I_u;
         curr_I_v[a] = prev_I_v[a] + delta_I_v;
         curr_R_u[a] = prev_R_u[a] + delta_R_u;
         curr_R_v[a] = prev_R_v[a] + delta_R_v;
-        // vaccination
+        // after that, apply vaccination
         curr_S_u[a] = curr_S_u[a] - (delta_vax[daily_counter_fit[t-1],a]/n_daily_time_steps) * curr_S_u[a] / (1);
         curr_S_v[a] = curr_S_v[a] + (delta_vax[daily_counter_fit[t-1],a]/n_daily_time_steps) * curr_S_u[a] / (1);
         curr_R_u[a] = curr_R_u[a] - (delta_vax[daily_counter_fit[t-1],a]/n_daily_time_steps) * curr_R_u[a] / (1);
         curr_R_v[a] = curr_R_v[a] + (delta_vax[daily_counter_fit[t-1],a]/n_daily_time_steps) * curr_R_u[a] / (1);
-        //
+        // 
         curr_delta_ili[a] = (delta_infective_exposures_u * 1 + delta_infective_exposures_v * (1-ve_ili_cond_inf) ) * prop_ili[ season_id_day[daily_counter_fit[t]], a ];
         curr_delta_ili_abs[a] = curr_delta_ili[a] * pop_age_group[a,1];
+        
+        // update attack rate
+        ar[ season_id_day[curr_day], a ] = ar[ season_id_day[curr_day], a ] + (delta_infective_exposures_u+delta_infective_exposures_v);
         
         // Only store once per day
         if ( daily_daystart_fit[t]==1 ) { 
@@ -218,6 +225,7 @@ transformed parameters {
           }
           //
         }
+        
       } // through age groups
       }
       // Update previous values with current values for next iteration
@@ -230,6 +238,8 @@ transformed parameters {
       
       prev_delta_ili = curr_delta_ili;
       prev_delta_ili_abs = curr_delta_ili_abs;
+      
+      
       
     } // end of multi-daily loop
     
@@ -280,14 +290,15 @@ model {
   // target += normal_lpdf( prop_ili_season | 0 , 0.0001 ) ;
   
   
-  target += normal_lpdf( log(prop_ili_mu) | log(0.10) , prior_sigma_prop_ili );// check in R: rnorm(2000,logit(0.1), 3) %>% inv_logit() %>% dens()
+  // target += normal_lpdf( log(prop_ili_mu) | log(0.10) , prior_sigma_prop_ili );// check in R: rnorm(2000,logit(0.1), 3) %>% inv_logit() %>% dens()
   
   // prop_ili_season ~ normal( 0 , sigma_prop_ili_season);
-  // prop_ili_age ~    normal( 0 , sigma_prop_ili_age);
+  prop_ili_age ~    normal( 0 , sigma_prop_ili_age);
   
   // I_ini determined the season timing and certainly be a very low value
-  logit(SIR_ini_mu[2]) ~ normal( logit(0.000003) , prior_sigma_i ); // check in R: rnorm(2000,logit(0.000002),0.4) %>% inv_logit() %>% dens()
-  logit(SIR_ini_mu[1]) ~ normal( logit(0.77) , prior_sigma_s ); // check in R: rnorm(2000,logit(0.85),0.2) %>% inv_logit() %>% dens()
+  // logit(SIR_ini_mu[2]) ~ normal( logit(0.000003) , prior_sigma_i ); // check in R: rnorm(2000,logit(0.000002),0.4) %>% inv_logit() %>% dens()
+  // logit(SIR_ini_mu[1]) ~ normal( logit(0.77) , prior_sigma_s ); // check in R: rnorm(2000,logit(0.85),0.2) %>% inv_logit() %>% dens()
+  
   // logit(SIR_ini_mu[1,3]) ~ normal( logit(0.15) , 0.2 ); // check in R: rnorm(2000,logit(0.0015),0.4) %>% inv_logit() %>% dens()
   
   // logit(reciprocal_phi) ~ normal( logit(0.05) , 0.1 ); // check in R: rnorm(2000,logit(0.99),0.1) %>% inv_logit() %>% dens()

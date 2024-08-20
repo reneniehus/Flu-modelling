@@ -5,7 +5,7 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
   
   # compile the stan model 
   m <- stan_model(file=mod_path)
-  browser()
+  
   # run the model fit
   if (T) {
     start_time <- Sys.time()
@@ -14,39 +14,63 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
       algorithm = "meanfield", # variational inference algorithm
       grad_samples=5 , # samples to determine the gradient ( 2 is slower than 5, )
       tol_rel_obj = 0.01,
-      iter=1000, # 
+      iter=50000, # 
       output_samples = 500,
-      #chains=2, thin=2, iter=300, # a "long run" 
+      # chains=4, # thin=2, iter=300, # a "long run" 
       seed=12, # seed for pseudo-random numbers to ensure reproducibility
       data=stan_list # data input into the model
     ) # 
     end_time <- Sys.time(); end_time - start_time
   } # 1.6 min
-  browser()
+  
   # plot the fit against fitted data
   modelled_fit = fit00 %>% gather_draws(gen_ili_obs_fit_sum[n]) %>% 
-    filter(.draw%in%c(1:20)) %>% # filter a number of posterior draws
+    filter(.draw%in%c(1:100)) %>% # filter a number of posterior draws
     select(-.chain,-.iteration) %>% ungroup() %>% 
-    right_join( stan_list$all_season_fit %>% mutate(age_total = stan_list$ili_obs_fit$age_1 ),
-                by = join_by(n)) %>%
-    group_by(date) %>%
-    mutate(mean_value = mean(.value)) %>%
-    ungroup()
+    group_by(n) %>% summarise(mean_value = mean(.value)) %>% ungroup() %>% 
+    right_join( stan_list$all_season_fit,
+                by = join_by(n)) 
   modelled_proj = fit00 %>% gather_draws(gen_ili_t_obs_project_sum[scen,week_id]) %>% 
-    filter(.draw%in%c(1:50)) %>%
+    filter(.draw%in%c(1:100)) %>%
     select(-.chain,-.iteration) %>% ungroup() %>% 
+    group_by(scen,week_id) %>% summarise(mean_value = mean(.value)) %>% ungroup() %>% 
     right_join( stan_list$all_season_project ,
-                by = join_by(week_id)) %>% 
-    group_by(date=date_wed,scen) %>%
-    mutate(mean_value = mean(.value)) %>%
-    ungroup()
-  browser()
+                by = join_by(week_id)) %>% mutate(date=date_mon)
   p1 = modelled_fit %>% ggplot(aes(date,age_total)) + geom_line() + 
     geom_line(aes(y=mean_value),col="lightblue") +
     geom_line(data=modelled_proj,aes(col=as.factor(scen),y=mean_value)) +
-    coord_cartesian(ylim = c(0,2*modelled_fit$age_total %>% max(na.rm=T))) +
     labs(subtitle = paste( EU_long(country_short_input)," (",country_short_input,")") ); p1
   
+  # age split version
+  obs_data = stan_list$ili_obs_fit %>% mutate(n=1:n(),date=stan_list$ili_obs_fit_date) %>% 
+    pivot_longer(cols=1:stan_list$n_age_groups,names_to = "age") %>% 
+    mutate(age=as.factor(age) %>% as.numeric())
+  modelled_fit = fit00 %>% gather_draws(gen_ili_obs_fit[n,age]) %>% 
+    filter(.draw%in%c(1:100)) %>% # filter a number of posterior draws
+    select(-.chain,-.iteration) %>% ungroup() %>% 
+    group_by(n,age) %>% summarise(mean_value = mean(.value)) %>% ungroup() %>% 
+    left_join(obs_data,by=c("n","age"))
+  
+  proj_df = stan_list$all_season_project %>% select(country_short,week_id,date=date_wed)
+  modelled_proj = fit00 %>% gather_draws(gen_ili_t_obs_project[scen,week_id,age]) %>% 
+    filter(.draw%in%c(1:100)) %>%
+    select(-.chain,-.iteration) %>% ungroup() %>% 
+    group_by(week_id,age,scen) %>% summarise(mean_value = mean(.value)) %>% ungroup() %>% 
+    left_join( proj_df, by=join_by(week_id)  )
+  
+  p2 = modelled_fit %>% ggplot(aes(date,value)) + geom_line() + 
+    geom_line(aes(y=mean_value),col="lightblue") +
+    geom_line(data=modelled_proj,aes(col=as.factor(scen),y=mean_value)) +
+    facet_wrap(~age,ncol=1,scales="free_y") +
+    labs(subtitle = paste( EU_long(country_short_input)," (",country_short_input,")") ); p2
+  
+  # extract parameters
+  df = NULL
+  mp="prop_ili_mu"; x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
+  mp="prop_ili"; x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x[1:stan_list$n_age_groups,])
+  mp="ar"; x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
+  mp="SIR_ini_mu"; x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
+  mp="cum_ili_log"; x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
   
   if (F) source("code/01_main_supporting/old_stan_fit_code.R")
   
@@ -58,6 +82,8 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
                                            stan_list$df_agegroups,
                                            stan_list$all_season_project)
   mout$plot_fit = p1
+  mout$plot_fit_byage = p2
+  mout$pars_df = df
   return(mout)
 }
 
@@ -266,10 +292,11 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
     # daily steps
     n_daily_time_steps = 1,
     # priors
-    sigma_cum_ili = 4,
+    sigma_cum_ili = 2,
     prior_sigma_prop_ili = 5,
     prior_sigma_i = 5,
-    prior_sigma_s = 2
+    prior_sigma_s = 2,
+    sigma_prop_ili_age = 1
   )
   # Add vaccination to Oct 1st to the oldest age group
   # for fitting
@@ -292,16 +319,16 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
   # summary targets
   stan_list$cum_ili_obs_log = rowsum(x=stan_list$ili_obs_fit,group=stan_list$season_id_week,na.rm = T) %>% rowSums() %>% log()
   stan_list$n_ili_obs_notna = rowsum(x=stan_list$ili_obs_notna,group=stan_list$season_id_week,na.rm = T) %>% rowSums()
-  stan_list$weight_obs_epi =  1.0 #1/mean( stan_list$n_ili_obs_notna ) 
+  stan_list$weight_obs_epi =  0.05 #1/mean( stan_list$n_ili_obs_notna ) 
   stan_list$weight_cum_ili =  1.0 # 
   ###################################################################
   
   ### for debugging: make it 2 age groups: <65 and above
   if (age_collapse=="two") {
     stan_list$n_age_groups = 2
-    stan_list$contact_matrix = matrix(data=c(1,1,1,1),nrow=2,ncol=2)
+    stan_list$contact_matrix = matrix(data=c(1/2,1/2,1/2,1/2),nrow=2,ncol=2)
     stan_list$pop_age_group = matrix(data=c(sum(stan_list$pop_age_group[1:3,1]),stan_list$pop_age_group[4,1]),
-                                            nrow=2,ncol=1)
+                                     nrow=2,ncol=1)
     stan_list$ili_obs_fit =  stan_list$ili_obs_fit %>% transmute(
       age_1=replace_na(age_00_04+age_05_14+age_15_64,0) %>% as.integer(),
       age_2=replace_na(age_65_99,0) %>% as.integer()
