@@ -293,27 +293,37 @@ load_flu_data_demography_respicast = function(data=data, params=NULL , regenerat
     if (new_from_online==T) {
       # load data freshly from the internet
       pop_df = NULL
+      pop_fine_df = NULL
       xlocations = read_csv(file="output/respicompass_locations.csv",show_col_types = F)
       country_v = xlocations$location_name
       for (country_i in country_v) {
         pr=paste("> Loading pop data for:",country_i,"... \n"); cat(green(pr))
         read_file=paste0("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/miscellaneous/population/",country_i,"_aggr.csv")
+        read_file_fine = paste0("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/miscellaneous/population/",country_i,".csv")
         xdf = read_csv(read_file,show_col_types = FALSE)
+        xdf_fine = read_csv(read_file_fine,show_col_types = FALSE)
         xdf$country = country_i
+        xdf_fine$country = country_i
         pop_df=rbind(pop_df,xdf)
+        pop_fine_df=rbind(pop_fine_df,xdf_fine)
       }
       pop_df = pop_df %>% select(country,age_group,population)
-      
       pop_df %>% write_csv("output/population_pyramid_respicast.csv")
+      
+      pop_fine_df = pop_fine_df %>% select(country,age_group,population)
+      pop_fine_df %>% write_csv("output/population_pyramid_fine_respicast.csv")
+      
     }
     if (new_from_online==F) {
       # load data from local storage
       pr=paste("Loading respicast demography data from disk ... \n"); cat(green(pr))
-      pop_df = read_csv("output/population_pyramid_respicast.csv",show_col_types = F) 
+      pop_df = read_csv("output/population_pyramid_respicast.csv",show_col_types = F)
+      pop_fine_df = read_csv("output/population_pyramid_fine_respicast.csv",show_col_types = F)
     }
     
     dat_demography = list(
-      population_pyramid = pop_df
+      population_pyramid = pop_df,
+      population_pyramid_fine = pop_fine_df
     )
     save(dat_demography,file="output/demography_respicast.Rdata")
     

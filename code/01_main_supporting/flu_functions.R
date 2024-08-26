@@ -180,8 +180,9 @@ data_into_all_season = function(data,params,withforce=F){
         tests_sentinel_quality = xtyping_sent %>% filter(indicator=="tests") %>% summarise(x=mean(value>5,na.rm=T)) %>% pull(x)
         ntests_nonsent = xtyping_nonsent%>% filter(indicator=="tests")%>% summarise(msum=sum(value,na.rm=T)) %>% pull(msum)
         tests_nonsentinel_quality = xtyping_nonsent %>% filter(indicator=="tests") %>% summarise(x=mean(value>5,na.rm=T)) %>% pull(x)
-        
         ili_plus_sum=x_iliplus %>% summarise(x=sum(value,na.rm=T)) %>% pull(x)
+        ili_plus_agesplit_sum=x_iliplus %>% filter(agegroup!="age_total") %>% summarise(x=sum(value,na.rm=T)) %>% pull(x)
+        
         ili_plus_quality=x_iliplus %>% summarise(x=mean(!is.na(value))) %>% pull(x)
         
         ## plotting
@@ -215,6 +216,7 @@ data_into_all_season = function(data,params,withforce=F){
           tests_nonsentinel=ntests_nonsent,
           tests_nonsentinel_quality=tests_nonsentinel_quality,
           ili_plus_sum=ili_plus_sum,
+          ili_plus_agesplit_sum=ili_plus_agesplit_sum,
           ili_plus_quality=ili_plus_quality,
           # nested dataframes
           nest(xinc_iliari) %>% rename(inc_iliari=data),
@@ -240,10 +242,9 @@ transform_contracts = function(data,params) {
   #stop("Implement the 5th age group!")
   contacts_normalized_all = list()
   
-  if (F){
-    xlocations = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/supporting-files/locations_iso2_codes.csv",show_col_types = F)
+  if (T){
+    xlocations = data$helpers_respicompass$iso2_code
     for (country_i in xlocations$location_name){ # country_i = xlocations$location_name[1]
-      stop("Check if population matrices below neeed to be transposed or not")
       
       # Load original contact matrix
       contacts_orig = data$contact[[country_i]]
@@ -252,8 +253,8 @@ transform_contracts = function(data,params) {
       }
       
       # Get population sizes
-      read_file=paste0("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/miscellaneous/population/",country_i,".csv")
-      x_pop = read_csv(read_file,show_col_types = FALSE)
+      x_pop = data$demography_respicast$population_pyramid_fin %>% 
+        filter(country==country_i)
       x_pop_vec = x_pop$population 
       x_pop_vec = c(x_pop_vec[1:16], sum(x_pop_vec[17:21]))
       
@@ -262,7 +263,7 @@ transform_contracts = function(data,params) {
       x_contacts = rbind(x_contacts, x_contacts[16,])
       contacts_orig = x_contacts
       
-      # Fix the contact matrix non-symmetry issue by taking the mean value of the two (taking population size into account, obviously)
+      # Fix the contact matrix non-symmetry issue by taking the mean value of the two (taking population size into account)
       contacts = NA*contacts_orig
       for (ii in 1:nrow(contacts_orig)){
         for (jj in 1:nrow(contacts_orig)){
@@ -313,7 +314,6 @@ transform_contracts = function(data,params) {
       # Get total mean number of contacts per person
       total_nr_contacts_per_person = sum( contacts_total_new[row(contacts_total_new)>=col(contacts_total_new)] ) / sum(x_pop_vec)
       
-      
       # Get a new contact matrix with only 4 age groups, such that average number of contacts per person equals to one
       x_new_pop = data$demography_respicast$population_pyramid %>% filter(country == country_i) %>% pull(population)
       x_pop_matrix = t(matrix(rep(x_new_pop,4), nrow=4))
@@ -322,17 +322,106 @@ transform_contracts = function(data,params) {
       # The new contact matrix where elements are per person contacts between age group i and j such that the (weighted) average number of contacts is 1
       contacts_normalized = contacts_total_new / (x_pop_matrix * total_nr_contacts_per_person)
       
+      # each column should sum to 1, so that each age group has 1 effective contact
+      for (a in 1:4) {
+        contacts_normalized[,a] = contacts_normalized[,a] / sum( contacts_normalized[,a] )
+      }
+      
+      
       contacts_normalized_all[[country_i]] = contacts_normalized
-      
-      
-      
     }
   }
   
-  contacts_normalized_all = as_tibble( matrix(1/5,5,5) )
+  # create EU average:
+  contacts_collect = contacts_normalized_all[[1]]*0
+  collect_counter = 0
+  for (country_i in names(contacts_normalized_all)) {
+    contacts_collect = contacts_collect + contacts_normalized_all[[country_i]]
+    collect_counter = collect_counter + 1
+  }
+  EU_contacts = contacts_collect / collect_counter
+  contacts_normalized_all[["EU"]] = EU_contacts
   
   return(contacts_normalized_all)
 }
+
+
+get_contact_matrix <- function( country_in, options ){
+  
+  if (length( country_in )!=1 ){
+    stop("country_in must be a single country")
+  }
+  
+  if ( options$contact_data == "prem_polymod_2023"){
+    
+    file_contact_data <- paste0( path_core_functions, 
+                                 "data/prem_extended_polymod/", country_in, "_2023.rds" )
+    contact_data <- readRDS( file_contact_data )
+    
+    A_symmetric <- diag( contact_data$x_pop ) %*% contact_data$A 
+    
+    x_pop_model <- rep( NA, 10 )
+    mat_transform <-  array( 0, c(length( contact_data$x_pop ), 10 ) )
+    
+    x_pop_model[1:3] <- contact_data$x_pop[1:3] 
+    mat_transform[ 1:3, 1:3 ] <- diag( rep( 1, 3 ))
+    
+    #15-17yrs = 3/5 * 15-19yrs
+    x_pop_model[ 4 ] <- 3/5*contact_data$x_pop[4] 
+    mat_transform[ 4, 4 ] <- 3/5
+    
+    #18-24yrs = 2/5 * 15-19yrs + 20-24yrs
+    x_pop_model[ 5 ] <- 2/5*contact_data$x_pop[4] + contact_data$x_pop[5]  
+    mat_transform[ 4:5 , 5 ] <- c( 2/5, 1 )
+    
+    #25-49yrs = 25-29yrs +  30-34yrs +  35-39yrs +  40-44yrs  + 45-49yrs 
+    x_pop_model[ 6 ] <- sum( contact_data$x_pop[6:10] ) 
+    mat_transform[ 6:10, 6 ] <- 1
+    
+    #50-59yrs = 50-54yrs +  55-59yrs 
+    x_pop_model[ 7 ] <- sum( contact_data$x_pop[11:12] )
+    mat_transform[ 11:12, 7 ] <- 1
+    
+    #60-69yrs = 60-64yrs +  65-69yrs 
+    x_pop_model[ 8 ] <- sum( contact_data$x_pop[13:14] )
+    mat_transform[ 13:14, 8 ] <- 1
+    
+    #
+    ratio_75to79yrs_over_75plus <- contact_data$x_pop_long[16]/contact_data$x_pop[16]
+    ratio_80plus_over_75plus <- contact_data$x_pop_long[17]/contact_data$x_pop[16]
+    
+    #70-79yrs =  70-74yrs + 75-79yrs 
+    x_pop_model[ 9 ] <- contact_data$x_pop[15] + ratio_75to79yrs_over_75plus * contact_data$x_pop[16]
+    mat_transform[ 15:16, 9 ] <- c( 1, ratio_75to79yrs_over_75plus )
+    ####
+    # x_pop_model[ 9 ] <- contact_data$x_pop_long[15] + contact_data$x_pop_long[16]
+    # mat_transform[ 15:16, 9 ] <- 1
+    
+    #80+yrs = 80+yrs
+    x_pop_model[ 10 ] <- ratio_80plus_over_75plus * contact_data$x_pop[16]
+    mat_transform[ 16, 10 ] <- ratio_80plus_over_75plus
+    ####
+    # x_pop_model[ 10 ] <- contact_data$x_pop_long[17]
+    # mat_transform[ 17, 10 ] <- 1
+    
+    #normalise
+    x_pop_model <- x_pop_model/sum( x_pop_model )
+    
+    A_sym_model <- t( mat_transform ) %*% A_symmetric %*% mat_transform
+    
+    mout <- list( A  = diag( 1/x_pop_model ) %*% A_sym_model, 
+                  pi_vec = x_pop_model )
+    
+    # names( mout ) <- country_in
+    
+  }else{
+    warning("Only 1 source for contact data implemented: prem_polymod_2023")
+  }
+  
+  return( mout )
+}
+# res_matrix <- get_contact_matrix( "Norway", tibble( contact_data="prem_polymod_2023") )
+
 
 squash_axis <- function(from, to, factor) { 
   # A transformation function that squashes the range of [from, to] by factor on a given axis 

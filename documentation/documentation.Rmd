@@ -14,15 +14,13 @@ library(fst)
 
 ## Introduction
 
-This document describes an age and vaccination dissaggregated SIR model. We are fitting the model to weekly ILI incidence multiplied by flu-positivity in that same week.
+This document describes an age and vaccination dissaggregated SIR model for influenza. We are fitting the model to weekly ILI incidence multiplied by flu-positivity in that same week.
 
 ## SIR
 
-We consider a population consisting of $N$ individuals. The population is divided into three compartments: the susceptible, infectious and removed compartments. Their sizes, at any time $t$ for an age class $j$, are denoted by $S^{(j)}(t)$, $I^{(j)}(t)$ and $R^{(j)}(t)$ respectively. We also use a community contact rate $\beta$. We let the rate of recovery be denoted $\gamma$.
+We consider a population consisting of $N$ individuals. The population is divided into three compartments: the susceptible, infectious and removed compartments. Their sizes, at any time $t$ for an age class $j$, are denoted by $S^{(j)}(t)$, $I^{(j)}(t)$ and $R^{(j)}(t)$ respectively. Subscript $u$ and $v$ are used to distinguish between the unvaccinated and vaccinated groups, respectively. We let $vax(t)$ be the fraction of new people being vaccinated on day $t$. We further let $ve_{inf}$, $ve_{susc}$ and $ve_{severe}$ be the vaccine efficacy in terms of infectiousness, susceptibility and severe disease.
 
-We use a contact matrix $C$, with elements $C_{i,j}$ being the average number of contacts an individual in age group $i$ has with individuals in age group $j$ within 24h.
-
-We let $vax(t)$ be the fraction of new people being vaccinated on day $t$. Subscript $u$ and $v$ are used to distinguish between the unvaccinated and vaccinated groups. We further let $ve_{inf}$, $ve_{susc}$ and $ve_{severe}$ be the vaccine efficacy in terms of infectiousness, susceptibility and severe disease.
+We also use a community contact rate $\beta$. We let the rate of recovery be denoted $\gamma$. We use a contact matrix $C$, with elements $C_{i,j}$ being the average number of contacts an individual in age group $i$ has with individuals in age group $j$ within 24h.
 
 The SIR model is specified as follows
 
@@ -44,7 +42,7 @@ R_{v}^{(j)}(t) & = R_{v}^{(j)}(t-1) + \gamma I_{v}^{(j)}(t - 1) + vax^{(j)}(t-1)
 
 \end{aligned}
 ```
-Interpretation of the first equation: Let's multiply both sides with the population size of the focus age group ($N^{(j)}$) to allow interpretation of this equation in terms of how the absolute number of susceptible, unvaccinated individuals of age group $j$ changes. The new number of susceptible, unvaccinated individuals of age group $j$ ($N^{(j)}S_u^{(j)}(t)$) is given through the number of such individuals in the previous time-step ($N_{j}S_u^{(j)}(t-1)$), minus those that were vaccinated and those that were infected.
+Interpretation of the first equation: Let's multiply both sides with the population size of the focus age group ($N^{(j)}$) to allow interpretation of this equation in terms of how the **absolute** number of susceptible, unvaccinated individuals of age group $j$ changes. The new number of susceptible, unvaccinated individuals of age group $j$ ($N^{(j)}S_u^{(j)}(t)$) is given through the number of such individuals in the previous time-step ($N_{j}S_u^{(j)}(t-1)$), minus those that were vaccinated and those that were infected.
 
 In particular, the number of newly vaccinated susceptible, unvaccinated individuals in $j$ is given by the total number of vaccinated individuals in $j$ in the last time-step ( $N^{(j)}vax^{(j)}(t-1)$ ) multiplied by the chance of a vaccination occurring in the susceptible as opposed to the recovered group of $j$ ( $\frac{S_u^{(j)}(t-1) }{S_u^{(j)}(t-1)+R_u^{(j)}(t-1)}$ ). Let's take a number example: There are 10 new individuals being vaccinated in the group 'young', and this group contains 40 susceptible, unvaccinated individuals as well as 100 recovered, unvaccinated individuals. Thus, 10 x 20/100=2 individuals of the group 'young' that are susceptible and unvaccinated are being vaccinated and therefore removed from this group.
 

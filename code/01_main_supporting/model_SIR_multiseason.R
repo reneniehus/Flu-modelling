@@ -1,69 +1,30 @@
-fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_short_input) {
+fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_short_input,m) {
   
   # initiate output list
   mout=list()
-  
-  # compile the stan model 
-  m <- stan_model(file=mod_path)
-  
   # run the model fit
+  fname = paste0("../Big data/fit",country_short_input,".Rdata")
   if (T) {
+    # compile the stan model 
     start_time <- Sys.time()
     fit00=rstan::vb(
       m,
       algorithm = "meanfield", # variational inference algorithm
       grad_samples=5 , # samples to determine the gradient ( 2 is slower than 5, )
-      tol_rel_obj = 0.01,
-      iter=50000, # 
-      output_samples = 500,
+      tol_rel_obj = 0.005,output_samples = 1000,iter=50000, # default=0.01, smaller means more strict with convergence
+      #tol_rel_obj = 0.02,output_samples = 400,iter=10000, # fast run
       # chains=4, # thin=2, iter=300, # a "long run" 
       seed=12, # seed for pseudo-random numbers to ensure reproducibility
       data=stan_list # data input into the model
     ) # 
     end_time <- Sys.time(); end_time - start_time
-  } # 1.6 min
-  
+    save(fit00,file = fname)
+  } # 
+  # load(file = fname)
   # plot the fit against fitted data
-  modelled_fit = fit00 %>% gather_draws(gen_ili_obs_fit_sum[n]) %>% 
-    filter(.draw%in%c(1:100)) %>% # filter a number of posterior draws
-    select(-.chain,-.iteration) %>% ungroup() %>% 
-    group_by(n) %>% summarise(mean_value = mean(.value)) %>% ungroup() %>% 
-    right_join( stan_list$all_season_fit,
-                by = join_by(n)) 
-  modelled_proj = fit00 %>% gather_draws(gen_ili_t_obs_project_sum[scen,week_id]) %>% 
-    filter(.draw%in%c(1:100)) %>%
-    select(-.chain,-.iteration) %>% ungroup() %>% 
-    group_by(scen,week_id) %>% summarise(mean_value = mean(.value)) %>% ungroup() %>% 
-    right_join( stan_list$all_season_project ,
-                by = join_by(week_id)) %>% mutate(date=date_mon)
-  p1 = modelled_fit %>% ggplot(aes(date,age_total)) + geom_line() + 
-    geom_line(aes(y=mean_value),col="lightblue") +
-    geom_line(data=modelled_proj,aes(col=as.factor(scen),y=mean_value)) +
-    labs(subtitle = paste( EU_long(country_short_input)," (",country_short_input,")") ); p1
-  
-  # age split version
-  obs_data = stan_list$ili_obs_fit %>% mutate(n=1:n(),date=stan_list$ili_obs_fit_date) %>% 
-    pivot_longer(cols=1:stan_list$n_age_groups,names_to = "age") %>% 
-    mutate(age=as.factor(age) %>% as.numeric())
-  modelled_fit = fit00 %>% gather_draws(gen_ili_obs_fit[n,age]) %>% 
-    filter(.draw%in%c(1:100)) %>% # filter a number of posterior draws
-    select(-.chain,-.iteration) %>% ungroup() %>% 
-    group_by(n,age) %>% summarise(mean_value = mean(.value)) %>% ungroup() %>% 
-    left_join(obs_data,by=c("n","age"))
-  
-  proj_df = stan_list$all_season_project %>% select(country_short,week_id,date=date_wed)
-  modelled_proj = fit00 %>% gather_draws(gen_ili_t_obs_project[scen,week_id,age]) %>% 
-    filter(.draw%in%c(1:100)) %>%
-    select(-.chain,-.iteration) %>% ungroup() %>% 
-    group_by(week_id,age,scen) %>% summarise(mean_value = mean(.value)) %>% ungroup() %>% 
-    left_join( proj_df, by=join_by(week_id)  )
-  
-  p2 = modelled_fit %>% ggplot(aes(date,value)) + geom_line() + 
-    geom_line(aes(y=mean_value),col="lightblue") +
-    geom_line(data=modelled_proj,aes(col=as.factor(scen),y=mean_value)) +
-    facet_wrap(~age,ncol=1,scales="free_y") +
-    labs(subtitle = paste( EU_long(country_short_input)," (",country_short_input,")") ); p2
-  
+  p1 = plot_fit(fit00,stan_list,country_short_input)
+  p2 = plot_fit_byage(fit00,stan_list,country_short_input)
+  browser()
   # extract parameters
   df = NULL
   mp="prop_ili_mu"; x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
@@ -77,7 +38,7 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
   # add into output list 
   mout$stan_list = stan_list
   mout$fit = fit00
-  mout$modelled_proj = extract_projections(params,fit00,n_iter=20,
+  mout$modelled_proj = extract_projections(params,fit00,n_iter=500,
                                            stan_list$df_scenarios,
                                            stan_list$df_agegroups,
                                            stan_list$all_season_project)
@@ -151,6 +112,7 @@ wrangle_fit_df = function(params,data,all_season_country,country_short_input,tar
       select(country_short,date,season,agegroup,value)-> all_season_fit
     # impute summer low-activity
     all_season_fit %>% mutate(
+      summer_low_day = as.integer(date%in%params$summer_low_dates),
       value=ifelse( date%in%params$summer_low_dates, 0 , value )
     ) -> all_season_fit
     
@@ -191,7 +153,7 @@ wrangle_fit_df = function(params,data,all_season_country,country_short_input,tar
 } 
 
 # computing a list with all input required by the model
-make_stan_list = function(params,data,all_season_fit_wide,country_short_input,vax_country,pop_country,age_collapse="all"){
+make_stan_list = function(params,data,all_season_fit_wide,country_short_input,vax_country,pop_country,contacts,age_collapse="all"){
   # helpers for the dataframes
   start_year = year(today())
   season     = paste0(start_year,"/",start_year+1)
@@ -222,7 +184,11 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
   crossing( country_short=country_short_input,
             nesting(data_w=all_season_project$date_mon,season=all_season_project$season), 
             d_shift=c(-6:0) ) %>% 
-    mutate(date=data_w+d_shift) %>% select(country_short,season,date) -> all_season_project_daily
+    mutate(date=data_w+d_shift) %>% select(country_short,season,date) %>% ungroup() %>% 
+    group_by(season) %>%  mutate(h=1:n(),
+                                 season_start=case_when(h==1~1,h==2~2,.default=0) ) %>% 
+    ungroup() -> all_season_project_daily
+ 
   # plotting
   p1 = all_season_fit_wide %>% ggplot(aes(date,age_total)) + geom_line() + geom_rug()
   
@@ -248,8 +214,8 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
     season_id_raw = fct_inorder(all_season_fit_daily$season) %>% levels() %>% enframe(),
     df_scenarios = df_scenarios,
     df_agegroups = df_agegroups,
-    ili_obs_fit_date = all_season_fit_wide$date,
-    ili_obs_project = all_season_project$date_wed,
+    ili_fit_date = all_season_fit_wide$date,
+    ili_proj_date = all_season_project$date_wed,
     ## data relevated for the fit
     n_season = n_distinct(all_season_fit_wide$season),
     n_week_fit = nrow(all_season_fit_wide),
@@ -262,20 +228,23 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
     ili_obs_notna = all_season_fit_wide %>% 
       select( any_of(params$SIR_multiseason$age_groups) ) %>% 
       mutate_all(~ !is.na(.) ) %>% mutate_all(~as.integer(.) ),
+    ili_summer_low = all_season_fit_wide$summer_low_day,
     #
-    season_start = as.integer(all_season_fit_daily$season_start),
-    season_id_day = fct_inorder(all_season_fit_daily$season) %>% as.integer(),
-    season_id_week = fct_inorder(all_season_fit_wide$season) %>% as.integer(),
+    season_start_fit = as.integer(all_season_fit_daily$season_start),
+    season_id_day_fit = fct_inorder(all_season_fit_daily$season) %>% as.integer(),
+    season_id_week_fit = fct_inorder(all_season_fit_wide$season) %>% as.integer(),
     #
     pop = sum(pop_age_group), 
     #
     pop_age_group=matrix(pop_age_group ,nrow=n_age_groups,ncol=1),
-    #contact_matrix=matrix(data=rep(1/n_age_groups,n_age_groups^2),nrow=n_age_groups,ncol=n_age_groups),
-    contact_matrix=matrix(data=rep(1/n_age_groups,n_age_groups^2),nrow=n_age_groups,ncol=n_age_groups),
+    contact_matrix=contacts[[EU_long(country_short_input)]],
     delta_vax=tibble( A=z_fit,B=z_fit,C=z_fit,D=z_fit) %>% mnaming(age_groups),
     # data relevant for projected scenarios
-    n_week_project = nrow(all_season_project),
-    n_day_project= nrow(all_season_project)*7,
+    n_week_proj = nrow(all_season_project),
+    n_day_proj= nrow(all_season_project)*7,
+    season_start_proj = as.integer(all_season_project_daily$season_start),
+    season_id_day_proj = fct_inorder(all_season_project_daily$season) %>% as.integer(),
+    season_id_week_proj = fct_inorder(all_season_project_daily$season) %>% as.integer(),
     n_scenario = nrow(df_scenarios),
     axis_transmission = df_scenarios$axis_transmission,
     axis_vax = df_scenarios$axis_vax,
@@ -293,7 +262,7 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
     n_daily_time_steps = 1,
     # priors
     sigma_cum_ili = 2,
-    prior_sigma_prop_ili = 5,
+    prior_sigma_prop_ili = 2,
     prior_sigma_i = 5,
     prior_sigma_s = 2,
     sigma_prop_ili_age = 1
@@ -312,15 +281,26 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
   stan_list$delta_vax_null$age_65_99[ind_vax] = 0
   
   stan_list$daily_counter_fit = rep(1:stan_list$n_day_fit, each=stan_list$n_daily_time_steps)
-  stan_list$daily_counter_proj = rep(1:stan_list$n_day_project, each=stan_list$n_daily_time_steps)
+  stan_list$daily_counter_proj = rep(1:stan_list$n_day_proj, each=stan_list$n_daily_time_steps)
   
   stan_list$daily_daystart_fit = rep(1:stan_list$n_daily_time_steps, each=stan_list$n_day_fit)
   stan_list$daily_daystart_proj = rep(1:stan_list$n_daily_time_steps, each=stan_list$n_day_proj)
   # summary targets
-  stan_list$cum_ili_obs_log = rowsum(x=stan_list$ili_obs_fit,group=stan_list$season_id_week,na.rm = T) %>% rowSums() %>% log()
-  stan_list$n_ili_obs_notna = rowsum(x=stan_list$ili_obs_notna,group=stan_list$season_id_week,na.rm = T) %>% rowSums()
-  stan_list$weight_obs_epi =  0.05 #1/mean( stan_list$n_ili_obs_notna ) 
+  stan_list$cum_ili_obs_log = rowsum(x=stan_list$ili_obs_fit,group=stan_list$season_id_week_fit,na.rm = T) %>% rowSums() %>% log()
+  stan_list$n_ili_obs_notna = rowsum(x=stan_list$ili_obs_notna,group=stan_list$season_id_week_fit,na.rm = T) %>% rowSums()
+  stan_list$weight_obs_epi =  stan_list$ili_obs_fit*0 + 0.05 #1/mean( stan_list$n_ili_obs_notna ) 
+  # if (country_short_input=="IT") stan_list$weight_obs_epi =  0.01
   stan_list$weight_cum_ili =  1.0 # 
+  # impute missing contact data
+  if (country_short_input %in% c("NO","CZ")) {
+    stan_list$contact_matrix = contacts[["EU"]]
+  }
+  # support fit of AT
+  if (country_short_input %in% c("AT","IT")) {
+    stan_list$weight_obs_epi[stan_list$ili_summer_low==0,] = 0 # don't get influenced by seasonal surveillance
+  }
+  
+  
   ###################################################################
   
   ### for debugging: make it 2 age groups: <65 and above
@@ -372,21 +352,26 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
 extract_projections = function(params,fit00,n_iter,df_scenarios,df_agegroups,all_season_project){
   # extract projections
   modelled_proj = fit00 %>% 
-    gather_draws(gen_ili_u_obs_project[scen_id,week_id,agegroup_id], # if you want to apply changes here, do look up the useful gather_draws {tidybayes} syntax
-                 gen_ili_v_obs_project[scen_id,week_id,agegroup_id],
-                 gen_ili_u_obs_project_sum[scen_id,week_id],
-                 gen_ili_v_obs_project_sum[scen_id,week_id]) %>% 
+    gather_draws(gen_ili_u_obs_proj[scen_id,week_id,agegroup_id], # if you want to apply changes here, do look up the useful gather_draws {tidybayes} syntax
+                 gen_ili_v_obs_proj[scen_id,week_id,agegroup_id],
+                 gen_ili_t_obs_proj[scen_id,week_id,agegroup_id],
+                 gen_ili_u_obs_proj_sum[scen_id,week_id],
+                 gen_ili_v_obs_proj_sum[scen_id,week_id],
+                 gen_ili_t_obs_proj_sum[scen_id,week_id]) %>% 
     filter(.draw%in%c(1:n_iter)) %>% # filter a number of posterior draws
     select(-.chain,-.iteration) %>% ungroup() %>% # remove unneeded columns and grouping
     mutate(vax_status=case_when(
-      .variable=="gen_ili_u_obs_project"~"vaxNo",
-      .variable=="gen_ili_v_obs_project"~"vaxYes",
-      .variable=="gen_ili_u_obs_project_sum"~"vaxNo",
-      .variable=="gen_ili_v_obs_project_sum"~"vaxYes"
+      .variable=="gen_ili_u_obs_proj"~"vaxNo",
+      .variable=="gen_ili_v_obs_proj"~"vaxYes",
+      .variable=="gen_ili_t_obs_proj"~"vaxTotal",
+      .variable=="gen_ili_u_obs_proj_sum"~"vaxNo",
+      .variable=="gen_ili_v_obs_proj_sum"~"vaxYes",
+      .variable=="gen_ili_t_obs_proj_sum"~"vaxTotal"
     )) %>% 
     mutate(agegroup_id=case_when(
-      .variable=="gen_ili_u_obs_project_sum"~0,
-      .variable=="gen_ili_v_obs_project_sum"~0,
+      .variable=="gen_ili_u_obs_proj_sum"~0,
+      .variable=="gen_ili_v_obs_proj_sum"~0,
+      .variable=="gen_ili_t_obs_proj_sum"~0,
       TRUE ~ agegroup_id
     )) %>% 
     left_join(df_scenarios,by = join_by(scen_id)) %>% # add scenario info
@@ -408,4 +393,57 @@ extract_projections = function(params,fit00,n_iter,df_scenarios,df_agegroups,all
             value=.value) 
   # Required columns in df_for_submission (as per: https://github.com/european-modelling-hubs/RespiCompass/wiki/Submission-format):
   return(modelled_proj)
+}
+
+plot_fit = function(fit00,stan_list,country_short_input) {
+  
+  modelled_fit = fit00 %>% gather_draws(gen_ili_obs_fit_sum[n]) %>% 
+    filter(.draw%in%c(1:500)) %>% # filter a number of posterior draws
+    select(-.chain,-.iteration) %>% ungroup() %>% 
+    group_by(n) %>% summarise(mean_value = mean(.value),
+                              low=quantile(.value,probs=0.1),
+                              upp=quantile(.value,probs=0.9)) %>% ungroup() %>% 
+    right_join( stan_list$all_season_fit,
+                by = join_by(n)) 
+  modelled_proj = fit00 %>% gather_draws(gen_ili_t_obs_proj_sum[scen,week_id]) %>% 
+    filter(.draw%in%c(1:500)) %>%
+    select(-.chain,-.iteration) %>% ungroup() %>% 
+    group_by(scen,week_id) %>% summarise(mean_value = mean(.value),
+                                         low=quantile(.value,probs=0.1),
+                                         upp=quantile(.value,probs=0.9)) %>% ungroup() %>% 
+    right_join( stan_list$all_season_project ,
+                by = join_by(week_id)) %>% mutate(date=date_mon)
+  p1 = modelled_fit %>% ggplot() + geom_line(aes(date,age_total)) + 
+    geom_ribbon(aes(x=date,ymin=low,ymax=upp),fill="lightblue") +
+    geom_ribbon(data=modelled_proj,aes(x=date,fill=as.factor(scen),ymin=low,ymax=upp)) +
+    labs(subtitle = paste0( EU_long(country_short_input)," (",country_short_input,")") ); p1
+  
+  return(p1)
+}
+
+plot_fit_byage = function(fit00,stan_list,country_short_input){
+  # age split version
+  obs_data = stan_list$ili_obs_fit %>% mutate(n=1:n(),date=stan_list$ili_fit_date) %>% 
+    pivot_longer(cols=1:stan_list$n_age_groups,names_to = "age") %>% 
+    mutate(age=as.factor(age) %>% as.numeric())
+  modelled_fit = fit00 %>% gather_draws(gen_ili_obs_fit[n,age]) %>% 
+    filter(.draw%in%c(1:100)) %>% # filter a number of posterior draws
+    select(-.chain,-.iteration) %>% ungroup() %>% 
+    group_by(n,age) %>% summarise(mean_value = mean(.value)) %>% ungroup() %>% 
+    left_join(obs_data,by=c("n","age"))
+  
+  proj_df = stan_list$all_season_project %>% select(country_short,week_id,date=date_wed)
+  modelled_proj = fit00 %>% gather_draws(gen_ili_t_obs_proj[scen,week_id,age]) %>% 
+    filter(.draw%in%c(1:100)) %>%
+    select(-.chain,-.iteration) %>% ungroup() %>% 
+    group_by(week_id,age,scen) %>% summarise(mean_value = mean(.value)) %>% ungroup() %>% 
+    left_join( proj_df, by=join_by(week_id)  )
+  
+  p2 = modelled_fit %>% ggplot(aes(date,value)) + geom_line() + 
+    geom_line(aes(y=mean_value),col="lightblue") +
+    geom_line(data=modelled_proj,aes(col=as.factor(scen),y=mean_value)) +
+    facet_wrap(~age,ncol=1,scales="free_y") +
+    labs(subtitle = paste0( EU_long(country_short_input)," (",country_short_input,")") ); p2
+  
+  return(p2)
 }
