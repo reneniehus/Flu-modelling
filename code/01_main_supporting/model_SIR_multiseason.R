@@ -11,8 +11,8 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
       m,
       algorithm = "meanfield", # variational inference algorithm
       grad_samples=5 , # samples to determine the gradient ( 2 is slower than 5, )
-      tol_rel_obj = 0.005,output_samples = 1000,iter=50000, # default=0.01, smaller means more strict with convergence
-      #tol_rel_obj = 0.02,output_samples = 400,iter=10000, # fast run
+      # tol_rel_obj = 0.005,output_samples = 1000,iter=50000, # default=0.01, smaller means more strict with convergence
+      tol_rel_obj = 0.02,output_samples = 400,iter=10000, # fast run
       # chains=4, # thin=2, iter=300, # a "long run" 
       seed=12, # seed for pseudo-random numbers to ensure reproducibility
       data=stan_list # data input into the model
@@ -20,11 +20,10 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
     end_time <- Sys.time(); end_time - start_time
     save(fit00,file = fname)
   } # 
-  # load(file = fname)
+  #load(file = fname)
   # plot the fit against fitted data
   p1 = plot_fit(fit00,stan_list,country_short_input)
   p2 = plot_fit_byage(fit00,stan_list,country_short_input)
-  browser()
   # extract parameters
   df = NULL
   mp="prop_ili_mu"; x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
@@ -296,9 +295,9 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
     stan_list$contact_matrix = contacts[["EU"]]
   }
   # support fit of AT
-  if (country_short_input %in% c("AT","IT")) {
-    stan_list$weight_obs_epi[stan_list$ili_summer_low==0,] = 0 # don't get influenced by seasonal surveillance
-  }
+  # if (country_short_input %in% c("AT","IT")) {
+  #   stan_list$weight_obs_epi[stan_list$ili_summer_low==0,] = 0 # don't get influenced by seasonal surveillance
+  # }
   
   
   ###################################################################

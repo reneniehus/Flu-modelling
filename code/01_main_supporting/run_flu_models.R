@@ -21,7 +21,7 @@ run_flu_models = function( params=NULL , data=NULL ){
     
     pr=paste("Initiating SIR_simple_multi_season \n"); cat(green(pr))
     # ---- |-Data for all countries ----
-    all_season = data_into_all_season(data,params,withforce=F); df_out$figs_prefit$fit_seasons_countries <- plot_add_season(all_season)
+    all_season = data_into_all_season(data,params,withforce=F); df_out$figs_prefit$fit_seasons_countries <- plot_all_season(all_season)
     contacts = transform_contracts(data,params) # transform the contact matrixes for model requirements
     target_input_v = params$SIR_simple_multi_season$target
     country_short_input_v = all_season %>% 
@@ -33,7 +33,7 @@ run_flu_models = function( params=NULL , data=NULL ){
     
     # ---- |-Run model for each country ----
     target_input=target_input_v[1]
-    country_short_input_v = country_short_input_v[!country_short_input_v %in% c("AT","IT")]  # country_short_input_v[!country_short_input_v %in% c("AT","IT")] # params$run_countries # c("IT","AT")
+    country_short_input_v = country_short_input_v  # country_short_input_v[!country_short_input_v %in% c("AT","IT")] # params$run_countries # c("IT","AT")
     m <- stan_model(file='./stan/SIR_multiseason_age_vax_2.stan')
     for (country_short_input in country_short_input_v ) { # country_short_input="IT"
       # ---- |-Prepare country specific data ----
@@ -87,8 +87,7 @@ run_flu_models = function( params=NULL , data=NULL ){
   return(df_out)
 }
 
-plot_add_season = function(all_season) {
-  #browser()
+plot_all_season = function(all_season) {
   p = all_season %>% 
     filter(season%in%c(params$SIR_multiseason$seasons_include) ) %>% 
     unnest(respicompass_ili_plus) %>% 

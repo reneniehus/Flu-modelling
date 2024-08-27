@@ -22,8 +22,8 @@ settings = function() {
   
   # ---- |-Data ----
   params$latest_start_year = 2023 # if the last full season is 2023/24, put 2023
-  params$season_start_monthday = "-09-01"
-  params$season_end_monthday = "-08-31"
+  params$season_start_monthday = "-08-01"
+  params$season_end_monthday = "-07-31"
   # summer low-activity ()
   low_start = "-06-01"
   low_stop  = "-09-01"

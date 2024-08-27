@@ -24,7 +24,7 @@ data = load_flu_data( params, regenerate = F, new_from_online = F) # loads the d
 models_out = run_flu_models( params, data ) # runs the model scripts
 
 # ---- |-save output ----
-process_and_save( params, models_out ) # processing the model output, with figures and saves
+if (F) process_and_save( params, models_out ) # processing the model output, with figures and saves
 
 # ---- |- Run special analyses
 if (F) source("code/03_special_analyses/season_country_var_rt.R")
