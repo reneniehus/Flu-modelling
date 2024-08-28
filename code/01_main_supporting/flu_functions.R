@@ -317,7 +317,7 @@ transform_contracts = function(data,params) {
       # Get a new contact matrix with only 4 age groups, such that average number of contacts per person equals to one
       x_new_pop = data$demography_respicast$population_pyramid %>% filter(country == country_i) %>% pull(population)
       x_pop_matrix = t(matrix(rep(x_new_pop,4), nrow=4))
-      warning("Is the above above ok or should it be transposed?")
+      # warning("Is the above above ok or should it be transposed?")
       
       # The new contact matrix where elements are per person contacts between age group i and j such that the (weighted) average number of contacts is 1
       contacts_normalized = contacts_total_new / (x_pop_matrix * total_nr_contacts_per_person)

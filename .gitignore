@@ -8,3 +8,4 @@ stan/SIR_simple.rds
 /output/ari-forecast-hub
 /output/flu-forecast-hub
 *.PROFILE
+packrat/lib*/

@@ -137,8 +137,8 @@ load_flu_data_vax = function(data=data, params=NULL , regenerate=T  , new_from_o
     
     vax = list(
       data_vax = data_vax %>% mutate(vaccine_coverage=vaccine_coverage/100) %>% pivot_wider(names_from = "scenario", values_from = vaccine_coverage),
-      data_vax_history = data_vax_hist %>% mutate(vaccine_coverage=as.numeric(vaccine_coverage)/100 ),
-      data_vax_history_all = data_vax_hist %>% mutate(vaccine_coverage=as.numeric(vaccine_coverage)/100 )
+      data_vax_history = data_vax_hist %>% mutate(vaccine_coverage=as.numeric(vaccine_coverage)/100 ) %>% mutate(season = str_replace(season, "-", "/")),
+      data_vax_history_all = data_vax_hist %>% mutate(vaccine_coverage=as.numeric(vaccine_coverage)/100 ) %>% mutate(season = str_replace(season, "-", "/"))
     )
     save(vax,file="output/vax.Rdata")
     
@@ -346,7 +346,7 @@ load_flu_data = function( params=NULL , regenerate=F,new_from_online=T  ){
   
   data = load_flu_data_vax( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate)
   
-  data = load_flu_data_contact( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate)
+  data = load_flu_data_contact( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
   
   data = load_flu_data_helpers_respicompass( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate)
   

@@ -1,25 +1,20 @@
 run_flu_models = function( params=NULL , data=NULL ){
   
-  if (F){
-    source("./code/00_main.R")
-  }
   # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  ### Initiating desired output list ##########
+  ### Initiating output list ##########
   # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   df_out = list(
     time_of_execution = now(),    # time-stamp
     figs_prefit = NULL,           # figures of data prior to entering the fitting functions
-    submission = NULL,     # for each model a clean dataframe following submission format (see above)
-    output = NULL           # for each model additional output 
+    mout = NULL                   # for each country the model output
   )
   
   # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   ### Running selected models ##########
   # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   if ( "SIR_simple_multi_season" %in% params$models_to_run ){
-    start_time <- Sys.time()
-    
     pr=paste("Initiating SIR_simple_multi_season \n"); cat(green(pr))
+    
     # ---- |-Data for all countries ----
     all_season = data_into_all_season(data,params,withforce=F); df_out$figs_prefit$fit_seasons_countries <- plot_all_season(all_season)
     contacts = transform_contracts(data,params) # transform the contact matrixes for model requirements
@@ -29,7 +24,7 @@ run_flu_models = function( params=NULL , data=NULL ){
       mutate(n_season=n()) %>% filter(n_season==3) %>% 
       pull(country_short) %>% unique()
     
-    modl <<- list()
+    mout <- list()
     
     # ---- |-Run model for each country ----
     target_input=target_input_v[1]
@@ -50,39 +45,32 @@ run_flu_models = function( params=NULL , data=NULL ){
       # replace by fake data
       if (F) stan_list = generate_ili_epi_test(par = c(NA),stan_list)
       stan_list$ili_obs_fit %>% sum() # sim:7879760 (nonoise: 8385360), IT:106110
-      path_fit = paste0("../Big data/multiseason_age_vax",target_input,country_short_input,".Rdata")
       pr=paste("> Now fitting:",target_input,"for",country_short_input,"... "); cleancat(green(pr))
       
       # ---- |-Fit ----
       tryCatch(
         {
-          # Run stan model
+          # Run model
           fitout=fit_with_stan(params,stan_list,mod_path=mod_path,all_season_fit_wide,country_short_input,m)
+          if (F) fitout=fit_with_eabc(params,stan_list)
         },
         error = function(cond) {
           message(paste0("Error in running: ", country_short_input,  ". Error: ", cond))
         }
       )
-      
-      
-      if (F) fitout=fit_with_eabc(params,stan_list)
-      
-      save(fitout,stan_list,file = path_fit)
       pr=paste("> Fitting:",target_input,"for",country_short_input,"Done \n"); cleancat(green(pr))
       
-      modl[[country_short_input]] <<- fitout
+      mout[[country_short_input]] <- fitout
     }
     end_time <- Sys.time() # 
     
     # add stuff to the output list
-    df_out$submission = NULL
-    df_out$other = modl
+    df_out$mout = mout
   }
   
   if (F) source("code/01_main_supporting/calling_other_models.R") # once you want to call additional models
   
-  pr=paste("> Method completed:",round(end_time - start_time,2),"sec \n"); cat(green(pr))
-  print(end_time - start_time)
+  pr=paste("> SIR_simple_multi_season run for all countries completed. \n"); cat(green(pr))
   #### output 
   return(df_out)
 }

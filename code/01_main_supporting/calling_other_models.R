@@ -59,9 +59,9 @@ if ( "SIR_simple_r0_variation" %in% params$models_to_run ){
   
   if (T){
     df_collect %>% bind_rows -> x
-    write_csv(x,file="code/03_special_analyses/rt_season_country.csv")
+    write_csv(x,file="code/04_special_analyses/rt_season_country.csv")
   }
-  x = read_csv(file="code/03_special_analyses/rt_season_country.csv")
+  x = read_csv(file="code/04_special_analyses/rt_season_country.csv")
   x = df_collect %>% bind_rows()
   (x$Rnull_eff) %>% min()
   rnull_mu = x$Rnull_eff %>% median()

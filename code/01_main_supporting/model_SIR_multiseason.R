@@ -1,40 +1,38 @@
 fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_short_input,m) {
   
-  # initiate output list
-  mout=list()
   # run the model fit
   fname = paste0("../Big data/fit",country_short_input,".Rdata")
-  if (T) {
-    # compile the stan model 
+  if (params$refit) {
     start_time <- Sys.time()
-    fit00=rstan::vb(
-      m,
-      algorithm = "meanfield", # variational inference algorithm
-      grad_samples=5 , # samples to determine the gradient ( 2 is slower than 5, )
-      # tol_rel_obj = 0.005,output_samples = 1000,iter=50000, # default=0.01, smaller means more strict with convergence
-      tol_rel_obj = 0.02,output_samples = 400,iter=10000, # fast run
-      # chains=4, # thin=2, iter=300, # a "long run" 
-      seed=12, # seed for pseudo-random numbers to ensure reproducibility
-      data=stan_list # data input into the model
-    ) # 
+    # rstan:vb settings
+    # grad_samples: samples to determine the gradient ( 2 is slower than 5, )
+    # tol_rel_obj: default=0.01, smaller means more strict with convergence
+    quick_vb = params$debug
+    if (!quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=5, tol_rel_obj = 0.005,output_samples = 400,iter=50000)
+    if ( quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=1, tol_rel_obj = 0.020,output_samples = 400,iter=10000)
+    fit00=rstan_vb(m,algorithm = "meanfield",seed=12,data=stan_list) 
     end_time <- Sys.time(); end_time - start_time
     save(fit00,file = fname)
-  } # 
-  #load(file = fname)
-  # plot the fit against fitted data
+  } else {
+    load(file = fname)
+  }
+  
+  # plot model fit against fitted data
   p1 = plot_fit(fit00,stan_list,country_short_input)
   p2 = plot_fit_byage(fit00,stan_list,country_short_input)
-  # extract parameters
+  
+  # extract fitted parameters
   df = NULL
-  mp="prop_ili_mu"; x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
-  mp="prop_ili"; x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x[1:stan_list$n_age_groups,])
-  mp="ar"; x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
-  mp="SIR_ini_mu"; x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
-  mp="cum_ili_log"; x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
+  mp="prop_ili_mu";    x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
+  mp="prop_ili";       x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x[1:stan_list$n_age_groups,])
+  mp="ar";             x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
+  mp="SIR_ini_mu";     x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
+  mp="cum_ili_log";    x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
   
-  if (F) source("code/01_main_supporting/old_stan_fit_code.R")
+  if (F) source("code/01_main_supporting/old_stan_fit_code.R") # code of previous fitting implementations
   
-  # add into output list 
+  # output list 
+  mout=list()
   mout$stan_list = stan_list
   mout$fit = fit00
   mout$modelled_proj = extract_projections(params,fit00,n_iter=500,
@@ -112,9 +110,8 @@ wrangle_fit_df = function(params,data,all_season_country,country_short_input,tar
     # impute summer low-activity
     all_season_fit %>% mutate(
       summer_low_day = as.integer(date%in%params$summer_low_dates),
-      value=ifelse( date%in%params$summer_low_dates, 0 , value )
+      value=ifelse( date%in%params$summer_low_dates & is.na(value), 0 , value )
     ) -> all_season_fit
-    
   }
   
   if (target_input=="ili") {
@@ -153,6 +150,7 @@ wrangle_fit_df = function(params,data,all_season_country,country_short_input,tar
 
 # computing a list with all input required by the model
 make_stan_list = function(params,data,all_season_fit_wide,country_short_input,vax_country,pop_country,contacts,age_collapse="all"){
+  
   # helpers for the dataframes
   start_year = year(today())
   season     = paste0(start_year,"/",start_year+1)

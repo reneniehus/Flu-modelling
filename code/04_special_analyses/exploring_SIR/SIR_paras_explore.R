@@ -1,5 +1,5 @@
 source("code/01_main_supporting/setup.R")
-source("code/03_special_analyses/exploring_SIR/bayesian_functions.R")
+source("code/04_special_analyses/exploring_SIR/bayesian_functions.R")
 
 # I_ini
 wave_settings_SIR$I_ini = 0.0001 * 1/50;  wave_df1 = sim_wave_SIR(wave_settings_SIR,"low" )

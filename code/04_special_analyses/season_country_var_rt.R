@@ -33,7 +33,7 @@ stan_list <- list(
 
 # run stan model
 fit <- rstan::stan(
-  file = "code/03_special_analyses/season_country_var_rt.stan",
+  file = "code/04_special_analyses/season_country_var_rt.stan",
   chains = 4, thin = 4, iter = 2500,
   seed = 12, cores = getOption("mc.cores", 1L),
   control = list(

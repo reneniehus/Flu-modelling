@@ -1,38 +1,41 @@
 settings = function() {
   params = list()
   
-  params$debug = T
+  # ---- |-Run modes ----
+  params$debug = T # T: runs scripts with settings that reduce run-time
+  params$refit = T # T: fits are run again and saved, F: saved fits will be used
+  
   # ---- |-Names/identifiers ----
   params$scenario_round_id = "2024_2025_1_FLU"
   params$scenario_team = "ECDC"
   params$scenario_model = "flumod"
+  
   # ---- |-Disease parameters ----
   params$rate_infectious = 0.2777778
   params$Rnull = 2.0 # https://www.cambridge.org/core/journals/epidemiology-and-infection/article/estimation-of-the-basic-reproductive-number-r0-for-epidemic-highly-pathogenic-avian-influenza-subtype-h5n1-spread/A60F72F5004F3BC5FAC2A3F8BB188A0F
-  # vaccine parameters
-  params$ve_spread = 0.20 # assuming a similar size of effect as for ve_inf
-  params$ve_inf = 0.20 #
-  params$ve_ili_cond_inf = 0.25 # 
+  
+  # immunity parameters
+  params$ve_spread = 0.20 # vaccine effect on onward spread when vaccinated individual is infected
+  params$ve_inf = 0.20 # vaccine efficacy on becoming infected given exposure
+  params$ve_ili_cond_inf = 0.25 # vaccine effect on ILI development given infections
+  # vaccine effect on ILI given exposure is the combined effect of ve_inf and ve_ili_cond_inf
   # (1-ve_ili) = (1-ve_inf)*(1-ve_ili_cond_inf) 
   params$ve_ili = 1-(1-params$ve_inf)*(1-params$ve_ili_cond_inf) # (1-ve_ili) = (1-ve_inf)*(1-ve_ili_cond_inf) 
   
-  params$ve_inf = 0.3 # vaccine efficacy on infectiousness
-  params$ve_susc = 0.3 # vaccine efficacy on susceptability
-  params$ve_severe = 0.6 # vaccine efficacy on severity, given infection
-  
   # ---- |-Data ----
-  params$latest_start_year = 2023 # if the last full season is 2023/24, put 2023
-  params$season_start_monthday = "-08-01"
-  params$season_end_monthday = "-07-31"
-  # summer low-activity ()
+  params$latest_start_year = 2023 # if the last partly/fully observed season is 2023/24, put 2023
+  params$season_start_monthday = "-08-01" # initial date of for SIR initiation
+  params$season_end_monthday = "-07-31" # end date of SIR process
+  # summer low-activity (where we assume that ILI activity = 0, where NA was reported)
   low_start = "-06-01"
   low_stop  = "-09-01"
   date_v = NULL
-  for (year_i in 2010:2026){
+  for (year_i in 2010:2030){
     date_v = c(date_v,seq( from=paste0(year_i,low_start) %>% ymd(), to=paste0(year_i,low_stop) %>% ymd(), by="day" ))
   }
   params$summer_low_dates = date_v %>% as_date() 
   
+  # ---- |-Simulations ----
   params$simulation_seed = 12
   
   # ---- |-Countries ----
@@ -40,7 +43,6 @@ settings = function() {
   
   # ---- |-Model-specific  settings ----
   params$models_to_run = c("SIR_simple_multi_season") # "SIR_simple","SIR_simple_r0_variation","SIR_simple_multi_season
-  
   # Settings for SIR_simple
   params$SIR_simple$target = "ILIconsultationrate"
   params$SIR_simple$agegroup = "age_total"
@@ -49,7 +51,6 @@ settings = function() {
   params$SIR_multiseason$seasons_exclude = c("2019/2020","2020/2021","2021/2022") # those impacted by COVID-19 acute phase
   params$SIR_multiseason$seasons_include = c("2017/2018","2018/2019","2023/2024") # 2017-2018, 2018-2019, and 2023-2024
   params$SIR_multiseason$age_groups = c("age_00_04","age_05_14","age_15_64","age_65_99")
-  
   # Settings for last_year_burden
   params$last_year_burden$target = "ILIconsultationrate"
   params$last_year_burden$agegroup = "age_total"

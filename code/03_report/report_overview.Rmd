@@ -1,0 +1,43 @@
+---
+title: "report_overview"
+output:
+  html_document:
+    code_folding: show
+    toc: true
+    toc_float: true
+    number_sections: true
+    theme: flatly
+    highlight: tango
+editor_options: 
+  chunk_output_type: console
+  chunk_output_highlight: default
+---
+
+# Overview report: Flu Scenario Modelling
+
+## Relevant background information
+- [Model meta-data link]
+- [Model documentation link]
+
+```{r for_summary}
+# 
+
+```
+
+### Summary
+The Model was run successfully for X countries, 
+
+
+### Detail section 1
+
+```{r }
+# 
+
+```
+
+### Detail section 2
+
+```{r }
+# 
+
+```
