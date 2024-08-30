@@ -16,6 +16,7 @@ data {
   real pop; // total population size
   matrix[n_age_groups,1] pop_age_group; // population size per age group, required to be a matrix 
   matrix[n_age_groups, n_age_groups] contact_matrix; // contact matrix
+  real a_factor[n_age_groups]; // age-specific modulation of beta, informed by contact matrix
   matrix[n_day_fit, n_age_groups] delta_vax; // daily fraction of newly vaccinated individuals per age group
   array[n_day_fit*n_daily_time_steps] int<lower=1,upper=n_day_fit> daily_counter_fit;
   array[n_day_fit*n_daily_time_steps] int<lower=1,upper=n_daily_time_steps> daily_daystart_fit;
@@ -201,8 +202,8 @@ transformed parameters {
       } else { // if not first day of the season, perform the normal step-wise processes
       for(a in 1:n_age_groups){
         // new infections
-        delta_infective_exposures_u = dt * beta_j * prev_S_u[a] * sum(to_vector(contact_matrix[ : , a]') .* (to_vector(prev_I_u)*1 + to_vector(prev_I_v)*(1-ve_spread)) );
-        delta_infective_exposures_v = dt * beta_j * prev_S_v[a] * sum(to_vector(contact_matrix[ : , a]') .* (to_vector(prev_I_u)*1 + to_vector(prev_I_v)*(1-ve_spread)) ) * (1 - ve_inf);
+        delta_infective_exposures_u = dt * beta_j*a_factor[a] * prev_S_u[a] * sum(to_vector(contact_matrix[a, : ]) .* (to_vector(prev_I_u)*1 + to_vector(prev_I_v)*(1-ve_spread)) );
+        delta_infective_exposures_v = dt * beta_j*a_factor[a] * prev_S_v[a] * sum(to_vector(contact_matrix[a, : ]) .* (to_vector(prev_I_u)*1 + to_vector(prev_I_v)*(1-ve_spread)) ) * (1 - ve_inf);
         // compute changes due to infections and curing
         delta_S_u = -delta_infective_exposures_u;
         delta_S_v = -delta_infective_exposures_v;
@@ -478,8 +479,8 @@ generated quantities {
       } else { // if not first day of the season, perform the normal step-wise processes
       for(a in 1:n_age_groups){
         // new infections
-        delta_infective_exposures_u = dt * beta_j * prev_S_u[a] * sum(to_vector(contact_matrix[ : , a]') .* (to_vector(prev_I_u)*1 + to_vector(prev_I_v)*(1-ve_spread)) );
-        delta_infective_exposures_v = dt * beta_j * prev_S_v[a] * sum(to_vector(contact_matrix[ : , a]') .* (to_vector(prev_I_u)*1 + to_vector(prev_I_v)*(1-ve_spread)) ) * (1 - ve_inf);
+        delta_infective_exposures_u = dt * beta_j*a_factor[a] * prev_S_u[a] * sum(to_vector(contact_matrix[a, : ]) .* (to_vector(prev_I_u)*1 + to_vector(prev_I_v)*(1-ve_spread)) );
+        delta_infective_exposures_v = dt * beta_j*a_factor[a] * prev_S_v[a] * sum(to_vector(contact_matrix[a, : ]) .* (to_vector(prev_I_u)*1 + to_vector(prev_I_v)*(1-ve_spread)) ) * (1 - ve_inf);
         // compute changes due to infections and curing
         delta_S_u = -delta_infective_exposures_u;
         delta_S_v = -delta_infective_exposures_v;
@@ -545,8 +546,8 @@ generated quantities {
     } // end of multi-daily loop
     //////// END-CORE DISEASE DYNAMIC PROCESS
     
-     // convert projections daily into weekly
-     for (i in 1:n_week_proj) {
+    // convert projections daily into weekly
+    for (i in 1:n_week_proj) {
       for (a in 1:n_age_groups) {
         // define 2 local variables
         int day_start = (i-1)*7+1; // f(i=1)=1 , f(i=2)=8

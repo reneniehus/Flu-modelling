@@ -15,6 +15,7 @@ source("code/01_main_supporting/flu_functions.R")
 source("code/01_main_supporting/load_flu_data.R")
 source("code/01_main_supporting/run_flu_models.R")
 source("code/01_main_supporting/process_and_save.R")
+source("code/01_main_supporting/send_report.R")
 source("code/01_main_supporting/model_SIR_multiseason.R")
 source("code/06_sandbox/generate_ili_epi_test.R")
 
@@ -25,11 +26,14 @@ data = load_flu_data( params, regenerate = F, new_from_online = F) # loads the d
 # ---- |-run flu models (i.e. fitting and projections) ----
 models_out = run_flu_models( params, data ) # runs the model scripts
 
-# ---- |-save output ----
-rep_list = process_and_save( params, data , models_out ) # processing the model output, with figures and saves
+# ---- |-process and save model output ----
+rep_list = process_and_save( params, data, models_out, save_submission=params$save_submission ) # processing the model output, with figures and saves
 
 # ---- |-report ----
-source("code/03_report/report_overview.Rmd") # requires: params, data , rep_list
+rmarkdown::render("code/03_report/report_overview.Rmd") # requires: params, data , rep_list
+
+# ---- |-Send ----
+send_report()
 
 # ---- |- Run special analyses
 if (F) source("code/04_special_analyses/season_country_var_rt.R")

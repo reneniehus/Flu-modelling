@@ -120,8 +120,8 @@ generate_ili_epi_test= function(par,stan_list){
       
     } else {
       for(a in 1:n_age_groups){  
-        delta_infective_exposures_u = beta * S_u[t-1,a]  * sum( contact_matrix[ ,a] * ( I_u[t-1,]*1 + I_v[t-1,]*(1-ve_spread)) )
-        delta_infective_exposures_v = beta * S_v[t-1,a]  * sum( contact_matrix[ ,a] * ( I_u[t-1,]*1 + I_v[t-1,]*(1-ve_spread)) ) * (1 - ve_inf)
+        delta_infective_exposures_u = beta * S_u[t-1,a]  * sum( contact_matrix[a ,] * ( I_u[t-1,]*1 + I_v[t-1,]*(1-ve_spread)) )
+        delta_infective_exposures_v = beta * S_v[t-1,a]  * sum( contact_matrix[a ,] * ( I_u[t-1,]*1 + I_v[t-1,]*(1-ve_spread)) ) * (1 - ve_inf)
         
         delta_S_u = -delta_infective_exposures_u
         delta_S_v = -delta_infective_exposures_v

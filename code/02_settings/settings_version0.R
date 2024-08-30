@@ -2,13 +2,16 @@ settings = function() {
   params = list()
   
   # ---- |-Run modes ----
-  params$debug = T # T: runs scripts with settings that reduce run-time
-  params$refit = T # T: fits are run again and saved, F: saved fits will be used
+  params$debug = F # T: runs scripts with settings that reduce run-time
+  params$refit = F # T: fits are run again and saved, F: saved fits will be used
+  params$save_submission = T # T: saves the file ready for respicompass, F; will be faster
   
   # ---- |-Names/identifiers ----
   params$scenario_round_id = "2024_2025_1_FLU"
   params$scenario_team = "ECDC"
   params$scenario_model = "flumod"
+  
+  params$four_age_groups = c("0-4","5-14","15-64","65+")
   
   # ---- |-Disease parameters ----
   params$rate_infectious = 0.2777778

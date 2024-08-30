@@ -9,7 +9,7 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
     # tol_rel_obj: default=0.01, smaller means more strict with convergence
     quick_vb = params$debug
     if (!quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=5, tol_rel_obj = 0.005,output_samples = 400,iter=50000)
-    if ( quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=1, tol_rel_obj = 0.020,output_samples = 400,iter=10000)
+    if ( quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=1, tol_rel_obj = 0.020,output_samples = 100,iter= 5000)
     fit00=rstan_vb(m,algorithm = "meanfield",seed=12,data=stan_list) 
     end_time <- Sys.time(); end_time - start_time
     save(fit00,file = fname)
@@ -20,6 +20,8 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
   # plot model fit against fitted data
   p1 = plot_fit(fit00,stan_list,country_short_input)
   p2 = plot_fit_byage(fit00,stan_list,country_short_input)
+  # extract data summaries
+  season_ili_mean=sum(stan_list$ili_obs_fit)/stan_list$n_season # observed burden 
   
   # extract fitted parameters
   df = NULL
@@ -28,6 +30,7 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
   mp="ar";             x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
   mp="SIR_ini_mu";     x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
   mp="cum_ili_log";    x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
+  
   
   if (F) source("code/01_main_supporting/old_stan_fit_code.R") # code of previous fitting implementations
   
@@ -42,6 +45,8 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
   mout$plot_fit = p1
   mout$plot_fit_byage = p2
   mout$pars_df = df
+  #
+  mout$season_ili_mean = season_ili_mean
   return(mout)
 }
 
@@ -151,14 +156,14 @@ wrangle_fit_df = function(params,data,all_season_country,country_short_input,tar
 # computing a list with all input required by the model
 make_stan_list = function(params,data,all_season_fit_wide,country_short_input,vax_country,pop_country,contacts,age_collapse="all"){
   
-  # helpers for the dataframes
+  # helpers for the fit and project dataframes
   start_year = year(today())
   season     = paste0(start_year,"/",start_year+1)
   start_date = ymd(paste0(start_year,params$season_start_monthday))
   end_date   = ymd(paste0(start_year+1,params$season_end_monthday))
   date_v = seq(from=start_date,to=end_date,by="day")
   date_v_wed = date_v[weekdays(date_v)=="Wednesday"][1:52]
-  date_v_mon = date_v[weekdays(date_v)=="Monday"][1:52]
+  date_v_mon = date_v[weekdays(date_v)=="Monday"   ][1:52]
   
   # dataframe for projections
   all_season_project = tibble(country_short=country_short_input,
@@ -167,6 +172,7 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
                               date_wed=date_v_wed,
                               value=NA) %>% 
     mutate(week_id=1:n()) %>% 
+    # adding the RespiCompass indicators for projection horizons
     left_join(data$helpers_respicompass$iso_weeks,by=c("date_mon"="start_week_day"))
   
   # make daily version of the data frame - from some daily indicators that the model needs
@@ -192,7 +198,8 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
   # helpers for stan list
   df_scenarios = params$scenarios
   pop_pyramid = data$demography_respicast$population_pyramid %>% filter(country==EU_long(country_short_input))
-  pop_age_group = pop_pyramid$population 
+  pop_pyramid = pop_pyramid %>% select(age_group,population) %>% deframe()
+  pop_age_group = pop_pyramid[params$four_age_groups]
   age_groups = params$SIR_multiseason$age_groups
   n_age_groups = length(age_groups)
   df_agegroups_ecdc = tibble(agegroup_id=c(0:n_age_groups),
@@ -202,6 +209,19 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
   df_agegroups = df_agegroups_ecdc %>% left_join(df_age_translate,by = join_by(age_group_ecdc))
   z_proj = rep(0,nrow(all_season_project_daily))
   z_fit  = rep(0,nrow(all_season_fit_daily))
+  
+  contact_matrix = contacts[[EU_long(country_short_input)]]
+  if (country_short_input %in% c("NO","CZ")) {
+    contact_matrix = contacts[["EU"]]
+  }
+  # first compute the total number of contacts made by a member of age group i with individuals across all age groups
+  contact_activity_age = rowSums(contact_matrix)
+  # then compute the activity factor per age group relative to the population weighted average number of contacts of all age groups
+  a_factor = contact_activity_age/weighted.mean(contact_activity_age,w = pop_age_group)
+  # normalise such that each row i contact_matrix[i,] gives the relative distribution of contact of any invidual of age group i
+  for (a in 1:n_age_groups) {
+    contact_matrix[a,] = contact_matrix[a,]/sum(contact_matrix[a,])
+  }
   
   # ---- |-Stan list and fit----
   stan_list = list(
@@ -234,7 +254,8 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
     pop = sum(pop_age_group), 
     #
     pop_age_group=matrix(pop_age_group ,nrow=n_age_groups,ncol=1),
-    contact_matrix=contacts[[EU_long(country_short_input)]],
+    contact_matrix=contact_matrix,
+    a_factor=a_factor,
     delta_vax=tibble( A=z_fit,B=z_fit,C=z_fit,D=z_fit) %>% mnaming(age_groups),
     # data relevant for projected scenarios
     n_week_proj = nrow(all_season_project),
@@ -268,7 +289,13 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
   # for fitting
   my_date_v = all_season_fit_daily$date
   ind_vax = ( month(my_date_v)==10 & day(my_date_v)==1 )
-  stan_list$delta_vax$age_65_99[ind_vax] = (vax_country$higher_vax_coverage + vax_country$lower_vax_coverage)/2
+  # use historica vaccine coverage
+  hist_vax_ind = tibble(iso2_code=country_short_input, 
+         season=all_season_fit_daily$season[ind_vax],
+         target_group="65+y") %>% 
+    left_join(data$vax$data_vax_history,join_by(iso2_code, season, target_group))
+  hist_vax_ind$vaccine_coverage[is.na(hist_vax_ind$vaccine_coverage)] = (vax_country$higher_vax_coverage + vax_country$lower_vax_coverage)/2
+  stan_list$delta_vax$age_65_99[ind_vax] = hist_vax_ind$vaccine_coverage
   # for projections
   my_date_v = all_season_project_daily$date
   ind_vax = which( my_date_v == paste0( year(min(my_date_v)),"-10-01" ) )
@@ -288,10 +315,6 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
   stan_list$weight_obs_epi =  stan_list$ili_obs_fit*0 + 0.05 #1/mean( stan_list$n_ili_obs_notna ) 
   # if (country_short_input=="IT") stan_list$weight_obs_epi =  0.01
   stan_list$weight_cum_ili =  1.0 # 
-  # impute missing contact data
-  if (country_short_input %in% c("NO","CZ")) {
-    stan_list$contact_matrix = contacts[["EU"]]
-  }
   # support fit of AT
   # if (country_short_input %in% c("AT","IT")) {
   #   stan_list$weight_obs_epi[stan_list$ili_summer_low==0,] = 0 # don't get influenced by seasonal surveillance
