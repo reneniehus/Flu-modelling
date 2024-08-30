@@ -1,4 +1,4 @@
-send_report - function() {
+send_report <- function() {
   library(emayili)
   email <- emayili::envelope()
   Sys.sleep(30) # wait for X seconds, allow time for the html to be rendered

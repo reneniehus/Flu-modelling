@@ -8,7 +8,6 @@ source("code/01_main_supporting/setup.R")
 # ---- |-load task specific settings ----
 source("code/02_settings/settings_version0.R") # this script is what is changed by a high-level user
 params=settings() # creates the params-list
-figs = list() # create an empty list for figures
 
 # sourcing other files, models etc
 source("code/01_main_supporting/flu_functions.R")
