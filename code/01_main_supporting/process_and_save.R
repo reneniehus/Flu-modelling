@@ -49,7 +49,7 @@ process_and_save = function(params=NULL, data=NULL, models_out=NULL,save_submiss
   df_submission %>% group_by(scenario_id) %>% 
     summarise(cum_burden_log=sum(value) %>% log()) %>% arrange(cum_burden_log)
   df_submission %>% group_by(scenario_id,location) %>% 
-    summarise(cum_burden_log=sum(value) %>% log()) %>% arrange(location,cum_burden_log) %>% View()
+    summarise(cum_burden_log=sum(value) %>% log()) %>% arrange(location,cum_burden_log)
   #
   sum_ili = df_submission %>% filter(pop_group=="total_vaxTotal") %>% 
     group_by(scenario_id,location,horizon) %>% summarise(value=mean(value)) %>% ungroup() %>% 
