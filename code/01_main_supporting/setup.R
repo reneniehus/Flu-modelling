@@ -34,7 +34,7 @@ library(tidylog) # only temporarily
 library(summarytools)
 library(zoo)
 library(here)
-library(dagitty)
+# library(dagitty)
 library(ISOweek)
 library(EpiEstim)
 library(fst)

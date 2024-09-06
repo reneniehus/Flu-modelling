@@ -2,8 +2,8 @@ settings = function() {
   params = list()
   
   # ---- |-Run modes ----
-  params$debug = T # T: runs scripts with settings that reduce run-time
-  params$refit = F # T: fits are run again and saved, F: saved fits will be used
+  params$debug = F # T: runs scripts with settings that reduce run-time
+  params$refit = T # T: fits are run again and saved, F: saved fits will be used
   params$save_submission = F # T: saves the file ready for respicompass, F; will be faster
   
   # ---- |-Names/identifiers ----

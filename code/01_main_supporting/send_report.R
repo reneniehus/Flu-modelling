@@ -5,7 +5,7 @@ send_report <- function() {
   
   email <- email %>%
     emayili::from(addr = 'rene.niehus@ecdc.europa.eu') %>%
-    emayili::to( c('rene.niehus@ecdc.europa.eu', 'rene7niehus@gmail.com')) %>% 
+    emayili::to( c('rene.niehus@ecdc.europa.eu', 'rene7niehus@gmail.com','rok.grah@ecdc.europa.eu')) %>% 
     emayili::subject(subject = 'subject') %>%
     #emayili::html('message in html') %>% 
     emayili::attachment(path = './code/03_report/report_overview.html') %>% 
