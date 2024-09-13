@@ -12,9 +12,9 @@ load_flu_data_epi = function(data=data, params=NULL, regenerate=T , new_from_onl
     if (new_from_online==T) {
       # load data freshly from the internet
       pr=paste("Loading epi data from github ... \n"); cat(green(pr))
-      erviss_ili_ari = read_csv(file="https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/snapshots/2024-05-24_ILIARIRates.csv",show_col_types = FALSE)
-      data_sentinel_detections = read_csv(file="https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/snapshots/2024-05-24_sentinelTestsDetectionsPositivity.csv",show_col_types = FALSE)
-      data_nonsentinel_detections = read_csv(file="https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/snapshots/2024-05-24_nonSentinelTestsDetections.csv",show_col_types = FALSE)
+      erviss_ili_ari = read_csv(file="https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/ILIARIRates.csv",show_col_types = FALSE)
+      data_sentinel_detections = read_csv(file="https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/sentinelTestsDetectionsPositivity.csv",show_col_types = FALSE)
+      data_nonsentinel_detections = read_csv(file="https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/nonSentinelTestsDetections.csv",show_col_types = FALSE)
       data_respicompass_iliplus = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/target-data/influenza/ili_plus.csv",show_col_types = FALSE)
       # save locally
       erviss_ili_ari %>% write_csv(file="./data/erviss_iliari_snapshot_2024-05-24.csv")
