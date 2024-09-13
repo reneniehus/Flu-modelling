@@ -31,7 +31,7 @@ run_flu_models = function( params=NULL , data=NULL ){
     country_short_input_v = country_short_input_v  # country_short_input_v[!country_short_input_v %in% c("AT","IT")] # params$run_countries # c("IT","AT")
     m <- stan_model(file='./stan/SIR_multiseason_age_vax_2.stan')
     
-    for (country_short_input in "BE" ) { # country_short_input="IT"; country_short_input_v
+    for (country_short_input in country_short_input_v ) { # country_short_input="IT"; country_short_input_v
       # ---- |-Prepare country specific data ----
       pop_country = data$demography_respicast$population_pyramid %>% 
         filter(country==EU_long(country_short_input)) %>% pull(population) %>% sum()

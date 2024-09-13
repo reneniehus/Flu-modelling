@@ -2,19 +2,19 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
   
   # run the model fit
   fname = paste0("../Big data/fit",country_short_input,".Rdata")
-  if (params$refit) {
+  if (params$load_earlyfit) {
+    load(file = fname)
+  } else {
     start_time <- Sys.time()
     # rstan:vb settings
     # grad_samples: samples to determine the gradient ( 2 is slower than 5, )
     # tol_rel_obj: default=0.01, smaller means more strict with convergence
-    quick_vb = params$debug
+    quick_vb = params$rapid_stan_fit
     if (!quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=5, tol_rel_obj = 0.005,output_samples = 400,iter=50000)
-    if ( quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=1, tol_rel_obj = 0.020,output_samples = 300,iter= 5000)
+    if ( quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=1, tol_rel_obj = 0.020,output_samples = 300,iter= 9000)
     fit00=rstan_vb(m,algorithm = "meanfield",seed=12,data=stan_list) 
     end_time <- Sys.time(); end_time - start_time
     save(fit00,file = fname)
-  } else {
-    load(file = fname)
   }
   
   # plot model fit against fitted data
@@ -118,8 +118,8 @@ wrangle_fit_df = function(params,data,all_season_country,country_short_input,tar
     if (country_short_input %in% params$ili_plus_sentinel   ) sent = T;
     if (country_short_input %in% params$ili_plus_nonsentinel) sent = F;
     
-    if ( sent) x %>% unnest(erviss_ili_plus_sentinel   ) -> y; y %>% ggplot(aes(date,value)) +geom_line()+labs(subtitle='erviss_sent')
-    if (!sent) x %>% unnest(erviss_ili_plus_nonsentinel) -> y; y %>% ggplot(aes(date,value)) +geom_line()+labs(subtitle='erviss_nonsent')
+    if ( sent) {x %>% unnest(erviss_ili_plus_sentinel   ) -> y; y %>% ggplot(aes(date,value)) +geom_line()+labs(subtitle='erviss_sent')}
+    if (!sent) {x %>% unnest(erviss_ili_plus_nonsentinel) -> y; y %>% ggplot(aes(date,value)) +geom_line()+labs(subtitle='erviss_nonsent')}
     if (is.na(sent)) warning("Country has unclear sentinal/nonsentinel ili-plus indicator")
     
     y %>% 
@@ -442,7 +442,6 @@ extract_projections = function(params,fit00,n_iter,df_scenarios,df_agegroups,all
 }
 
 plot_fit = function(fit00,stan_list,country_short_input) {
-  
   modelled_fit = fit00 %>% gather_draws(gen_ili_obs_fit_sum[n]) %>% 
     filter(.draw%in%c(1:500)) %>% # filter a number of posterior draws
     select(-.chain,-.iteration) %>% ungroup() %>% 
@@ -460,6 +459,7 @@ plot_fit = function(fit00,stan_list,country_short_input) {
     right_join( stan_list$all_season_project ,
                 by = join_by(week_id)) %>% mutate(date=date_mon)
   p1 = modelled_fit %>% ggplot() + geom_line(aes(date,age_total)) + 
+    geom_line(data=. %>% filter(season==max(season)),aes(date,age_total),col="red") +
     geom_ribbon(aes(x=date,ymin=low,ymax=upp),fill="lightblue") +
     geom_ribbon(data=modelled_proj,aes(x=date,fill=as.factor(scen),ymin=low,ymax=upp)) +
     labs(subtitle = paste0( EU_long(country_short_input)," (",country_short_input,")") ); p1
@@ -469,7 +469,7 @@ plot_fit = function(fit00,stan_list,country_short_input) {
 
 plot_fit_byage = function(fit00,stan_list,country_short_input){
   # age split version
-  obs_data = stan_list$ili_obs_fit %>% mutate(n=1:n(),date=stan_list$ili_fit_date) %>% 
+  obs_data = stan_list$all_season_fit %>% select(age_00_04:age_65_99,date,season,n) %>% 
     pivot_longer(cols=1:stan_list$n_age_groups,names_to = "age") %>% 
     mutate(age=as.factor(age) %>% as.numeric())
   modelled_fit = fit00 %>% gather_draws(gen_ili_obs_fit[n,age]) %>% 
@@ -486,8 +486,9 @@ plot_fit_byage = function(fit00,stan_list,country_short_input){
     left_join( proj_df, by=join_by(week_id)  )
   
   p2 = modelled_fit %>% ggplot(aes(date,value)) + geom_line() + 
-    geom_line(aes(y=mean_value),col="lightblue") +
-    geom_line(data=modelled_proj,aes(col=as.factor(scen),y=mean_value)) +
+    geom_line(data=. %>% filter(season==max(season)),aes(date,value),col="red",linewidth=1.4) +
+    geom_line(aes(y=mean_value),col="lightblue",alpha=0.8) +
+    geom_line(data=modelled_proj,aes(col=as.factor(scen),y=mean_value),alpha=0.5) +
     facet_wrap(~age,ncol=1,scales="free_y") +
     labs(subtitle = paste0( EU_long(country_short_input)," (",country_short_input,")") ); p2
   
