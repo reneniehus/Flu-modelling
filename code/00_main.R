@@ -32,7 +32,7 @@ rep_list = process_and_save( params, data, models_out, save_submission=params$sa
 rmarkdown::render("code/03_report/report_overview.Rmd") # requires: params, data , rep_list
 
 # ---- |-Send ----
-send_report()
+send_report(params)
 
 # ---- |- Run special analyses
 if (F) source("code/04_special_analyses/season_country_var_rt.R")

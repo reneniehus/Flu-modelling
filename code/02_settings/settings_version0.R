@@ -2,9 +2,12 @@ settings = function() {
   params = list()
   
   # ---- |-Run modes ----
-  params$debug = F # T: runs scripts with settings that reduce run-time
+  params$debug = T # T: runs scripts with settings that reduce run-time
   params$refit = T # T: fits are run again and saved, F: saved fits will be used
   params$save_submission = F # T: saves the file ready for respicompass, F; will be faster
+  
+  # ---- |-Resport setting ----
+  params$report_recipients = c('rene.niehus@ecdc.europa.eu', 'rene7niehus@gmail.com','rok.grah@ecdc.europa.eu')
   
   # ---- |-Names/identifiers ----
   params$scenario_round_id = "2024_2025_1_FLU"

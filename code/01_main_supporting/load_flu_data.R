@@ -342,7 +342,7 @@ load_flu_data = function( params=NULL , regenerate=F,new_from_online=T  ){
   
   data = list() # reset data list
   
-  data = load_flu_data_epi( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate)
+  data = load_flu_data_epi( data=data, params=NULL , new_from_online=T , regenerate=T )
   
   data = load_flu_data_vax( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate)
   
