@@ -81,15 +81,17 @@ rep_warning_wed = function(df_rep,ind_name){
 }
 
 data_into_all_season = function(data,params,withforce=F){
+  # function that loops through countries and seasons and makes all useful data available through a list (avoid model choices here)
   
   file_doesnot_exist = !file.exists("output/all_season.Rdata")
   if (file_doesnot_exist|withforce==T) {
-    # initiate
+    # initiate list
     df_collect = list()
     df_i = 1
     
+    # loop only through countries where ILIconsultationrate exists
     country_short_input_v=data$epi$erviss_ili_ari %>% 
-      filter(target==params$SIR_simple$target) %>% 
+      filter(target=="ILIconsultationrate") %>% 
       pull(country_short) %>% unique() ; length(country_short_input_v)
     
     for (country_short_input_i in country_short_input_v) { # country_short_input_i = country_short_input_v[1] 
@@ -109,9 +111,9 @@ data_into_all_season = function(data,params,withforce=F){
           filter(country_short == country_short_input_i) %>% 
           select(-country_short) %>% 
           filter( date%in%date_v ) -> xinc_iliari; rep_warning_wed(xinc_iliari,"ili/ari")
-        
         if ( nrow(xinc_iliari) == 0 ) next;
-        # fill the date gaps
+        
+        # fill data gaps
         crossing(target=c("ILIconsultationrate","ARIconsultationrate"), 
                  date=date_v_wed,
                  agegroup=c("age_00_04", "age_15_64", "age_05_14", "age_65_99", "age_total")
@@ -124,11 +126,19 @@ data_into_all_season = function(data,params,withforce=F){
           filter(country_short == country_short_input_i,date%in%date_v) %>% 
           filter(pathogen=="Influenza",pathogensubtype=="total") %>% 
           select(-country_short,-survtype,-countryname,-pathogen,-age,-yearweek) -> xtyping_sent
-        # fill the date gaps
+        # fill tdata gaps
         if (nrow(xtyping_sent)>=1) crossing( date=date_v_wed,
                                              indicator=c("detections","positivity","tests"  ) ) %>% 
           left_join( xtyping_sent, by = join_by(date,indicator) ) %>% 
-          fill( c("pathogentype", "pathogensubtype"),.direction = "downup" ) -> xtyping_sent; rep_warning_wed(xtyping_sent,"sent_typing")
+          fill( c("pathogentype", "pathogensubtype"),.direction = "downup" ) -> xtyping_sent; 
+        # calculate my own positivity
+        xtyping_sent %>% group_by(date) %>%  mutate(
+          value=ifelse(indicator=="positivity",
+                       value[indicator=="detections"]/value[indicator=="tests"],
+                       value)
+        ) %>% ungroup() -> xtyping_sent
+        rep_warning_wed(xtyping_sent,"sent_typing")
+        
         
         # typing_nonsentinel
         data$epi$erviss_typing_nonsentinel %>% 
@@ -140,6 +150,7 @@ data_into_all_season = function(data,params,withforce=F){
                                                 indicator=c("detections","positivity","tests"  ) ) %>% 
           left_join( xtyping_nonsent, by = join_by(date,indicator) ) %>% 
           fill( c("pathogentype", "pathogensubtype"),.direction = "downup" ) -> xtyping_nonsent
+        # compute positivty
         xtyping_nonsent %>% group_by(date) %>%  mutate(
           value=ifelse(indicator=="positivity",
                        value[indicator=="detections"]/value[indicator=="tests"],
@@ -169,6 +180,15 @@ data_into_all_season = function(data,params,withforce=F){
           left_join(  x_iliplus,by = join_by(target,date,agegroup) ) %>% 
           fill(c("agegroup", "target"),.direction = "downup") -> x_iliplus
         
+        ## erviss-based ili_plus
+        . %>% select(date,value) -> mfu
+        xinc_iliari %>% filter(target=="ILIconsultationrate") %>% select(date,agegroup,value) %>% rename(ILI=value) -> x1
+        xtyping_sent %>% filter(indicator=="positivity")%>% mfu() %>% rename(pos=value)  -> x2_sent
+        xtyping_nonsent %>% filter(indicator=="positivity")%>% mfu() %>% rename(pos=value) -> x2_nonsent
+        . %>% transmute(date=date,agegroup=agegroup,value=pos*ILI) -> mfu
+        x1 %>% left_join(x2_sent,by = 'date') %>% mfu() -> x_iliplus_erviss_sent
+        x1 %>% left_join(x2_nonsent,by = 'date') %>% mfu() -> x_iliplus_erviss_nonsent
+        
         
         ## data quality measures
         ili_sum=xinc_iliari %>% filter(target=="ILIconsultationrate") %>% summarise(x=sum(value,na.rm=T)) %>% pull(x)
@@ -181,9 +201,16 @@ data_into_all_season = function(data,params,withforce=F){
         ntests_nonsent = xtyping_nonsent%>% filter(indicator=="tests")%>% summarise(msum=sum(value,na.rm=T)) %>% pull(msum)
         tests_nonsentinel_quality = xtyping_nonsent %>% filter(indicator=="tests") %>% summarise(x=mean(value>5,na.rm=T)) %>% pull(x)
         ili_plus_sum=x_iliplus %>% summarise(x=sum(value,na.rm=T)) %>% pull(x)
+        ili_plus_erviss_sent_sum=x_iliplus_erviss_sent %>% summarise(x=sum(value,na.rm=T)) %>% pull(x)
+        ili_plus_erviss_nonsent_sum=x_iliplus_erviss_nonsent %>% summarise(x=sum(value,na.rm=T)) %>% pull(x)
+        
         ili_plus_agesplit_sum=x_iliplus %>% filter(agegroup!="age_total") %>% summarise(x=sum(value,na.rm=T)) %>% pull(x)
+        ili_plus_erviss_sent_agesplit_sum=x_iliplus_erviss_sent %>% filter(agegroup!="age_total") %>% summarise(x=sum(value,na.rm=T)) %>% pull(x)
+        ili_plus_erviss_nonsent_agesplit_sum=x_iliplus_erviss_nonsent %>% filter(agegroup!="age_total") %>% summarise(x=sum(value,na.rm=T)) %>% pull(x)
         
         ili_plus_quality=x_iliplus %>% summarise(x=mean(!is.na(value))) %>% pull(x)
+        ili_plus_erviss_sent_quality=x_iliplus_erviss_sent %>% summarise(x=mean(!is.na(value))) %>% pull(x)
+        ili_plus_erviss_nonsent_quality=x_iliplus_erviss_nonsent %>% summarise(x=mean(!is.na(value))) %>% pull(x)
         
         ## plotting
         xinc_iliari %>% ggplot(aes(date,value))+geom_line()
@@ -215,15 +242,26 @@ data_into_all_season = function(data,params,withforce=F){
           tests_sentinel_quality=tests_sentinel_quality,
           tests_nonsentinel=ntests_nonsent,
           tests_nonsentinel_quality=tests_nonsentinel_quality,
+          # ili plus, 3 versions
           ili_plus_sum=ili_plus_sum,
           ili_plus_agesplit_sum=ili_plus_agesplit_sum,
           ili_plus_quality=ili_plus_quality,
+          #
+          ili_plus_erviss_sent_sum=ili_plus_erviss_sent_sum,
+          ili_plus_erviss_sent_agesplit_sum=ili_plus_erviss_sent_agesplit_sum,
+          ili_plus_erviss_sent_quality=ili_plus_erviss_sent_quality,
+          #
+          ili_plus_erviss_nonsent_sum=ili_plus_erviss_nonsent_sum,
+          ili_plus_erviss_nonsent_agesplit_sum=ili_plus_erviss_nonsent_agesplit_sum,
+          ili_plus_erviss_nonsent_quality=ili_plus_erviss_nonsent_quality,
           # nested dataframes
           nest(xinc_iliari) %>% rename(inc_iliari=data),
           nest(xtyping_sent) %>% rename(typing_sentinel=data),
           nest(xtyping_nonsent) %>% rename(typing_nonsentinel=data),
           nest(xtyping_combined) %>% rename(typing_combined=data),
-          nest(x_iliplus) %>% rename(respicompass_ili_plus=data)
+          nest(x_iliplus) %>% rename(respicompass_ili_plus=data),
+          nest(x_iliplus_erviss_sent) %>% rename(erviss_ili_plus_sentinel=data),
+          nest(x_iliplus_erviss_nonsent) %>% rename(erviss_ili_plus_nonsentinel=data)
         )
         df_i = df_i + 1
       } # season loop

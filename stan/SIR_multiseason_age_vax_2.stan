@@ -4,10 +4,11 @@ data {
   // data relevant for the fit 
   int n_age_groups;  // number of age groups
   int n_season;      // number of seasons
+  int n_season_cum_fit; // number of seasons for the cumulative fit
   int n_week_fit;    // number of observable values, weekly
   int n_day_fit;     // number of obervatble values, daily
   int ili_obs_fit[n_week_fit, n_age_groups]; // observed ili
-  real<lower=0> cum_ili_obs_log[ n_season ]; // observed cumulative ili (log-scale)
+  real cum_ili_obs_log[ n_season ]; // observed cumulative ili (log-scale)
   int n_daily_time_steps; // number of daily steps
   array[n_week_fit,n_age_groups]int<lower=0,upper=1> ili_obs_notna; // indicating non-missing data with 1, otherwise 0
   array[n_day_fit] int<lower=0,upper=2> season_start_fit; // indicating first week of a season with 1, the second week with 2, otherwise 0
@@ -307,7 +308,7 @@ model {
     }
   }
   
-  for (s in 1:n_season) {
+  for (s in 1:n_season_cum_fit ) {
     target += weight_cum_ili*normal_lpdf( cum_ili_obs_log[s] | cum_ili_log[s] , sigma_cum_ili ) ; 
   }
   

@@ -2,7 +2,7 @@ settings = function() {
   params = list()
   
   # ---- |-Run modes ----
-  params$debug = T # T: runs scripts with settings that reduce run-time
+  params$debug = F # T: runs scripts with settings that reduce run-time
   params$refit = T # T: fits are run again and saved, F: saved fits will be used
   params$save_submission = F # T: saves the file ready for respicompass, F; will be faster
   
@@ -29,9 +29,12 @@ settings = function() {
   params$ve_ili = 1-(1-params$ve_inf)*(1-params$ve_ili_cond_inf) # (1-ve_ili) = (1-ve_inf)*(1-ve_ili_cond_inf) 
   
   # ---- |-Data ----
-  params$latest_start_year = 2023 # if the last partly/fully observed season is 2023/24, put 2023
+  params$latest_start_year = 2024 # if the last partly/fully observed season is 2024/25, put 2024
   params$season_start_monthday = "-08-01" # initial date of for SIR initiation
   params$season_end_monthday = "-07-31" # end date of SIR process
+  
+  params$ili_plus_sentinel = c("AT","BE","CZ","DK","EE","FI","FR","IE","IT","NL","NO","PL","SI") # for which countries is ili-plus computation based on sentinel pathogen testing
+  params$ili_plus_nonsentinel = c("HR","IS","LV","MT","RO") # for which countries is ili-plus computation based on non-sentinel pathogen testing
   # summer low-activity (where we assume that ILI activity = 0, where NA was reported)
   low_start = "-06-01"
   low_stop  = "-09-01"
@@ -53,10 +56,11 @@ settings = function() {
   params$SIR_simple$target = "ILIconsultationrate"
   params$SIR_simple$agegroup = "age_total"
   # Settings for SIR_multiseason
-  params$SIR_simple_multi_season$target = c("respicompass_ili_plus") # c("ili","ili_typing_sentinel","ili_typing_all","respicompass_ili_plus")
+  params$SIR_simple_multi_season$target = c("erviss_ili_plus") # c("ili","ili_typing_sentinel","ili_typing_all","respicompass_ili_plus","erviss_ili_plus")
   params$SIR_multiseason$seasons_exclude = c("2019/2020","2020/2021","2021/2022") # those impacted by COVID-19 acute phase
-  params$SIR_multiseason$seasons_include = c("2017/2018","2018/2019","2023/2024") # 2017-2018, 2018-2019, and 2023-2024
+  params$SIR_multiseason$seasons_include = c("2017/2018","2018/2019","2023/2024","2024/2025") # 2017-2018, 2018-2019, 2023-2024, and 2024-2025
   params$SIR_multiseason$age_groups = c("age_00_04","age_05_14","age_15_64","age_65_99")
+  params$n_season_cum_fit = 3 # as per RespiCompass round 1, avoid fitting the cumulative ili for an early ongoing season
   # Settings for last_year_burden
   params$last_year_burden$target = "ILIconsultationrate"
   params$last_year_burden$agegroup = "age_total"

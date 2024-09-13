@@ -93,7 +93,6 @@ load_flu_data_epi = function(data=data, params=NULL, regenerate=T , new_from_onl
         agegroup=age,
         value=value
       ) 
-    
     epi = list(
       date_epilist_created = today(),
       erviss_ili_ari = erviss_ili_ari,

@@ -16,7 +16,7 @@ run_flu_models = function( params=NULL , data=NULL ){
     pr=paste("Initiating SIR_simple_multi_season \n"); cat(green(pr))
     
     # ---- |-Data for all countries ----
-    all_season = data_into_all_season(data,params,withforce=F); df_out$figs_prefit$fit_seasons_countries <- plot_all_season(all_season)
+    all_season = data_into_all_season( data,params,withforce=F ); df_out$figs_prefit$fit_seasons_countries <- plot_all_season(all_season)
     contacts = transform_contracts(data,params) # transform the contact matrixes for model requirements
     target_input_v = params$SIR_simple_multi_season$target
     country_short_input_v = all_season %>% 
@@ -30,7 +30,8 @@ run_flu_models = function( params=NULL , data=NULL ){
     target_input=target_input_v[1]
     country_short_input_v = country_short_input_v  # country_short_input_v[!country_short_input_v %in% c("AT","IT")] # params$run_countries # c("IT","AT")
     m <- stan_model(file='./stan/SIR_multiseason_age_vax_2.stan')
-    for (country_short_input in country_short_input_v ) { # country_short_input="IT"
+    
+    for (country_short_input in "BE" ) { # country_short_input="IT"; country_short_input_v
       # ---- |-Prepare country specific data ----
       pop_country = data$demography_respicast$population_pyramid %>% 
         filter(country==EU_long(country_short_input)) %>% pull(population) %>% sum()

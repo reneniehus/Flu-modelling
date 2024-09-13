@@ -9,7 +9,7 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
     # tol_rel_obj: default=0.01, smaller means more strict with convergence
     quick_vb = params$debug
     if (!quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=5, tol_rel_obj = 0.005,output_samples = 400,iter=50000)
-    if ( quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=1, tol_rel_obj = 0.020,output_samples = 100,iter= 5000)
+    if ( quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=1, tol_rel_obj = 0.020,output_samples = 300,iter= 5000)
     fit00=rstan_vb(m,algorithm = "meanfield",seed=12,data=stan_list) 
     end_time <- Sys.time(); end_time - start_time
     save(fit00,file = fname)
@@ -105,6 +105,31 @@ fit_with_eabc = function(params,stan_list,mod_path) {
 wrangle_fit_df = function(params,data,all_season_country,country_short_input,target_input){
   
   all_season = all_season_country
+  
+  if (target_input=="erviss_ili_plus") {
+    all_season %>% 
+      filter(country_short == country_short_input,
+             season%in%params$SIR_multiseason$seasons_include) -> x
+    
+    # to compare the different ili_plus versions
+    x %>% select(country_short,season,ili_plus_agesplit_sum,ili_plus_erviss_sent_agesplit_sum,ili_plus_erviss_nonsent_agesplit_sum)
+    
+    sent = NA
+    if (country_short_input %in% params$ili_plus_sentinel   ) sent = T;
+    if (country_short_input %in% params$ili_plus_nonsentinel) sent = F;
+    
+    if ( sent) x %>% unnest(erviss_ili_plus_sentinel   ) -> y; y %>% ggplot(aes(date,value)) +geom_line()+labs(subtitle='erviss_sent')
+    if (!sent) x %>% unnest(erviss_ili_plus_nonsentinel) -> y; y %>% ggplot(aes(date,value)) +geom_line()+labs(subtitle='erviss_nonsent')
+    if (is.na(sent)) warning("Country has unclear sentinal/nonsentinel ili-plus indicator")
+    
+    y %>% 
+      select(country_short,date,season,agegroup,value)-> all_season_fit
+    # impute summer low-activity
+    all_season_fit %>% mutate(
+      summer_low_day = as.integer(date%in%params$summer_low_dates),
+      value=ifelse( date%in%params$summer_low_dates & is.na(value), 0 , value )
+    ) -> all_season_fit
+  }
   
   if (target_input=="respicompass_ili_plus") {
     all_season %>% 
@@ -235,6 +260,7 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
     ili_proj_date = all_season_project$date_wed,
     ## data relevated for the fit
     n_season = n_distinct(all_season_fit_wide$season),
+    n_season_cum_fit = params$n_season_cum_fit, # as per RespiCompass Round 1 
     n_week_fit = nrow(all_season_fit_wide),
     n_day_fit = nrow(all_season_fit_daily),
     n_age_groups = n_age_groups,
@@ -310,7 +336,7 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
   stan_list$daily_daystart_fit = rep(1:stan_list$n_daily_time_steps, each=stan_list$n_day_fit)
   stan_list$daily_daystart_proj = rep(1:stan_list$n_daily_time_steps, each=stan_list$n_day_proj)
   # summary targets
-  stan_list$cum_ili_obs_log = rowsum(x=stan_list$ili_obs_fit,group=stan_list$season_id_week_fit,na.rm = T) %>% rowSums() %>% log()
+  stan_list$cum_ili_obs_log = rowsum(x=stan_list$ili_obs_fit,group=stan_list$season_id_week_fit,na.rm = T) %>% rowSums() %>% zero_plus_eps(eps=1/10^6) %>% log()
   stan_list$n_ili_obs_notna = rowsum(x=stan_list$ili_obs_notna,group=stan_list$season_id_week_fit,na.rm = T) %>% rowSums()
   stan_list$weight_obs_epi =  stan_list$ili_obs_fit*0 + 0.05 #1/mean( stan_list$n_ili_obs_notna ) 
   # if (country_short_input=="IT") stan_list$weight_obs_epi =  0.01
