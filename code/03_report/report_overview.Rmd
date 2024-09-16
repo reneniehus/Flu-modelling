@@ -13,29 +13,49 @@ editor_options:
   chunk_output_highlight: default
 ---
 
-# Overview report: Flu Scenario Modelling
+# Flu Scenario Modelling-repeat update
 
-## Relevant background information
+```{r}
+load(file = "./output/rep_list.Rdata") # rep_list
+rl = rep_list
+```
 
-Model meta-data link Model documentation link
+## Executive summary
+
+We fit a flu scenario model (deterministic SIR, age- and vaccine-status disaggregated) to ILI-plus as an indicator of flu activity. The model is fitted separately to all `r rl$N_countries_fit` EU/EEA countries that have data. \
+\
+-Highlights of any countries where recent ILI activity deviates significantly from expectations\
+-overview over the scenario projections, and any substantial changes since the last report
 
 ```{r for_summary}
 
-
 ```
 
-### Summary
+### Data overview
 
-The Model was run successfully for X countries,
+The date of the last data load is XXX, and the countries that indicated any activity where XXX.
 
-### Detail section 1
+Countries with most ILI activity added (compared to country-baseline):
 
-```{r }
-# 
+### ILI-plus activity summary
 
+Watch list of countries where ILI activity is unexpected based on the model's projections
+
+### Scenario Projections
+
+Summary table of what is projected for each country
+
+```{r scenario_projections}
+rl$sum_ili
 ```
 
-### Detail section 2
+### Methodology
+
+Brief summary of the model structure
+
+List of key assumptions and limitations
+
+Explain analysis steps for this report
 
 ```{r }
 # 

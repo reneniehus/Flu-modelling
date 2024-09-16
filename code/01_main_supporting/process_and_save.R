@@ -6,20 +6,32 @@ process_and_save = function(params=NULL, data=NULL, models_out=NULL,save_submiss
   df_submission = NULL
   df_data_summaries = NULL
   for (i in 1:length(models_out$mout)) {
+    i_country = names(models_out$mout)[i]
+    i_country_long = names(models_out$mout)[i] %>% EU_long()
     # parameter estimates
-    x = models_out$mout[[i]]$pars_df
-    x = as_tibble(x, rownames = "para")
-    x$country = names(models_out$mout)[i]
-    x$country_long = names(models_out$mout)[i] %>% EU_long()
-    df_para = rbind(df_para,x)
+    xpar = models_out$mout[[i]]$pars_df
+    xpar = as_tibble(xpar, rownames = "para")
+    xpar$country = i_country
+    xpar$country_long = i_country_long
+    df_para = rbind(df_para,xpar)
     # submission df
-    x = models_out$mout[[i]]$modelled_proj
-    df_submission = rbind(df_submission,x)
-    # observed burden
-    x1 = models_out$mout[[i]]$season_ili_mean
-    x_df = tibble(location=names(models_out$mout)[i],
-                  season_ili_mean=x1)
+    xsubm = models_out$mout[[i]]$modelled_proj
+    df_submission = rbind(df_submission,xsubm)
+    # projected burden
+    x1 = models_out$mout[[i]]$season_ili_mod_mean
+    . %>% filter(pop_group=="total_vaxTotal") %>% 
+      group_by(output_type_id,scenario_id) %>% summarise( value=sum(value) ) %>% ungroup()  -> mfu
+    baseline_low = xsubm %>% filter(scenario_id=="G") %>% mfu() %>% summarise(val=quantile(value,0.1)) %>% deframe()
+    baseline_upp = xsubm %>% filter(scenario_id=="G") %>% mfu() %>% summarise(val=quantile(value,0.9)) %>% deframe()
+    pessimis_low = xsubm %>% filter(scenario_id%in%c("B","D","F") ) %>% mfu() %>% summarise(val=quantile(value,0.1)) %>% deframe()
+    pessimis_upp = xsubm %>% filter(scenario_id%in%c("B","D","F") ) %>% mfu() %>% summarise(val=quantile(value,0.9)) %>% deframe()
+    x_df = tibble(location=i_country_long,
+                  baseline_low=baseline_low/x1,
+                  baseline_upp=baseline_upp/x1,
+                  pessimis_low=pessimis_low/x1,
+                  pessimis_upp=pessimis_upp/x1)
     df_data_summaries = rbind(df_data_summaries,x_df)
+    # 
   }
   
   ## ---- |-Sense checks ----
@@ -51,13 +63,6 @@ process_and_save = function(params=NULL, data=NULL, models_out=NULL,save_submiss
   df_submission %>% group_by(scenario_id,location) %>% 
     summarise(cum_burden_log=sum(value) %>% log()) %>% arrange(location,cum_burden_log)
   #
-  sum_ili = df_submission %>% filter(pop_group=="total_vaxTotal") %>% 
-    group_by(scenario_id,location,horizon) %>% summarise(value=mean(value)) %>% ungroup() %>% 
-    group_by(scenario_id,location) %>% 
-    summarise(proj_burden=sum(value)) %>% 
-    left_join( df_data_summaries, by="location" ) %>% 
-    mutate( proj_burden_rel = ((proj_burden/season_ili_mean)*100) %>% round() ) %>% 
-    arrange(location,scenario_id) 
   
   ## ---- |-Save ----
   if (save_submission) {
@@ -79,10 +84,12 @@ process_and_save = function(params=NULL, data=NULL, models_out=NULL,save_submiss
   # pack the list
   rep_list = list(
     N_countries_fit=models_out$mout %>% length(),
-    sum_ili=sum_ili
-    # plots
+    df_data_summaries=df_data_summaries,
+    # 
+    df_para=df_para
     
   )
+  save(rep_list,file="./output/rep_list.Rdata")
   
   return(rep_list)
 }

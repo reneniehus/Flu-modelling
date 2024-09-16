@@ -6,7 +6,7 @@ settings = function() {
   
   # debug/fast modes
   params$rapid_stan_fit = F # T: runs scripts with settings that reduce run-time
-  params$load_earlyfit  = F # T: saved fits will be used
+  params$load_earlyfit  = T # T: saved fits will be used
   
   # ---- |-Resport setting ----
   params$send_report = T
@@ -63,6 +63,7 @@ settings = function() {
   params$SIR_simple_multi_season$target = c("erviss_ili_plus") # c("ili","ili_typing_sentinel","ili_typing_all","respicompass_ili_plus","erviss_ili_plus")
   params$SIR_multiseason$seasons_exclude = c("2019/2020","2020/2021","2021/2022") # those impacted by COVID-19 acute phase
   params$SIR_multiseason$seasons_include = c("2017/2018","2018/2019","2023/2024","2024/2025") # 2017-2018, 2018-2019, 2023-2024, and 2024-2025
+  params$SIR_multiseason$seasons_baseline = c("2017/2018","2018/2019","2023/2024")
   params$SIR_multiseason$age_groups = c("age_00_04","age_05_14","age_15_64","age_65_99")
   params$n_season_cum_fit = 3 # as per RespiCompass round 1, avoid fitting the cumulative ili for an early ongoing season
   # Settings for last_year_burden
