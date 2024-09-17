@@ -20,6 +20,7 @@ source("code/06_sandbox/generate_ili_epi_test.R")
 
 # ---- |-load flu data ----
 data = load_flu_data( params, regenerate = F, new_from_online = F) # loads the data
+save(data,file="./output/data_RespiCompass_round1.Rdata")
 # regenerate=T recreates the data lists, new_from_online=T uses the online versions for recreation
 
 # ---- |-run flu models (i.e. fitting and projections) ----
@@ -29,7 +30,7 @@ models_out = run_flu_models( params, data ) # runs the model scripts
 rep_list = process_and_save( params, data, models_out, save_submission=params$save_submission ) # processing the model output, with figures and saves
 
 # ---- |-report ----
-rmarkdown::render("code/03_report/report_overview.Rmd") # requires: params, data , rep_list
+if (F) rmarkdown::render("code/03_report/report_overview.Rmd") # requires: params, data , rep_list
 
 # ---- |-Send ----
 send_report(params)

@@ -1,5 +1,4 @@
 fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_short_input,m) {
-  
   # run the model fit
   fname = paste0("../Big data/fit",country_short_input,".Rdata")
   if (params$load_earlyfit) {
@@ -11,7 +10,8 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
     # tol_rel_obj: default=0.01, smaller means more strict with convergence
     quick_vb = params$rapid_stan_fit
     if (!quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=5, tol_rel_obj = 0.005,output_samples = 400,iter=50000)
-    if ( quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=1, tol_rel_obj = 0.020,output_samples = 300,iter= 9000)
+    if (!quick_vb&country_short_input=="FI" ) rstan_vb <- function(...) rstan::vb(...,grad_samples=10, tol_rel_obj = 0.005,output_samples = 400,iter=80000)
+    if ( quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=2, tol_rel_obj = 0.018,output_samples = 300,iter= 9000)
     fit00=rstan_vb(m,algorithm = "meanfield",seed=12,data=stan_list) 
     end_time <- Sys.time(); end_time - start_time
     save(fit00,file = fname)
@@ -23,7 +23,7 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
   # extract data summaries
   season_ili_mean    =sum(stan_list$ili_obs_fit[stan_list$season_id_week_fit%in%c(1,2,3),])/3 # observed burden # 35517.33
   fitted_season_cum_ili = summary(fit00,pars="cum_ili_log",probs = c(0.1, 0.9))$summary[,1]
-  season_ili_mod_mean=mean( fitted_season_cum_ili ) %>% exp() # observed burden # 35517.33
+  season_ili_mod_mean=mean( fitted_season_cum_ili ) %>% exp() # observed burden 
   
   # extract fitted parameters
   df = NULL
@@ -40,7 +40,7 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
   mout=list()
   mout$stan_list = stan_list
   mout$fit = fit00
-  mout$modelled_proj = extract_projections(params,fit00,n_iter=500,
+  mout$modelled_proj = extract_projections(params,fit00,n_iter=300,
                                            stan_list$df_scenarios,
                                            stan_list$df_agegroups,
                                            stan_list$all_season_project)
@@ -183,9 +183,8 @@ wrangle_fit_df = function(params,data,all_season_country,country_short_input,tar
 
 # computing a list with all input required by the model
 make_stan_list = function(params,data,all_season_fit_wide,country_short_input,vax_country,pop_country,contacts,age_collapse="all"){
-  
   # helpers for the fit and project dataframes
-  start_year = year(today())
+  start_year = params$proj_start_year
   season     = paste0(start_year,"/",start_year+1)
   start_date = ymd(paste0(start_year,params$season_start_monthday))
   end_date   = ymd(paste0(start_year+1,params$season_end_monthday))
@@ -339,7 +338,8 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
   stan_list$daily_daystart_fit = rep(1:stan_list$n_daily_time_steps, each=stan_list$n_day_fit)
   stan_list$daily_daystart_proj = rep(1:stan_list$n_daily_time_steps, each=stan_list$n_day_proj)
   # summary targets
-  stan_list$cum_ili_obs_log = rowsum(x=stan_list$ili_obs_fit,group=stan_list$season_id_week_fit,na.rm = T) %>% rowSums() %>% zero_plus_eps(eps=1/10^6) %>% log()
+  stan_list$cum_ili_obs_log     = rowsum(x=stan_list$ili_obs_fit,group=stan_list$season_id_week_fit,na.rm = T) %>% rowSums() %>% zero_plus_eps(eps=1/10^6) %>% log()
+  stan_list$cum_ili_obs_age_log = rowsum(x=stan_list$ili_obs_fit,group=stan_list$season_id_week_fit,na.rm = T) %>% zero_plus_eps(eps=1/10^6) %>% log()
   stan_list$n_ili_obs_notna = rowsum(x=stan_list$ili_obs_notna,group=stan_list$season_id_week_fit,na.rm = T) %>% rowSums()
   stan_list$weight_obs_epi =  stan_list$ili_obs_fit*0 + 0.05 #1/mean( stan_list$n_ili_obs_notna ) 
   # if (country_short_input=="IT") stan_list$weight_obs_epi =  0.01

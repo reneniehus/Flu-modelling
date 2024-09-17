@@ -8,7 +8,8 @@ data {
   int n_week_fit;    // number of observable values, weekly
   int n_day_fit;     // number of obervatble values, daily
   int ili_obs_fit[n_week_fit, n_age_groups]; // observed ili
-  real cum_ili_obs_log[ n_season ]; // observed cumulative ili (log-scale)
+  real cum_ili_obs_log[ n_season ]; // observed cumulative ili (log-scale) by season
+  real cum_ili_obs_age_log[ n_season,n_age_groups ]; // observed cumulative ili (log-scale) by season and age-group
   int n_daily_time_steps; // number of daily steps
   array[n_week_fit,n_age_groups]int<lower=0,upper=1> ili_obs_notna; // indicating non-missing data with 1, otherwise 0
   array[n_day_fit] int<lower=0,upper=2> season_start_fit; // indicating first week of a season with 1, the second week with 2, otherwise 0
@@ -91,12 +92,16 @@ transformed parameters {
   matrix<lower=0, upper=1>[n_season,n_age_groups] ar; // attack rate
   
   array[n_week_fit,n_age_groups] real<lower=0> delta_ili_abs_weekly; // ili/detectable incidence in absolute numbers, weekly aggregate
-  vector[n_season] cum_ili_log ; // to store the sum of ili for each season
+  array[n_season,n_age_groups] real cum_ili_log ; // to store the sum of ili for each season
   real phi; // dispersion parameter of the observeation process, var=mu+reciprocal_phi*mu^2
   simplex[3] SIR_ini[n_season, n_age_groups]; // how to access: SIR_ini[season,age,compartment] // S I R initial values per season, 1 can be replaced by n_age_groups
   real<lower=0> prop_ili[n_season, n_age_groups]; // proportion of infections that are ili 
   phi = 1 / reciprocal_phi; // dispersion parameter: var=mu+reciprocal_phi*mu^2
-  for (s in 1:n_season) cum_ili_log[ s ] = 0 ; // reset the counter
+  for (s in 1:n_season) {
+    for (a in 1:n_age_groups) {
+      cum_ili_log[ s,a ] = 0 ; // reset the counter
+    }
+  }
   
   // --------------------------------parameter hierarchical architecture
   for (s in 1:n_season) { // season effect
@@ -278,7 +283,7 @@ transformed parameters {
         int day_end = day_start+6;
         delta_ili_abs_weekly[t,a] = sum( delta_ili_u_abs[day_start:day_end,a] ) + sum( delta_ili_v_abs[day_start:day_end,a] );
         // save summary stats
-        if (ili_obs_notna[t,a]==1) cum_ili_log[ season_id_week_fit[t] ] = cum_ili_log[ season_id_week_fit[t] ] + delta_ili_abs_weekly[t,a] ;
+        if (ili_obs_notna[t,a]==1) cum_ili_log[ season_id_week_fit[t], a ] = cum_ili_log[ season_id_week_fit[t], a ] + delta_ili_abs_weekly[t,a] ;
       }
     }
     
@@ -288,13 +293,12 @@ transformed parameters {
   
   
   // convert to log scale
-  for (s in 1:n_season) cum_ili_log[s] = log(cum_ili_log[s]);
+  for (s in 1:n_season_cum_fit ) {
+    for (a in 1:n_age_groups) {
+      cum_ili_log[s,a] = log(cum_ili_log[s,a]) ;
+    }
+  }
   
-  // for (s in 1:n_season) {
-    //   for (a in 1:n_age_groups) {
-      //     logit( prop_ili[s,a] ) = logit( prop_ili_mu ) + prop_ili_season[s] + prob_ili_age[a]; 
-      //   }
-      // }
       
 }
 
@@ -309,7 +313,9 @@ model {
   }
   
   for (s in 1:n_season_cum_fit ) {
-    target += weight_cum_ili*normal_lpdf( cum_ili_obs_log[s] | cum_ili_log[s] , sigma_cum_ili ) ; 
+    for (a in 1:n_age_groups) {
+      target += weight_cum_ili*normal_lpdf( cum_ili_obs_age_log[s,a] | cum_ili_log[s,a] , sigma_cum_ili ) ;
+    }
   }
   
   // --------------------------------prior part

@@ -128,6 +128,11 @@ inv_logit = function (x)
   return(p)
 }
 #
+replace_inf = function(vector_with_inf,replacement=NA){
+  vector_with_inf[is.infinite(vector_with_inf)] = replacement
+  return(vector_with_inf)
+}
+
 zero_plus_eps = function(vector_with_zeros,eps=1/(100*10^6) ){
   (vector_with_zeros==0) %>% sum() -> n_zeros
   #print(paste("zero_plus_eps() is adding a mass of:", n_zeros*eps))

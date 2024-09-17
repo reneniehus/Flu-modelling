@@ -70,12 +70,12 @@ process_and_save = function(params=NULL, data=NULL, models_out=NULL,save_submiss
     sub_cols = c("round_id","scenario_id","target","location","pop_group",
                  "horizon","target_end_date","output_type","output_type_id","value")
     df_submission %>% 
-      select(any_of(sub_cols) ) %>% filter(output_type_id%in%c(1:400)) %>% 
+      select(any_of(sub_cols) ) %>% filter(output_type_id%in%c(1:300)) %>% 
       mutate(horizon=as.integer(horizon),output_type_id=as.character(output_type_id)) %>% 
       filter(scenario_id%in%c("A","B","C","D","E","F")) %>% 
       filter(!is.na(horizon)) -> x
-    el_distinct = c("round_id"=1,"scenario_id"=6,"target"=1,"locatoin"=18,
-                    "pop_group"=15,"horizon"=43,"output_type_id"=400)
+    el_distinct = c("round_id"=1,"scenario_id"=6,"target"=1,"location"=18,
+                    "pop_group"=15,"horizon"=43,"output_type_id"=300)
     cumprod(el_distinct)
     x %>% write_parquet("../Big data/2024_2025_1_FLU-ECDC-flumod.parquet")
   }

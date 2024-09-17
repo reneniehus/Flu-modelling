@@ -2,7 +2,7 @@ settings = function() {
   params = list()
   
   # ---- |-Run modes ----
-  params$save_submission = F # T: saves the file ready for respicompass, F; will be faster
+  params$save_submission = T # T: saves the file ready for respicompass, F; will be faster
   
   # debug/fast modes
   params$rapid_stan_fit = F # T: runs scripts with settings that reduce run-time
@@ -19,6 +19,7 @@ settings = function() {
   params$scenario_model = "flumod"
   
   params$four_age_groups = c("0-4","5-14","15-64","65+") # the order is important
+  params$proj_start_year = 2024 # when projecting the season 2024/25, put 2024
   
   # ---- |-Disease parameters ----
   params$rate_infectious = 0.2777778

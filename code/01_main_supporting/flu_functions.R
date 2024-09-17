@@ -136,7 +136,7 @@ data_into_all_season = function(data,params,withforce=F){
           value=ifelse(indicator=="positivity",
                        value[indicator=="detections"]/value[indicator=="tests"],
                        value)
-        ) %>% ungroup() -> xtyping_sent
+        ) %>% ungroup() %>% mutate(value=replace_inf(value,NA)) -> xtyping_sent
         rep_warning_wed(xtyping_sent,"sent_typing")
         
         
@@ -151,12 +151,14 @@ data_into_all_season = function(data,params,withforce=F){
           left_join( xtyping_nonsent, by = join_by(date,indicator) ) %>% 
           fill( c("pathogentype", "pathogensubtype"),.direction = "downup" ) -> xtyping_nonsent
         # compute positivty
+        
         xtyping_nonsent %>% group_by(date) %>%  mutate(
           value=ifelse(indicator=="positivity",
                        value[indicator=="detections"]/value[indicator=="tests"],
                        value)
-        ) %>% ungroup() -> xtyping_nonsent; rep_warning_wed(xtyping_nonsent,"nonsent_typing")
-        
+        ) %>% ungroup() %>% mutate(value=replace_inf(value,NA)) -> xtyping_nonsent; rep_warning_wed(xtyping_nonsent,"nonsent_typing")
+        xtyping_nonsent %>% filter(value %>% is.infinite()) -> mytest
+        if (nrow(mytest)>0) {browser()}
         ## combine sentinel and non-sentinel
         xtyping_sent    %>% rename(value_sent=value)   -> x1
         xtyping_nonsent %>% rename(value_nonsent=value)-> x2
@@ -188,7 +190,6 @@ data_into_all_season = function(data,params,withforce=F){
         . %>% transmute(date=date,agegroup=agegroup,value=pos*ILI) -> mfu
         x1 %>% left_join(x2_sent,by = 'date') %>% mfu() -> x_iliplus_erviss_sent
         x1 %>% left_join(x2_nonsent,by = 'date') %>% mfu() -> x_iliplus_erviss_nonsent
-        
         
         ## data quality measures
         ili_sum=xinc_iliari %>% filter(target=="ILIconsultationrate") %>% summarise(x=sum(value,na.rm=T)) %>% pull(x)
