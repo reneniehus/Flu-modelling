@@ -6,12 +6,12 @@ settings = function() {
   
   # debug/fast modes
   params$rapid_stan_fit = F # T: runs scripts with settings that reduce run-time
-  params$load_earlyfit  = T # T: saved fits will be used
+  params$load_earlyfit  = F # T: saved fits will be used
   
   # ---- |-Resport setting ----
   params$send_report = T
   params$report_recipients = c('rene.niehus@ecdc.europa.eu', 'rene7niehus@gmail.com','rok.grah@ecdc.europa.eu')
-  params$report_recipients = c('rene.niehus@ecdc.europa.eu')
+  #params$report_recipients = c('rene.niehus@ecdc.europa.eu')
   
   # ---- |-Names/identifiers ----
   params$scenario_round_id = "2024_2025_1_FLU"
@@ -27,8 +27,8 @@ settings = function() {
   
   # immunity parameters
   params$ve_spread = 0.20 # vaccine effect on onward spread when vaccinated individual is infected
-  params$ve_inf = 0.20 # vaccine efficacy on becoming infected given exposure
-  params$ve_ili_cond_inf = 0.25 # vaccine effect on ILI development given infections
+  params$ve_inf = 0.25 # vaccine efficacy on becoming infected given exposure
+  params$ve_ili_cond_inf = 0.20 # vaccine effect on ILI development given infections
   # vaccine effect on ILI given exposure is the combined effect of ve_inf and ve_ili_cond_inf
   # (1-ve_ili) = (1-ve_inf)*(1-ve_ili_cond_inf) 
   params$ve_ili = 1-(1-params$ve_inf)*(1-params$ve_ili_cond_inf) # (1-ve_ili) = (1-ve_inf)*(1-ve_ili_cond_inf) 

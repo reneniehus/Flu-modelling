@@ -6,8 +6,10 @@ process_and_save = function(params=NULL, data=NULL, models_out=NULL,save_submiss
   df_submission = NULL
   df_data_summaries = NULL
   for (i in 1:length(models_out$mout)) {
+    
     i_country = names(models_out$mout)[i]
     i_country_long = names(models_out$mout)[i] %>% EU_long()
+    pr=paste(i_country_long,"\n"); cat(green(pr))
     # parameter estimates
     xpar = models_out$mout[[i]]$pars_df
     xpar = as_tibble(xpar, rownames = "para")
@@ -63,6 +65,13 @@ process_and_save = function(params=NULL, data=NULL, models_out=NULL,save_submiss
   df_submission %>% group_by(scenario_id,location) %>% 
     summarise(cum_burden_log=sum(value) %>% log()) %>% arrange(location,cum_burden_log)
   #
+  x = df_submission %>% group_by(scenario_id,location) %>% 
+    summarise(cum_burden_log=sum(value) %>% log()) %>% arrange(location,cum_burden_log)
+  mcountry="FR"
+  x %>% filter(location==mcountry) %>% pull(cum_burden_log) -> mburd
+  names(mburd) = x %>% filter(location==mcountry) %>% pull(scenario_id)
+  mburd = exp(mburd)
+  (mburd["E"]-mburd["G"])/mburd["E"]
   
   ## ---- |-Save ----
   if (save_submission) {
@@ -85,6 +94,7 @@ process_and_save = function(params=NULL, data=NULL, models_out=NULL,save_submiss
   rep_list = list(
     N_countries_fit=models_out$mout %>% length(),
     df_data_summaries=df_data_summaries,
+    df_submission=df_submission,
     # 
     df_para=df_para
     

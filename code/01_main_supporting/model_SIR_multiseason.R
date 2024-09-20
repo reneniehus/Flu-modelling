@@ -22,8 +22,13 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
   p2 = plot_fit_byage(fit00,stan_list,country_short_input)
   # extract data summaries
   season_ili_mean    =sum(stan_list$ili_obs_fit[stan_list$season_id_week_fit%in%c(1,2,3),])/3 # observed burden # 35517.33
-  fitted_season_cum_ili = summary(fit00,pars="cum_ili_log",probs = c(0.1, 0.9))$summary[,1]
-  season_ili_mod_mean=mean( fitted_season_cum_ili ) %>% exp() # observed burden 
+  season_ili_mod_mean = fit00 %>% gather_draws(delta_ili_abs_weekly_sum[n]) %>% 
+    filter(.draw%in%c(1:500)) %>% # filter a number of posterior draws
+    select(-.chain,-.iteration) %>% ungroup() %>% 
+    group_by(n) %>% summarise(mean_value = mean(.value)) %>% ungroup() %>% 
+    right_join( stan_list$all_season_fit,
+                by = join_by(n)) %>% group_by(season) %>% summarise(cum_ili=sum(mean_value) %>% log()) %>% 
+    pull(cum_ili) %>% mean() %>% exp()
   
   # extract fitted parameters
   df = NULL

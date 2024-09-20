@@ -9,7 +9,7 @@ send_report <- function(params) {
     email <- email %>%
       emayili::from(addr = 'rene.niehus@ecdc.europa.eu') %>%
       emayili::to( params$report_recipients ) %>% 
-      emayili::subject(subject = 'subject') %>%
+      emayili::subject(subject = 'New flu scenario model run complete') %>%
       #emayili::html('message in html') %>% 
       emayili::attachment(path = './code/03_report/report_overview.html') %>% 
       emayili::attachment(path = './code/03_report/fit_flip.pdf')
