@@ -9,3 +9,5 @@ stan/SIR_simple.rds
 /output/flu-forecast-hub
 *.PROFILE
 packrat/lib*/
+output/RespiCompass_round1.Rdata
+output/RespiCompass_round1.Rdata

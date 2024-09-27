@@ -92,6 +92,7 @@ transformed parameters {
   matrix<lower=0, upper=1>[n_season,n_age_groups] ar; // attack rate
   
   array[n_week_fit,n_age_groups] real<lower=0> delta_ili_abs_weekly; // ili/detectable incidence in absolute numbers, weekly aggregate
+  array[n_week_fit,n_age_groups] real<lower=0> delta_ili_percap_weekly; // per 100000 of age group
   array[n_season,n_age_groups] real cum_ili_log ; // to store the sum of ili for each season
   real phi; // dispersion parameter of the observeation process, var=mu+reciprocal_phi*mu^2
   simplex[3] SIR_ini[n_season, n_age_groups]; // how to access: SIR_ini[season,age,compartment] // S I R initial values per season, 1 can be replaced by n_age_groups
@@ -282,8 +283,9 @@ transformed parameters {
         int day_start = (t-1)*7+1;
         int day_end = day_start+6;
         delta_ili_abs_weekly[t,a] = sum( delta_ili_u_abs[day_start:day_end,a] ) + sum( delta_ili_v_abs[day_start:day_end,a] );
+        delta_ili_percap_weekly[t,a] = delta_ili_abs_weekly[t,a]/pop_age_group[a,1]*100000;
         // save summary stats
-        if (ili_obs_notna[t,a]==1) cum_ili_log[ season_id_week_fit[t], a ] = cum_ili_log[ season_id_week_fit[t], a ] + delta_ili_abs_weekly[t,a] ;
+        if (ili_obs_notna[t,a]==1) cum_ili_log[ season_id_week_fit[t], a ] = cum_ili_log[ season_id_week_fit[t], a ] + delta_ili_percap_weekly[t,a] ;
       }
     }
     
@@ -308,7 +310,7 @@ model {
   
   for (t in 1:n_week_fit) {
     for (a in 1:n_age_groups) {
-      if (ili_obs_notna[t,a]==1) target += weight_obs_epi[t,a]*neg_binomial_2_lpmf( ili_obs_fit[t,a] | delta_ili_abs_weekly[t,a]+1e-6, phi ) ; // TODO: remove this line and see if you get priors back
+      if (ili_obs_notna[t,a]==1) target += weight_obs_epi[t,a]*neg_binomial_2_lpmf( ili_obs_fit[t,a] | delta_ili_percap_weekly[t,a]+1e-6, phi ) ; // TODO: remove this line and see if you get priors back
     }
   }
   
@@ -325,7 +327,7 @@ model {
   // target += normal_lpdf( prop_ili_season | 0 , 0.0001 ) ;
   
   // prior based on initial fit with flat priors (all countries by AT&IT are good fits)
-  target += normal_lpdf( log(prop_ili_mu) | -4.33 , prior_sigma_prop_ili );// check in R: rnorm(2000,logit(0.1), 3) %>% inv_logit() %>% dens()
+  target += normal_lpdf( log(prop_ili_mu) | -1.5 , prior_sigma_prop_ili );// check in R: rnorm(2000,logit(0.1), 3) %>% inv_logit() %>% dens()
   
   // prop_ili_season ~ normal( 0 , sigma_prop_ili_season);
   prop_ili_age ~    normal( 0 , sigma_prop_ili_age);
@@ -353,15 +355,27 @@ generated quantities {
   array[n_week_fit] int<lower=0> gen_ili_obs_fit_sum;
   // note: stan does not have 3-dimensional matrices, thus opting for arrays or 2-dimensional matrixes
   // note: matrix[n,m] M[o] creates an array of length o, each element contraining an nxm matrix, M CONFUSINGLY has then dimension [o,n,m]
-  array[n_scenario, n_week_proj, n_age_groups ] int<lower=0> gen_ili_u_obs_proj; // unvaccinated
-  array[n_scenario, n_week_proj, n_age_groups ] int<lower=0> gen_ili_v_obs_proj; // vaccinated
-  array[n_scenario, n_week_proj, n_age_groups ] int<lower=0> gen_ili_t_obs_proj; // total
+  array[n_scenario, n_week_proj, n_age_groups ] int<lower=0>  gen_ili_u_obs_proj; // unvaccinated
+  array[n_scenario, n_week_proj, n_age_groups ] int<lower=0>  gen_ili_v_obs_proj; // vaccinated
+  array[n_scenario, n_week_proj, n_age_groups ] int<lower=0>  gen_ili_t_obs_proj; // total
+  array[n_scenario, n_week_proj, n_age_groups ] real<lower=0> gen_ili_u_percap_obs_proj; // per 100 000 of total
+  array[n_scenario, n_week_proj, n_age_groups ] real<lower=0> gen_ili_v_percap_obs_proj; // per 100 000 of total
+  array[n_scenario, n_week_proj, n_age_groups ] real<lower=0> gen_ili_t_percap_obs_proj; // per 100 000 of total
   array[n_scenario, n_week_proj  ] int<lower=0> gen_ili_u_obs_proj_sum;
   array[n_scenario, n_week_proj  ] int<lower=0> gen_ili_v_obs_proj_sum;
   array[n_scenario, n_week_proj  ] int<lower=0> gen_ili_t_obs_proj_sum;
+  array[n_scenario, n_week_proj  ] real<lower=0> gen_ili_u_percap_obs_proj_sum; // per 100 000 of focus group 
+  array[n_scenario, n_week_proj  ] real<lower=0> gen_ili_v_percap_obs_proj_sum; // per 100 000 of focus group
+  array[n_scenario, n_week_proj  ] real<lower=0> gen_ili_t_percap_obs_proj_sum; // per 100 000 of focus group
   //
   array[n_scenario, n_week_proj, n_age_groups] real gen_delta_ili_u_abs_weekly; // unvaccinated
   array[n_scenario, n_week_proj, n_age_groups] real gen_delta_ili_v_abs_weekly; // vaccinated
+  //
+  array[n_scenario,n_week_proj,n_age_groups] real pop_a_u;
+  array[n_scenario,n_week_proj,n_age_groups] real pop_a_v;
+  array[n_scenario,n_week_proj] real pop_u;
+  array[n_scenario,n_week_proj] real pop_v;
+  //
   real Rnull_eff[n_season];
   real beta_noise;
   
@@ -561,7 +575,11 @@ generated quantities {
         int day_end = day_start+6;
         gen_delta_ili_u_abs_weekly[j,i,a] = sum( delta_ili_u_abs[day_start:day_end,a] );
         gen_delta_ili_v_abs_weekly[j,i,a] = sum( delta_ili_v_abs[day_start:day_end,a] );
+        pop_a_u[j,i,a] = ( S_u[day_start,a]+I_u[day_start,a]+R_u[day_start,a] )*pop_age_group[a,1]+1e-9; // population size of the unvaccinated in age group a
+        pop_a_v[j,i,a] = ( S_v[day_start,a]+I_v[day_start,a]+R_v[day_start,a] )*pop_age_group[a,1]+1e-9;// population size of the vaccinated in age group a
       }
+      pop_u[j,i] = sum( pop_a_u[j,i, ] )+1e-9; // population size of the unvaccinated 
+      pop_v[j,i] = sum( pop_a_v[j,i, ] )+1e-9; // popluation size of the vaccinated
     }
   }
   
@@ -570,14 +588,22 @@ generated quantities {
     //for (j in 1:1) {
       for (t in 1:n_week_proj) {
         for (a in 1:n_age_groups) {
-          gen_ili_u_obs_proj[j,t,a] = neg_binomial_2_rng( gen_delta_ili_u_abs_weekly[j,t,a]+1e-6 , phi ); // add small value to location parameter to avoid it being zero
-          gen_ili_v_obs_proj[j,t,a] = neg_binomial_2_rng( gen_delta_ili_v_abs_weekly[j,t,a]+1e-6 , phi ); // add small value to location parameter to avoid it being zero
+          gen_ili_u_obs_proj[j,t,a] = neg_binomial_2_rng( gen_delta_ili_u_abs_weekly[j,t,a]+1e-9 , phi ); // add small value to location parameter to avoid it being zero
+          gen_ili_v_obs_proj[j,t,a] = neg_binomial_2_rng( gen_delta_ili_v_abs_weekly[j,t,a]+1e-9 , phi ); // add small value to location parameter to avoid it being zero
           gen_ili_t_obs_proj[j,t,a] = gen_ili_u_obs_proj[j,t,a] + gen_ili_v_obs_proj[j,t,a];
+          // rate per 100,000 (as indicated with "percap")
+          gen_ili_u_percap_obs_proj[j,t,a] = gen_ili_u_obs_proj[j,t,a]/    pop_a_u[j,t,a]*100000;
+          gen_ili_v_percap_obs_proj[j,t,a] = gen_ili_v_obs_proj[j,t,a]/    pop_a_u[j,t,a]*100000;
+          gen_ili_t_percap_obs_proj[j,t,a] = gen_ili_t_obs_proj[j,t,a]/pop_age_group[a,1]*100000;
         }
         // sums across age-groups
         gen_ili_u_obs_proj_sum[j,t]=  sum(gen_ili_u_obs_proj[j,t, ]);
         gen_ili_v_obs_proj_sum[j,t]=  sum(gen_ili_v_obs_proj[j,t, ]);
         gen_ili_t_obs_proj_sum[j,t]=  sum(gen_ili_t_obs_proj[j,t, ]);
+        //  sums across age-groups, rate per 100,000 (as indicated with "percap")
+        gen_ili_u_percap_obs_proj_sum[j,t]=  sum(gen_ili_u_obs_proj[j,t, ])/pop_u[j,t]*100000;
+        gen_ili_v_percap_obs_proj_sum[j,t]=  sum(gen_ili_v_obs_proj[j,t, ])/pop_v[j,t]*100000;
+        gen_ili_t_percap_obs_proj_sum[j,t]=  sum(gen_ili_t_obs_proj[j,t, ])/       pop*100000;
       }
   }
   

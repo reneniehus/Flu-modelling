@@ -11,7 +11,7 @@ settings = function() {
   # ---- |-Resport setting ----
   params$send_report = T
   params$report_recipients = c('rene.niehus@ecdc.europa.eu', 'rene7niehus@gmail.com','rok.grah@ecdc.europa.eu')
-  #params$report_recipients = c('rene.niehus@ecdc.europa.eu')
+  params$report_recipients = c('rene.niehus@ecdc.europa.eu')
   
   # ---- |-Names/identifiers ----
   params$scenario_round_id = "2024_2025_1_FLU"
@@ -38,6 +38,7 @@ settings = function() {
   params$season_start_monthday = "-08-01" # initial date of for SIR initiation
   params$season_end_monthday = "-07-31" # end date of SIR process
   
+  params$ili_diff_denom_erviss = c("MT","LU","CY") # for these countries, erviss ILI data is per 100, and not 100,000
   params$ili_plus_sentinel = c("AT","BE","CZ","DK","EE","FI","FR","IE","IT","NL","NO","PL","SI") # for which countries is ili-plus computation based on sentinel pathogen testing
   params$ili_plus_nonsentinel = c("HR","IS","LV","MT","RO") # for which countries is ili-plus computation based on non-sentinel pathogen testing
   # summer low-activity (where we assume that ILI activity = 0, where NA was reported)
@@ -48,6 +49,7 @@ settings = function() {
     date_v = c(date_v,seq( from=paste0(year_i,low_start) %>% ymd(), to=paste0(year_i,low_stop) %>% ymd(), by="day" ))
   }
   params$summer_low_dates = date_v %>% as_date() 
+  params$weight_obs_epi = 0.025 # typical to have 42 non-NA epi data points per cum ILI observation
   
   # ---- |-Simulations ----
   params$simulation_seed = 12

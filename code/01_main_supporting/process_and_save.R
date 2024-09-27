@@ -96,8 +96,8 @@ process_and_save = function(params=NULL, data=NULL, models_out=NULL,save_submiss
     df_data_summaries=df_data_summaries,
     df_submission=df_submission,
     # 
-    df_para=df_para
-    
+    df_para=df_para,
+    ppar=ppar
   )
   save(rep_list,file="./output/rep_list.Rdata")
   

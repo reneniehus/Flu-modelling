@@ -23,7 +23,6 @@ run_flu_models = function( params=NULL , data=NULL ){
       filter(season%in%params$SIR_multiseason$seasons_include, ili_plus_agesplit_sum>0) %>% group_by(country_short) %>% 
       mutate(n_season=n()) %>% filter(n_season==3) %>% 
       pull(country_short) %>% unique()
-    
     mout <- list()
     
     # ---- |-Run model for each country ----

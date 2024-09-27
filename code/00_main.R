@@ -7,8 +7,7 @@ t1 <- Sys.time()
 source("code/01_main_supporting/setup.R")
 
 # ---- |-load task specific settings ----
-source("code/02_settings/settings_version0.R") # this script is what is changed by a high-level user
-params=settings() # creates the params-list
+source("code/02_settings/settings_version0.R"); params=settings() # settings_version_X.R script to be changed by high-level user
 
 # sourcing other files, models etc
 source("code/01_main_supporting/flu_functions.R")
@@ -34,9 +33,10 @@ save(models_out,file="../Big data/RespiCompass_round1_models_out.Rdata") # ca 13
 if (F) rmarkdown::render("code/03_report/report_overview.Rmd") # requires: params, data , rep_list
 
 # ---- |-Send ----
-send_report(params)
+if (F) send_report(params)
 
 # ---- |- Run special analyses
+if (F) source("code/04_special_analyses/ili_burden_over_seasons.R")
 if (F) source("code/04_special_analyses/season_country_var_rt.R")
 if (F) source("code/04_special_analyses/erviss_data_look.R")
 if (F) source("code/04_special_analyses/exploring_SIR/SIR_paras_explore.R") # explore what SIR paras do
@@ -44,6 +44,12 @@ if (F) source("code/04_special_analyses/forecasting/norrsken.R") # forecasting m
 t2 <- Sys.time(); t2-t1 # 20 mins
 
 # (temporary code for any quick checking)
+rep_list$ppar$p1 # inform prior in stan model for more efficient sampling
+models_out$mout$EE$plot_fit_byage
+models_out$mout$EE$pars_df
+models_out$mout$CZ$plot_fit_byage
+models_out$mout$CZ$pars_df
+
 x = rep_list$df_submission %>% group_by(scenario_id,location) %>% 
   summarise(cum_burden_log=sum(value) %>% log()) %>% arrange(location,cum_burden_log)
 mcountry="FR"

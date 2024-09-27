@@ -9,7 +9,8 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
     # grad_samples: samples to determine the gradient ( 2 is slower than 5, )
     # tol_rel_obj: default=0.01, smaller means more strict with convergence
     quick_vb = params$rapid_stan_fit
-    if (!quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=5, tol_rel_obj = 0.005,output_samples = 400,iter=50000)
+    if (!quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=5, tol_rel_obj = 0.005,output_samples = 300,iter=50000)
+    if (!quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=5, tol_rel_obj = 0.018,output_samples = 300,iter=10000)
     if (!quick_vb&country_short_input=="FI" ) rstan_vb <- function(...) rstan::vb(...,grad_samples=10, tol_rel_obj = 0.005,output_samples = 400,iter=80000)
     if ( quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=2, tol_rel_obj = 0.018,output_samples = 300,iter= 9000)
     fit00=rstan_vb(m,algorithm = "meanfield",seed=12,data=stan_list) 
@@ -125,18 +126,21 @@ wrangle_fit_df = function(params,data,all_season_country,country_short_input,tar
     sent = NA
     if (country_short_input %in% params$ili_plus_sentinel   ) sent = T;
     if (country_short_input %in% params$ili_plus_nonsentinel) sent = F;
-    
     if ( sent) {x %>% unnest(erviss_ili_plus_sentinel   ) -> y; y %>% ggplot(aes(date,value)) +geom_line()+labs(subtitle='erviss_sent')}
     if (!sent) {x %>% unnest(erviss_ili_plus_nonsentinel) -> y; y %>% ggplot(aes(date,value)) +geom_line()+labs(subtitle='erviss_nonsent')}
     if (is.na(sent)) warning("Country has unclear sentinal/nonsentinel ili-plus indicator")
     
-    y %>% 
-      select(country_short,date,season,agegroup,value)-> all_season_fit
+    y %>% select(country_short,date,season,agegroup,value)-> all_season_fit
+    
+    # rescale countries where ILI have diff denominator in ERVISS
+    if ( country_short_input%in%params$ili_diff_denom_erviss ) all_season_fit$value=1000*all_season_fit$value 
+    
     # impute summer low-activity
     all_season_fit %>% mutate(
       summer_low_day = as.integer(date%in%params$summer_low_dates),
       value=ifelse( date%in%params$summer_low_dates & is.na(value), 0 , value )
     ) -> all_season_fit
+    
   }
   
   if (target_input=="respicompass_ili_plus") {
@@ -316,7 +320,7 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
     prior_sigma_prop_ili = 2,
     prior_sigma_i = 5,
     prior_sigma_s = 2,
-    sigma_prop_ili_age = 1
+    sigma_prop_ili_age = 2
   )
   # Add vaccination to Oct 1st to the oldest age group
   # for fitting
@@ -346,7 +350,8 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
   stan_list$cum_ili_obs_log     = rowsum(x=stan_list$ili_obs_fit,group=stan_list$season_id_week_fit,na.rm = T) %>% rowSums() %>% zero_plus_eps(eps=1/10^6) %>% log()
   stan_list$cum_ili_obs_age_log = rowsum(x=stan_list$ili_obs_fit,group=stan_list$season_id_week_fit,na.rm = T) %>% zero_plus_eps(eps=1/10^6) %>% log()
   stan_list$n_ili_obs_notna = rowsum(x=stan_list$ili_obs_notna,group=stan_list$season_id_week_fit,na.rm = T) %>% rowSums()
-  stan_list$weight_obs_epi =  stan_list$ili_obs_fit*0 + 0.05 #1/mean( stan_list$n_ili_obs_notna ) 
+  stan_list$weight_obs_epi =  stan_list$ili_obs_fit*0 + params$weight_obs_epi #1/mean( stan_list$n_ili_obs_notna ) 
+  
   # if (country_short_input=="IT") stan_list$weight_obs_epi =  0.01
   stan_list$weight_cum_ili =  1.0 # 
   # support fit of AT
@@ -406,26 +411,26 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
 extract_projections = function(params,fit00,n_iter,df_scenarios,df_agegroups,all_season_project){
   # extract projections
   modelled_proj = fit00 %>% 
-    gather_draws(gen_ili_u_obs_proj[scen_id,week_id,agegroup_id], # if you want to apply changes here, do look up the useful gather_draws {tidybayes} syntax
-                 gen_ili_v_obs_proj[scen_id,week_id,agegroup_id],
-                 gen_ili_t_obs_proj[scen_id,week_id,agegroup_id],
-                 gen_ili_u_obs_proj_sum[scen_id,week_id],
-                 gen_ili_v_obs_proj_sum[scen_id,week_id],
-                 gen_ili_t_obs_proj_sum[scen_id,week_id]) %>% 
+    gather_draws(gen_ili_u_percap_obs_proj[scen_id,week_id,agegroup_id], # if you want to apply changes here, do look up the useful gather_draws {tidybayes} syntax
+                 gen_ili_v_percap_obs_proj[scen_id,week_id,agegroup_id],
+                 gen_ili_t_percap_obs_proj[scen_id,week_id,agegroup_id],
+                 gen_ili_u_percap_obs_proj_sum[scen_id,week_id],
+                 gen_ili_v_percap_obs_proj_sum[scen_id,week_id],
+                 gen_ili_t_percap_obs_proj_sum[scen_id,week_id]) %>% 
     filter(.draw%in%c(1:n_iter)) %>% # filter a number of posterior draws
     select(-.chain,-.iteration) %>% ungroup() %>% # remove unneeded columns and grouping
     mutate(vax_status=case_when(
-      .variable=="gen_ili_u_obs_proj"~"vaxNo",
-      .variable=="gen_ili_v_obs_proj"~"vaxYes",
-      .variable=="gen_ili_t_obs_proj"~"vaxTotal",
-      .variable=="gen_ili_u_obs_proj_sum"~"vaxNo",
-      .variable=="gen_ili_v_obs_proj_sum"~"vaxYes",
-      .variable=="gen_ili_t_obs_proj_sum"~"vaxTotal"
+      .variable=="gen_ili_u_percap_obs_proj"~"vaxNo",
+      .variable=="gen_ili_v_percap_obs_proj"~"vaxYes",
+      .variable=="gen_ili_t_percap_obs_proj"~"vaxTotal",
+      .variable=="gen_ili_u_percap_obs_proj_sum"~"vaxNo",
+      .variable=="gen_ili_v_percap_obs_proj_sum"~"vaxYes",
+      .variable=="gen_ili_t_percap_obs_proj_sum"~"vaxTotal"
     )) %>% 
     mutate(agegroup_id=case_when(
-      .variable=="gen_ili_u_obs_proj_sum"~0,
-      .variable=="gen_ili_v_obs_proj_sum"~0,
-      .variable=="gen_ili_t_obs_proj_sum"~0,
+      .variable=="gen_ili_u_percap_obs_proj_sum"~0,
+      .variable=="gen_ili_v_percap_obs_proj_sum"~0,
+      .variable=="gen_ili_t_percap_obs_proj_sum"~0,
       TRUE ~ agegroup_id
     )) %>% 
     left_join(df_scenarios,by = join_by(scen_id)) %>% # add scenario info
