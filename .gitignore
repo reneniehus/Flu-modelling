@@ -11,3 +11,5 @@ stan/SIR_simple.rds
 packrat/lib*/
 output/RespiCompass_round1.Rdata
 output/RespiCompass_round1.Rdata
+output/RespiCompass_round1.Rdata
+output/rep_list.Rdata

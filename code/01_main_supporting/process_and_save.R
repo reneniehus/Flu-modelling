@@ -37,14 +37,20 @@ process_and_save = function(params=NULL, data=NULL, models_out=NULL,save_submiss
   }
   
   ## ---- |-Sense checks ----
-  # explore fits
+  # total fit + proj
+  pdf(width = 12, height = 8, "code/03_report/fit_flip_tot.pdf")
+  for (i in 1:length(models_out$mout)) {
+    # figures
+    models_out$mout[[i]]$plot_fit %>% print()
+  }
+  dev.off()
+  # by-age fit + proj
   pdf(width = 12, height = 8, "code/03_report/fit_flip.pdf")
   for (i in 1:length(models_out$mout)) {
     # figures
     models_out$mout[[i]]$plot_fit_byage %>% print()
   }
   dev.off()
-  
   
   # explore parameters
   ppar = list()
@@ -60,14 +66,16 @@ process_and_save = function(params=NULL, data=NULL, models_out=NULL,save_submiss
     geom_pointrange(aes(y=country_long,x=mean,xmin=`10%`,xmax=`90%`)) +
     scale_x_log10() + labs(subtitle="I_ini") -> ppar$p3; ppar$p3
   # explore submissions: ordering
-  df_submission %>% group_by(scenario_id) %>% 
+  df_submission %>% filter(pop_group=="total_vaxTotal") %>% group_by(scenario_id) %>% 
     summarise(cum_burden_log=sum(value) %>% log()) %>% arrange(cum_burden_log)
-  df_submission %>% group_by(scenario_id,location) %>% 
-    summarise(cum_burden_log=sum(value) %>% log()) %>% arrange(location,cum_burden_log)
+  df_submission %>% filter(pop_group=="total_vaxTotal") %>% group_by(scenario_id,location) %>% 
+    summarise(cum_burden_log=sum(value) %>% log()) %>% ungroup() %>% arrange(location,cum_burden_log)
   #
-  x = df_submission %>% group_by(scenario_id,location) %>% 
+  x = df_submission %>% filter(pop_group=="total_vaxTotal")  %>% group_by(scenario_id,location) %>% 
     summarise(cum_burden_log=sum(value) %>% log()) %>% arrange(location,cum_burden_log)
-  mcountry="FR"
+  
+  # explore vax versus no-vax for individual countries
+  mcountry="RO"
   x %>% filter(location==mcountry) %>% pull(cum_burden_log) -> mburd
   names(mburd) = x %>% filter(location==mcountry) %>% pull(scenario_id)
   mburd = exp(mburd)

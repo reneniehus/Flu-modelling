@@ -327,10 +327,10 @@ model {
   // target += normal_lpdf( prop_ili_season | 0 , 0.0001 ) ;
   
   // prior based on initial fit with flat priors (all countries by AT&IT are good fits)
-  target += normal_lpdf( log(prop_ili_mu) | -1.5 , prior_sigma_prop_ili );// check in R: rnorm(2000,logit(0.1), 3) %>% inv_logit() %>% dens()
+  // target += normal_lpdf( log(prop_ili_mu) | -1.5 , prior_sigma_prop_ili );// check in R: rnorm(2000,logit(0.1), 3) %>% inv_logit() %>% dens()
   
   // prop_ili_season ~ normal( 0 , sigma_prop_ili_season);
-  prop_ili_age ~    normal( 0 , sigma_prop_ili_age);
+  // prop_ili_age ~    normal( 0 , sigma_prop_ili_age);
   
   // I_ini determined the season timing and certainly be a very low value
   // logit(SIR_ini_mu[2]) ~ normal( logit(0.000003) , prior_sigma_i ); // check in R: rnorm(2000,logit(0.000002),0.4) %>% inv_logit() %>% dens()
@@ -351,8 +351,11 @@ generated quantities {
   // --------------------------------declare generated variables
   // we give generated quantities the prefix "gen_"
   array[n_week_fit] real<lower=0> delta_ili_abs_weekly_sum;
+  array[n_week_fit] real<lower=0> delta_ili_percap_weekly_sum;
   array[n_week_fit, n_age_groups] int<lower=0> gen_ili_obs_fit;
+  array[n_week_fit, n_age_groups] real<lower=0> gen_ili_percap_obs_fit;
   array[n_week_fit] int<lower=0> gen_ili_obs_fit_sum;
+  array[n_week_fit] real<lower=0> gen_ili_obs_percap_fit_sum;
   // note: stan does not have 3-dimensional matrices, thus opting for arrays or 2-dimensional matrixes
   // note: matrix[n,m] M[o] creates an array of length o, each element contraining an nxm matrix, M CONFUSINGLY has then dimension [o,n,m]
   array[n_scenario, n_week_proj, n_age_groups ] int<lower=0>  gen_ili_u_obs_proj; // unvaccinated
@@ -392,9 +395,12 @@ generated quantities {
   for (t in 1:n_week_fit) {
     for (a in 1:n_age_groups) {
       gen_ili_obs_fit[t,a] = neg_binomial_2_rng( delta_ili_abs_weekly[t,a]+1e-6, phi );
+      gen_ili_percap_obs_fit[t,a] = gen_ili_obs_fit[t,a]/pop_age_group[a,1]*100000;
     }
     gen_ili_obs_fit_sum[t] = sum( gen_ili_obs_fit[t,] );
+    gen_ili_obs_percap_fit_sum[t] =  gen_ili_obs_fit_sum[t]/pop*100000;
     delta_ili_abs_weekly_sum[t] = sum( delta_ili_abs_weekly[t, ] );
+    delta_ili_percap_weekly_sum[t] = delta_ili_abs_weekly_sum[t]/pop*100000;
   }
   
   // --------------------------------simulate projected observations

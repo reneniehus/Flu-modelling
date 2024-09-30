@@ -11,7 +11,7 @@ settings = function() {
   # ---- |-Resport setting ----
   params$send_report = T
   params$report_recipients = c('rene.niehus@ecdc.europa.eu', 'rene7niehus@gmail.com','rok.grah@ecdc.europa.eu')
-  params$report_recipients = c('rene.niehus@ecdc.europa.eu')
+  params$report_recipients = c('rene7niehus@gmail.com')
   
   # ---- |-Names/identifiers ----
   params$scenario_round_id = "2024_2025_1_FLU"
@@ -49,7 +49,7 @@ settings = function() {
     date_v = c(date_v,seq( from=paste0(year_i,low_start) %>% ymd(), to=paste0(year_i,low_stop) %>% ymd(), by="day" ))
   }
   params$summer_low_dates = date_v %>% as_date() 
-  params$weight_obs_epi = 0.025 # typical to have 42 non-NA epi data points per cum ILI observation
+  params$weight_obs_epi = 0.10 # typical to have 42 non-NA epi data points per cum ILI observation
   
   # ---- |-Simulations ----
   params$simulation_seed = 12

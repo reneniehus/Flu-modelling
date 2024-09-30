@@ -10,20 +10,19 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
     # tol_rel_obj: default=0.01, smaller means more strict with convergence
     quick_vb = params$rapid_stan_fit
     if (!quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=5, tol_rel_obj = 0.005,output_samples = 300,iter=50000)
-    if (!quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=5, tol_rel_obj = 0.018,output_samples = 300,iter=10000)
-    if (!quick_vb&country_short_input=="FI" ) rstan_vb <- function(...) rstan::vb(...,grad_samples=10, tol_rel_obj = 0.005,output_samples = 400,iter=80000)
+    if (!quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=5, tol_rel_obj = 0.010,output_samples = 300,iter=40000)
+    if (!quick_vb&country_short_input%in%c("FI","IS") ) rstan_vb <- function(...) rstan::vb(...,grad_samples=10, tol_rel_obj = 0.005,output_samples = 400,iter=90000)
     if ( quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=2, tol_rel_obj = 0.018,output_samples = 300,iter= 9000)
     fit00=rstan_vb(m,algorithm = "meanfield",seed=12,data=stan_list) 
     end_time <- Sys.time(); end_time - start_time
-    save(fit00,file = fname)
+    if (!quick_vb) save(fit00,file = fname)
   }
-  
   # plot model fit against fitted data
   p1 = plot_fit(fit00,stan_list,country_short_input)
   p2 = plot_fit_byage(fit00,stan_list,country_short_input)
   # extract data summaries
   season_ili_mean    =sum(stan_list$ili_obs_fit[stan_list$season_id_week_fit%in%c(1,2,3),])/3 # observed burden # 35517.33
-  season_ili_mod_mean = fit00 %>% gather_draws(delta_ili_abs_weekly_sum[n]) %>% 
+  season_ili_mod_mean = fit00 %>% gather_draws(delta_ili_percap_weekly_sum[n]) %>% 
     filter(.draw%in%c(1:500)) %>% # filter a number of posterior draws
     select(-.chain,-.iteration) %>% ungroup() %>% 
     group_by(n) %>% summarise(mean_value = mean(.value)) %>% ungroup() %>% 
@@ -455,7 +454,7 @@ extract_projections = function(params,fit00,n_iter,df_scenarios,df_agegroups,all
 }
 
 plot_fit = function(fit00,stan_list,country_short_input) {
-  modelled_fit = fit00 %>% gather_draws(gen_ili_obs_fit_sum[n]) %>% 
+  modelled_fit = fit00 %>% gather_draws(gen_ili_obs_percap_fit_sum[n]) %>% 
     filter(.draw%in%c(1:500)) %>% # filter a number of posterior draws
     select(-.chain,-.iteration) %>% ungroup() %>% 
     group_by(n) %>% summarise(mean_value = mean(.value),
@@ -463,7 +462,7 @@ plot_fit = function(fit00,stan_list,country_short_input) {
                               upp=quantile(.value,probs=0.9)) %>% ungroup() %>% 
     right_join( stan_list$all_season_fit,
                 by = join_by(n)) 
-  modelled_proj = fit00 %>% gather_draws(gen_ili_t_obs_proj_sum[scen,week_id]) %>% 
+  modelled_proj = fit00 %>% gather_draws(gen_ili_t_percap_obs_proj_sum[scen,week_id]) %>% 
     filter(.draw%in%c(1:500)) %>%
     select(-.chain,-.iteration) %>% ungroup() %>% 
     group_by(scen,week_id) %>% summarise(mean_value = mean(.value),
@@ -485,14 +484,14 @@ plot_fit_byage = function(fit00,stan_list,country_short_input){
   obs_data = stan_list$all_season_fit %>% select(age_00_04:age_65_99,date,season,n) %>% 
     pivot_longer(cols=1:stan_list$n_age_groups,names_to = "age") %>% 
     mutate(age=as.factor(age) %>% as.numeric())
-  modelled_fit = fit00 %>% gather_draws(gen_ili_obs_fit[n,age]) %>% 
+  modelled_fit = fit00 %>% gather_draws(gen_ili_percap_obs_fit[n,age]) %>% 
     filter(.draw%in%c(1:100)) %>% # filter a number of posterior draws
     select(-.chain,-.iteration) %>% ungroup() %>% 
     group_by(n,age) %>% summarise(mean_value = mean(.value)) %>% ungroup() %>% 
     left_join(obs_data,by=c("n","age"))
   
   proj_df = stan_list$all_season_project %>% select(country_short,week_id,date=date_wed)
-  modelled_proj = fit00 %>% gather_draws(gen_ili_t_obs_proj[scen,week_id,age]) %>% 
+  modelled_proj = fit00 %>% gather_draws(gen_ili_t_percap_obs_proj[scen,week_id,age]) %>% 
     filter(.draw%in%c(1:100)) %>%
     select(-.chain,-.iteration) %>% ungroup() %>% 
     group_by(week_id,age,scen) %>% summarise(mean_value = mean(.value)) %>% ungroup() %>% 
