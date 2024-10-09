@@ -1,10 +1,12 @@
 run_flu_models = function( params=NULL , data=NULL ){
+  t1 <- Sys.time()
   
   # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   ### Initiating output list ##########
   # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   df_out = list(
     time_of_execution = now(),    # time-stamp
+    duration = NULL,              # exectuion duratoin
     figs_prefit = NULL,           # figures of data prior to entering the fitting functions
     mout = NULL                   # for each country the model output
   )
@@ -72,6 +74,8 @@ run_flu_models = function( params=NULL , data=NULL ){
   
   pr=paste("> SIR_simple_multi_season run for all countries completed. \n"); cat(green(pr))
   #### output 
+  t2 <- Sys.time()
+  df_out$duration = get_in_hms(t2, t1)
   return(df_out)
 }
 

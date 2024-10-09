@@ -1,5 +1,3 @@
-# code for RespiCompass Round 1 submission
-
 # ---- |-Start empty ----
 rm(list = ls(all.names = TRUE)); gc() # clear environment & memory
 
@@ -9,7 +7,7 @@ source("code/01_main_supporting/setup.R")
 # ---- |-load task specific settings ----
 source("code/02_settings/settings_version0.R"); params=settings() # settings_version_X.R script to be changed by high-level user
 
-# sourcing other files, models etc
+# ---- |-sourcing support scripts ----
 source("code/01_main_supporting/flu_functions.R")
 source("code/01_main_supporting/load_flu_data.R")
 source("code/01_main_supporting/run_flu_models.R")
@@ -21,13 +19,10 @@ source("code/06_sandbox/generate_ili_epi_test.R")
 # ---- |-load flu data ----
 data = load_flu_data( params, regenerate = F, new_from_online = F) # loads the data # regenerate=T recreates the data lists, new_from_online=T uses the online versions for recreation
 
-# ---- |-run flu models (i.e. fitting and projections) ----
-t1 <- Sys.time(); models_out = run_flu_models( params, data ); t2 <- Sys.time() # runs the model scripts
-
+# ---- |-run flu models (fitting and projections) ----
+models_out = run_flu_models( params, data ) # runs the model scripts
 # ---- |-process and save model output ----
 rep_list = process_and_save( params, data, models_out, save_submission=params$save_submission );  # processing the model output, with figures and saves
-if (T) save(data,params,rep_list,file="./output/RespiCompass_round1.Rdata") # ca 1 MB
-if (T) save(models_out,file="../Big data/RespiCompass_round1_models_out.Rdata") # ca 13 MBs
 
 # ---- |-report ----
 if (F) rmarkdown::render("code/03_report/report_overview.Rmd") # requires: params, data , rep_list
@@ -45,20 +40,19 @@ if (F) source("code/04_special_analyses/forecasting/norrsken.R") # forecasting m
 
 # ---- |- The end
 
-
 # (temporary code for any quick checking)
-models_out$mout$DK$plot_fit_byage
-models_out$mout$DK$plot_fit
-
-library(data.table)
-library(dtplyr)
-library(dplyr, warn.conflicts = FALSE)
-df_submission <- lazy_dt(rep_list$df_submission)
-
-df_submission %>% filter(pop_group=="total_vaxTotal") %>% 
-  filter(location=="CZ") %>% 
-  group_by(scenario_id,location) %>% 
-  summarise(cum_burden_log=sum(value) %>% log()) %>% arrange(location,cum_burden_log) %>% 
-  ungroup() %>% 
-  mutate(cum_burden=exp(cum_burden_log)) %>% as_tibble() %>% print(n=10)
+# models_out$mout$DK$plot_fit_byage
+# models_out$mout$DK$plot_fit
+# 
+# library(data.table)
+# library(dtplyr)
+# library(dplyr, warn.conflicts = FALSE)
+# df_submission <- lazy_dt(rep_list$df_submission)
+# 
+# df_submission %>% filter(pop_group=="total_vaxTotal") %>% 
+#   filter(location=="CZ") %>% 
+#   group_by(scenario_id,location) %>% 
+#   summarise(cum_burden_log=sum(value) %>% log()) %>% arrange(location,cum_burden_log) %>% 
+#   ungroup() %>% 
+#   mutate(cum_burden=exp(cum_burden_log)) %>% as_tibble() %>% print(n=10)
   
