@@ -41,18 +41,3 @@ if (F) source("code/04_special_analyses/forecasting/norrsken.R") # forecasting m
 # ---- |- The end
 
 # (temporary code for any quick checking)
-# models_out$mout$DK$plot_fit_byage
-# models_out$mout$DK$plot_fit
-# 
-# library(data.table)
-# library(dtplyr)
-# library(dplyr, warn.conflicts = FALSE)
-# df_submission <- lazy_dt(rep_list$df_submission)
-# 
-# df_submission %>% filter(pop_group=="total_vaxTotal") %>% 
-#   filter(location=="CZ") %>% 
-#   group_by(scenario_id,location) %>% 
-#   summarise(cum_burden_log=sum(value) %>% log()) %>% arrange(location,cum_burden_log) %>% 
-#   ungroup() %>% 
-#   mutate(cum_burden=exp(cum_burden_log)) %>% as_tibble() %>% print(n=10)
-  
