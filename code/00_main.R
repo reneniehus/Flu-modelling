@@ -31,6 +31,7 @@ if (F) rmarkdown::render("code/03_report/report_overview.Rmd") # requires: param
 if (F) send_report(params)
 
 # ---- |- Run special analyses
+if (F) source("code/04_special_analyses/burden_vs_vax.R") # can be run after data is loaded (load_flu_data)
 if (F) source("code/04_special_analyses/ili_burden_over_seasons.R") # can be run after data is loaded (load_flu_data)
 if (F) source("code/04_special_analyses/ili_vs_sari_burden.R") # can be run after data is loaded (load_flu_data)
 if (F) source("code/04_special_analyses/season_country_var_rt.R")
