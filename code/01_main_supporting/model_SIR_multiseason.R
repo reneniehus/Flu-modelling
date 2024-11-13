@@ -1,28 +1,30 @@
 fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_short_input,m) {
   # run the model fit
   fname = paste0("../Big data/fit",country_short_input,".Rdata")
+  duration_fit = "NA:NA:NA"
   if (params$load_earlyfit) {
     load(file = fname)
   } else {
-    start_time <- Sys.time()
+    start_fit <- Sys.time()
+    
     # rstan:vb settings
     # grad_samples: samples to determine the gradient ( 2 is slower than 5, )
     # tol_rel_obj: default=0.01, smaller means more strict with convergence
     quick_vb = params$rapid_stan_fit
-    if (!quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=5, tol_rel_obj = 0.005,output_samples = 400,iter=50000)
-    if (!quick_vb&country_short_input=="FI" ) rstan_vb <- function(...) rstan::vb(...,grad_samples=10, tol_rel_obj = 0.005,output_samples = 400,iter=80000)
-    if ( quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=2, tol_rel_obj = 0.018,output_samples = 300,iter= 9000)
+    if (!quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=5, tol_rel_obj = 0.005,output_samples = 300,iter=50000)
+    if (!quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=5, tol_rel_obj = 0.010,output_samples = 300,iter=40000)
+    if (!quick_vb&country_short_input%in%c("FI","IS") ) rstan_vb <- function(...) rstan::vb(...,grad_samples=10, tol_rel_obj = 0.005,output_samples = 400,iter=90000)
+    if ( quick_vb) rstan_vb <- function(...) rstan::vb(...,grad_samples=2, tol_rel_obj = 0.018,output_samples = 300,iter= 10000)
     fit00=rstan_vb(m,algorithm = "meanfield",seed=12,data=stan_list) 
-    end_time <- Sys.time(); end_time - start_time
-    save(fit00,file = fname)
+    end_fit <- Sys.time(); duration_fit = get_in_hms(end_fit, start_fit)
+    if (!quick_vb) save(fit00,file = fname)
   }
-  
   # plot model fit against fitted data
   p1 = plot_fit(fit00,stan_list,country_short_input)
   p2 = plot_fit_byage(fit00,stan_list,country_short_input)
   # extract data summaries
   season_ili_mean    =sum(stan_list$ili_obs_fit[stan_list$season_id_week_fit%in%c(1,2,3),])/3 # observed burden # 35517.33
-  season_ili_mod_mean = fit00 %>% gather_draws(delta_ili_abs_weekly_sum[n]) %>% 
+  season_ili_mod_mean = fit00 %>% gather_draws(delta_ili_percap_weekly_sum[n]) %>% 
     filter(.draw%in%c(1:500)) %>% # filter a number of posterior draws
     select(-.chain,-.iteration) %>% ungroup() %>% 
     group_by(n) %>% summarise(mean_value = mean(.value)) %>% ungroup() %>% 
@@ -37,7 +39,7 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
   mp="ar";             x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
   mp="SIR_ini_mu";     x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
   mp="cum_ili_log";    x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
-  
+  mp="reciprocal_phi"; x=summary(fit00,pars=mp,probs = c(0.1, 0.9))$summary; df=rbind(df,x)
   
   if (F) source("code/01_main_supporting/old_stan_fit_code.R") # code of previous fitting implementations
   
@@ -48,13 +50,14 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
   mout$modelled_proj = extract_projections(params,fit00,n_iter=300,
                                            stan_list$df_scenarios,
                                            stan_list$df_agegroups,
-                                           stan_list$all_season_project)
+                                           stan_list$all_season_project) %>% lazy_dt()
   mout$plot_fit = p1
   mout$plot_fit_byage = p2
   mout$pars_df = df
   #
   mout$season_ili_mean = season_ili_mean
   mout$season_ili_mod_mean = season_ili_mod_mean
+  mout$duration_fit
   return(mout)
 }
 
@@ -125,18 +128,21 @@ wrangle_fit_df = function(params,data,all_season_country,country_short_input,tar
     sent = NA
     if (country_short_input %in% params$ili_plus_sentinel   ) sent = T;
     if (country_short_input %in% params$ili_plus_nonsentinel) sent = F;
-    
     if ( sent) {x %>% unnest(erviss_ili_plus_sentinel   ) -> y; y %>% ggplot(aes(date,value)) +geom_line()+labs(subtitle='erviss_sent')}
     if (!sent) {x %>% unnest(erviss_ili_plus_nonsentinel) -> y; y %>% ggplot(aes(date,value)) +geom_line()+labs(subtitle='erviss_nonsent')}
     if (is.na(sent)) warning("Country has unclear sentinal/nonsentinel ili-plus indicator")
     
-    y %>% 
-      select(country_short,date,season,agegroup,value)-> all_season_fit
+    y %>% select(country_short,date,season,agegroup,value)-> all_season_fit
+    
+    # rescale countries where ILI have diff denominator in ERVISS
+    if ( country_short_input%in%params$ili_diff_denom_erviss ) all_season_fit$value=1000*all_season_fit$value 
+    
     # impute summer low-activity
     all_season_fit %>% mutate(
       summer_low_day = as.integer(date%in%params$summer_low_dates),
       value=ifelse( date%in%params$summer_low_dates & is.na(value), 0 , value )
     ) -> all_season_fit
+    
   }
   
   if (target_input=="respicompass_ili_plus") {
@@ -274,7 +280,7 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
     #
     ili_obs_fit = all_season_fit_wide %>% 
       select( any_of(params$SIR_multiseason$age_groups) ) %>% 
-      mutate_all(~ replace_na(.,0) ) %>% mutate_all(~as.integer(.) ),
+      mutate_all(~ replace_na(.,0) ),
     ili_obs_notna = all_season_fit_wide %>% 
       select( any_of(params$SIR_multiseason$age_groups) ) %>% 
       mutate_all(~ !is.na(.) ) %>% mutate_all(~as.integer(.) ),
@@ -316,13 +322,19 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
     prior_sigma_prop_ili = 2,
     prior_sigma_i = 5,
     prior_sigma_s = 2,
-    sigma_prop_ili_age = 1
+    sigma_prop_ili_age = 2
   )
+  # transform ILI rates into incidence
+  stan_list$ili_obs_incs = stan_list$ili_obs_fit
+  for (a in 1:stan_list$n_age_groups) {
+    stan_list$ili_obs_incs[,a] = (stan_list$ili_obs_fit[,a]*stan_list$pop_age_group[1,]/100000) %>% mutate_all(~as.integer(.) )
+  }
+  stan_list$age_total_incs = rowSums(stan_list$ili_obs_incs)
   # Add vaccination to Oct 1st to the oldest age group
   # for fitting
   my_date_v = all_season_fit_daily$date
   ind_vax = ( month(my_date_v)==10 & day(my_date_v)==1 )
-  # use historica vaccine coverage
+  # use historical vaccine coverage
   hist_vax_ind = tibble(iso2_code=country_short_input, 
          season=all_season_fit_daily$season[ind_vax],
          target_group="65+y") %>% 
@@ -342,12 +354,14 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
   
   stan_list$daily_daystart_fit = rep(1:stan_list$n_daily_time_steps, each=stan_list$n_day_fit)
   stan_list$daily_daystart_proj = rep(1:stan_list$n_daily_time_steps, each=stan_list$n_day_proj)
+  
   # summary targets
   stan_list$cum_ili_obs_log     = rowsum(x=stan_list$ili_obs_fit,group=stan_list$season_id_week_fit,na.rm = T) %>% rowSums() %>% zero_plus_eps(eps=1/10^6) %>% log()
   stan_list$cum_ili_obs_age_log = rowsum(x=stan_list$ili_obs_fit,group=stan_list$season_id_week_fit,na.rm = T) %>% zero_plus_eps(eps=1/10^6) %>% log()
+  stan_list$cum_ili_obs_incs_age_log = rowsum(x=stan_list$ili_obs_incs,group=stan_list$season_id_week_fit,na.rm = T) %>% zero_plus_eps(eps=1/10^6) %>% log()
   stan_list$n_ili_obs_notna = rowsum(x=stan_list$ili_obs_notna,group=stan_list$season_id_week_fit,na.rm = T) %>% rowSums()
-  stan_list$weight_obs_epi =  stan_list$ili_obs_fit*0 + 0.05 #1/mean( stan_list$n_ili_obs_notna ) 
-  # if (country_short_input=="IT") stan_list$weight_obs_epi =  0.01
+  stan_list$weight_obs_epi =  stan_list$ili_obs_fit*0 + params$weight_obs_epi #1/mean( stan_list$n_ili_obs_notna ) 
+  # 
   stan_list$weight_cum_ili =  1.0 # 
   # support fit of AT
   # if (country_short_input %in% c("AT","IT")) {
@@ -406,26 +420,26 @@ make_stan_list = function(params,data,all_season_fit_wide,country_short_input,va
 extract_projections = function(params,fit00,n_iter,df_scenarios,df_agegroups,all_season_project){
   # extract projections
   modelled_proj = fit00 %>% 
-    gather_draws(gen_ili_u_obs_proj[scen_id,week_id,agegroup_id], # if you want to apply changes here, do look up the useful gather_draws {tidybayes} syntax
-                 gen_ili_v_obs_proj[scen_id,week_id,agegroup_id],
-                 gen_ili_t_obs_proj[scen_id,week_id,agegroup_id],
-                 gen_ili_u_obs_proj_sum[scen_id,week_id],
-                 gen_ili_v_obs_proj_sum[scen_id,week_id],
-                 gen_ili_t_obs_proj_sum[scen_id,week_id]) %>% 
+    gather_draws(gen_ili_u_percap_obs_proj[scen_id,week_id,agegroup_id], # if you want to apply changes here, do look up the useful gather_draws {tidybayes} syntax
+                 gen_ili_v_percap_obs_proj[scen_id,week_id,agegroup_id],
+                 gen_ili_t_percap_obs_proj[scen_id,week_id,agegroup_id],
+                 gen_ili_u_percap_obs_proj_sum[scen_id,week_id],
+                 gen_ili_v_percap_obs_proj_sum[scen_id,week_id],
+                 gen_ili_t_percap_obs_proj_sum[scen_id,week_id]) %>% 
     filter(.draw%in%c(1:n_iter)) %>% # filter a number of posterior draws
     select(-.chain,-.iteration) %>% ungroup() %>% # remove unneeded columns and grouping
     mutate(vax_status=case_when(
-      .variable=="gen_ili_u_obs_proj"~"vaxNo",
-      .variable=="gen_ili_v_obs_proj"~"vaxYes",
-      .variable=="gen_ili_t_obs_proj"~"vaxTotal",
-      .variable=="gen_ili_u_obs_proj_sum"~"vaxNo",
-      .variable=="gen_ili_v_obs_proj_sum"~"vaxYes",
-      .variable=="gen_ili_t_obs_proj_sum"~"vaxTotal"
+      .variable=="gen_ili_u_percap_obs_proj"~"vaxNo",
+      .variable=="gen_ili_v_percap_obs_proj"~"vaxYes",
+      .variable=="gen_ili_t_percap_obs_proj"~"vaxTotal",
+      .variable=="gen_ili_u_percap_obs_proj_sum"~"vaxNo",
+      .variable=="gen_ili_v_percap_obs_proj_sum"~"vaxYes",
+      .variable=="gen_ili_t_percap_obs_proj_sum"~"vaxTotal"
     )) %>% 
     mutate(agegroup_id=case_when(
-      .variable=="gen_ili_u_obs_proj_sum"~0,
-      .variable=="gen_ili_v_obs_proj_sum"~0,
-      .variable=="gen_ili_t_obs_proj_sum"~0,
+      .variable=="gen_ili_u_percap_obs_proj_sum"~0,
+      .variable=="gen_ili_v_percap_obs_proj_sum"~0,
+      .variable=="gen_ili_t_percap_obs_proj_sum"~0,
       TRUE ~ agegroup_id
     )) %>% 
     left_join(df_scenarios,by = join_by(scen_id)) %>% # add scenario info
@@ -450,7 +464,8 @@ extract_projections = function(params,fit00,n_iter,df_scenarios,df_agegroups,all
 }
 
 plot_fit = function(fit00,stan_list,country_short_input) {
-  modelled_fit = fit00 %>% gather_draws(gen_ili_obs_fit_sum[n]) %>% 
+  # ili rate 
+  modelled_fit = fit00 %>% gather_draws(gen_ili_obs_percap_fit_sum[n]) %>% 
     filter(.draw%in%c(1:500)) %>% # filter a number of posterior draws
     select(-.chain,-.iteration) %>% ungroup() %>% 
     group_by(n) %>% summarise(mean_value = mean(.value),
@@ -458,7 +473,7 @@ plot_fit = function(fit00,stan_list,country_short_input) {
                               upp=quantile(.value,probs=0.9)) %>% ungroup() %>% 
     right_join( stan_list$all_season_fit,
                 by = join_by(n)) 
-  modelled_proj = fit00 %>% gather_draws(gen_ili_t_obs_proj_sum[scen,week_id]) %>% 
+  modelled_proj = fit00 %>% gather_draws(gen_ili_t_percap_obs_proj_sum[scen,week_id]) %>% 
     filter(.draw%in%c(1:500)) %>%
     select(-.chain,-.iteration) %>% ungroup() %>% 
     group_by(scen,week_id) %>% summarise(mean_value = mean(.value),
@@ -467,17 +482,69 @@ plot_fit = function(fit00,stan_list,country_short_input) {
     right_join( stan_list$all_season_project ,
                 by = join_by(week_id)) %>% mutate(date=date_mon)
   p1 = modelled_fit %>% ggplot() + geom_line(aes(date,age_total)) + 
-    geom_line(data=. %>% filter(season==max(season)),aes(date,age_total),col="red") +
+    geom_line(data=. %>% filter(season=="2024/2025" ),aes(date,age_total),col="red") +
     geom_ribbon(aes(x=date,ymin=low,ymax=upp),fill="lightblue") +
-    geom_ribbon(data=modelled_proj,aes(x=date,fill=as.factor(scen),ymin=low,ymax=upp)) +
-    labs(subtitle = paste0( EU_long(country_short_input)," (",country_short_input,")") ); p1
+    geom_ribbon(data=modelled_proj,aes(x=date,fill=as.factor(scen),ymin=low,ymax=upp)) + guides(fill="none")+
+    labs(x="",y="",subtitle = paste0( EU_long(country_short_input)," (",country_short_input,") ILI rate") ); p1
   
-  return(p1)
+  # ili incidence
+  modelled_fit = fit00 %>% gather_draws(delta_ili_incs_weekly_sum[n]) %>% 
+    filter(.draw%in%c(1:500)) %>% # filter a number of posterior draws
+    select(-.chain,-.iteration) %>% ungroup() %>% 
+    group_by(n) %>% summarise(mean_value = mean(.value),
+                              low=quantile(.value,probs=0.1),
+                              upp=quantile(.value,probs=0.9)) %>% ungroup() %>% 
+    mutate( age_total=stan_list$age_total_incs, 
+            date=stan_list$ili_fit_date,
+            name=stan_list$season_id_week_fit) %>% 
+    left_join(stan_list$season_id_raw %>% rename(season=value),by="name")
+  
+  modelled_proj = fit00 %>% gather_draws(gen_ili_t_obs_proj_sum[scen,week_id]) %>% 
+    filter(.draw%in%c(1:500)) %>%
+    select(-.chain,-.iteration) %>% ungroup() %>% 
+    group_by(scen,week_id) %>% summarise(mean_value = mean(.value),
+                                         low=quantile(.value,probs=0.1),
+                                         upp=quantile(.value,probs=0.9)) %>% ungroup() %>% 
+    right_join( stan_list$all_season_project ,
+                by = join_by(week_id)) %>% mutate(date=date_mon)
+  p2 = modelled_fit %>% ggplot() + geom_line(aes(date,age_total)) + 
+    geom_line(data=. %>% filter(season=="2024/2025"),aes(date,age_total),col="red") +
+    geom_ribbon(aes(x=date,ymin=low,ymax=upp),fill="lightblue") +
+    geom_ribbon(data=modelled_proj,aes(x=date,fill=as.factor(scen),ymin=low,ymax=upp)) + guides(fill=guide_legend("Scenario")) +
+    labs(x="",y="",subtitle = paste0( EU_long(country_short_input)," (",country_short_input,") ILI incidence") ); p2
+  p=(p1+p2); p
+  return(pp)
 }
 
 plot_fit_byage = function(fit00,stan_list,country_short_input){
   # age split version
+  
+  # ili rate 
   obs_data = stan_list$all_season_fit %>% select(age_00_04:age_65_99,date,season,n) %>% 
+    pivot_longer(cols=1:stan_list$n_age_groups,names_to = "age") %>% 
+    mutate(age=as.factor(age) %>% as.numeric())
+  modelled_fit = fit00 %>% gather_draws(gen_ili_percap_obs_fit[n,age]) %>% 
+    filter(.draw%in%c(1:100)) %>% # filter a number of posterior draws
+    select(-.chain,-.iteration) %>% ungroup() %>% 
+    group_by(n,age) %>% summarise(mean_value = mean(.value)) %>% ungroup() %>% 
+    left_join(obs_data,by=c("n","age"))
+  
+  proj_df = stan_list$all_season_project %>% select(country_short,week_id,date=date_wed)
+  modelled_proj = fit00 %>% gather_draws(gen_ili_t_percap_obs_proj[scen,week_id,age]) %>% 
+    filter(.draw%in%c(1:100)) %>%
+    select(-.chain,-.iteration) %>% ungroup() %>% 
+    group_by(week_id,age,scen) %>% summarise(mean_value = mean(.value)) %>% ungroup() %>% 
+    left_join( proj_df, by=join_by(week_id)  )
+  
+  p1 = modelled_fit %>% ggplot(aes(date,value)) + geom_line() + 
+    geom_line(data=. %>% filter(season=="2024/2025"),aes(date,value),col="red",linewidth=1.4) +
+    geom_line(aes(y=mean_value),col="lightblue",alpha=0.8) +
+    geom_line(data=modelled_proj,aes(col=as.factor(scen),y=mean_value),alpha=0.5) + guides(col="none") +
+    facet_wrap(~age,ncol=1,scales="free_y") +
+    labs(x="",y="",subtitle = paste0( EU_long(country_short_input)," (",country_short_input,"), ILI rate") ); p1
+  
+  # ili incidence
+  obs_data = cbind(stan_list$ili_obs_incs , stan_list$all_season_fit %>% select(date,season,n) ) %>% as_tibble() %>% 
     pivot_longer(cols=1:stan_list$n_age_groups,names_to = "age") %>% 
     mutate(age=as.factor(age) %>% as.numeric())
   modelled_fit = fit00 %>% gather_draws(gen_ili_obs_fit[n,age]) %>% 
@@ -494,11 +561,12 @@ plot_fit_byage = function(fit00,stan_list,country_short_input){
     left_join( proj_df, by=join_by(week_id)  )
   
   p2 = modelled_fit %>% ggplot(aes(date,value)) + geom_line() + 
-    geom_line(data=. %>% filter(season==max(season)),aes(date,value),col="red",linewidth=1.4) +
+    geom_line(data=. %>% filter(season=="2024/2025"),aes(date,value),col="red",linewidth=1.4) +
     geom_line(aes(y=mean_value),col="lightblue",alpha=0.8) +
-    geom_line(data=modelled_proj,aes(col=as.factor(scen),y=mean_value),alpha=0.5) +
+    geom_line(data=modelled_proj,aes(col=as.factor(scen),y=mean_value),alpha=0.5) + guides(col=guide_legend("Scenario")) +
     facet_wrap(~age,ncol=1,scales="free_y") +
-    labs(subtitle = paste0( EU_long(country_short_input)," (",country_short_input,")") ); p2
+    labs(x="",y="",subtitle = paste0( EU_long(country_short_input)," (",country_short_input,"), ILI incidence") ); p2
+  p = (p1 + p2); p
   
-  return(p2)
+  return(p)
 }

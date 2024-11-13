@@ -20,7 +20,6 @@ library(tidyverse)
 library(rstan)
 library(scales)
 library(ggpubr)
-library(lubridate)
 library(fitdistrplus)
 library(readxl)
 library(purrr)
@@ -45,6 +44,9 @@ library( scoringutils )
 library(crayon)
 library(Hmisc)
 library(eurostat)
+library(data.table)
+library(lubridate)
+library(dtplyr)
 
 # libraries not to include 
 # library(tsibble)
@@ -85,6 +87,13 @@ mstand <- function(v){
   return(mout)
 }
 my_comma <- scales::label_comma(accuracy = 1, big.mark = ",", decimal.mark = ".")
+
+
+get_in_hms <- function(time1, time2) {
+  format(as.POSIXct(as.numeric(difftime(time1, time2, units = 'secs')), 
+                    origin = '1970-01-01', tz = 'UTC'), '%H:%M:%S')  
+}
+
 # return the last element(s) of a vector
 mlast <- function(v , n=1 ){
   mout = v[length(v)]
