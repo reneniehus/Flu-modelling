@@ -17,18 +17,18 @@ load_flu_data_epi = function(data=data, params=NULL, regenerate=T , new_from_onl
       data_nonsentinel_detections = read_csv(file="https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/nonSentinelTestsDetections.csv",show_col_types = FALSE)
       data_respicompass_iliplus = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/target-data/influenza/ili_plus.csv",show_col_types = FALSE)
       # save locally
-      erviss_ili_ari %>% write_csv(file="./data/erviss_iliari_snapshot_2024-05-24.csv")
-      data_sentinel_detections %>% write_csv(file="./data/erviss_detections_sentinel_snapshot_2024-05-24.csv")
-      data_nonsentinel_detections %>% write_csv(file="./data/erviss_detections_nonsentinel_snapshot_2024-05-24.csv")
-      data_respicompass_iliplus %>% write_csv(file="./data/data_respicompass_iliplus.csv")
+      erviss_ili_ari %>% write_csv(file=here("data/erviss_iliari_snapshot_2024-05-24.csv"))
+      data_sentinel_detections %>% write_csv(file=here("data/erviss_detections_sentinel_snapshot_2024-05-24.csv"))
+      data_nonsentinel_detections %>% write_csv(file=here("data/erviss_detections_nonsentinel_snapshot_2024-05-24.csv"))
+      data_respicompass_iliplus %>% write_csv(file=here("data/data_respicompass_iliplus.csv"))
     }
     if (new_from_online==F) {
       pr=paste("Loading epi data from disk ... \n"); cat(green(pr))
       # load data from local storage
-      erviss_ili_ari = read_csv(file="./data/erviss_iliari_snapshot_2024-05-24.csv",show_col_types = FALSE)
-      data_sentinel_detections = read_csv(file="./data/erviss_detections_sentinel_snapshot_2024-05-24.csv",show_col_types = FALSE)
-      data_nonsentinel_detections = read_csv(file="./data/erviss_detections_nonsentinel_snapshot_2024-05-24.csv",show_col_types = FALSE)
-      data_respicompass_iliplus = read_csv(file="./data/data_respicompass_iliplus.csv",show_col_types = FALSE)
+      erviss_ili_ari = read_csv(file=here("data/erviss_iliari_snapshot_2024-05-24.csv"),show_col_types = FALSE)
+      data_sentinel_detections = read_csv(file=here("data/erviss_detections_sentinel_snapshot_2024-05-24.csv"),show_col_types = FALSE)
+      data_nonsentinel_detections = read_csv(file=here("data/erviss_detections_nonsentinel_snapshot_2024-05-24.csv"),show_col_types = FALSE)
+      data_respicompass_iliplus = read_csv(file=here("data/data_respicompass_iliplus.csv"),show_col_types = FALSE)
     }
     
     erviss_ili_ari = erviss_ili_ari %>% 
@@ -100,9 +100,9 @@ load_flu_data_epi = function(data=data, params=NULL, regenerate=T , new_from_onl
       erviss_typing_nonsentinel = data_nonsentinel_detections,
       respicompass_iliplus = respicompass_iliplus
     )
-    save(epi,file="output/epi.Rdata")
+    save(epi,file=here("output/epi.Rdata"))
     
-  } else { load(file="output/epi.Rdata") }
+  } else { load(file=here("output/epi.Rdata")) }
   
   # adding to data 
   data$epi = epi
@@ -111,7 +111,7 @@ load_flu_data_epi = function(data=data, params=NULL, regenerate=T , new_from_onl
 }
 
 load_flu_data_vax = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
-  file_doesnot_exist = !file.exists("output/vax.Rdata")
+  file_doesnot_exist = !file.exists(here("output/vax.Rdata"))
   if ( file_doesnot_exist|regenerate==T ) {
     
     if (new_from_online==T) {
@@ -121,16 +121,16 @@ load_flu_data_vax = function(data=data, params=NULL , regenerate=T  , new_from_o
       data_vax_hist_all = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/influenza/vaccination/vaccine_coverage_all.csv",show_col_types = F)
       
       # write
-      data_vax %>% write_csv(file="data/vax_flu_scenarios.csv")
-      data_vax_hist %>% write_csv(file="data/vax_flu_history.csv")
-      data_vax_hist_all %>% write_csv(file="data/vax_flu_history_all.csv")
+      data_vax %>% write_csv(file=here("data/vax_flu_scenarios.csv"))
+      data_vax_hist %>% write_csv(file=here("data/vax_flu_history.csv"))
+      data_vax_hist_all %>% write_csv(file=here("data/vax_flu_history_all.csv"))
       
     }
     if (new_from_online==F) {
       # load data from local storage
-      data_vax = read_csv(file="data/vax_flu_scenarios.csv",show_col_types = F )
-      data_vax_hist = read_csv(file="data/vax_flu_history.csv",show_col_types = F )
-      data_vax_hist_all = read_csv(file="data/vax_flu_history_all.csv",show_col_types = F )
+      data_vax = read_csv(file=here("data/vax_flu_scenarios.csv"),show_col_types = F )
+      data_vax_hist = read_csv(file=here("data/vax_flu_history.csv"),show_col_types = F )
+      data_vax_hist_all = read_csv(file=here("data/vax_flu_history_all.csv"),show_col_types = F )
       
     }
     
@@ -139,9 +139,9 @@ load_flu_data_vax = function(data=data, params=NULL , regenerate=T  , new_from_o
       data_vax_history = data_vax_hist %>% mutate(vaccine_coverage=as.numeric(vaccine_coverage)/100 ) %>% mutate(season = str_replace(season, "-", "/")),
       data_vax_history_all = data_vax_hist %>% mutate(vaccine_coverage=as.numeric(vaccine_coverage)/100 ) %>% mutate(season = str_replace(season, "-", "/"))
     )
-    save(vax,file="output/vax.Rdata")
+    save(vax,file=here("output/vax.Rdata"))
     
-  } else { load(file="output/vax.Rdata") }
+  } else { load(file=here("output/vax.Rdata")) }
   
   # adding to data 
   data$vax = vax
@@ -150,7 +150,7 @@ load_flu_data_vax = function(data=data, params=NULL , regenerate=T  , new_from_o
 }
 
 load_flu_data_contact = function(data=data, params=NULL , regenerate=T  , new_from_online=F){
-  file_doesnot_exist = !file.exists("output/contact.Rdata")
+  file_doesnot_exist = !file.exists(here("output/contact.Rdata"))
   if ( file_doesnot_exist|regenerate==T ) {
     
     if (new_from_online==T) {
@@ -165,10 +165,10 @@ load_flu_data_contact = function(data=data, params=NULL , regenerate=T  , new_fr
       for (country_i in xlocations$location_name){ # country_i = xlocations$location_name[1]
         contacts = 0
         try({ # As there are two files, each with half the countries, try to get contact matrix for a given country from both files
-          contacts = read_excel("./data/MUestimates_all_locations_1.xlsx", sheet = country_i, col_names = F, .name_repair = "unique_quiet", skip = 1)
+          contacts = read_excel(here("data/MUestimates_all_locations_1.xlsx"), sheet = country_i, col_names = F, .name_repair = "unique_quiet", skip = 1)
         }, silent = T)
         try({
-          contacts = read_excel("./data/MUestimates_all_locations_2.xlsx", sheet = country_i, col_names = F, .name_repair = "unique_quiet")
+          contacts = read_excel(here("data/MUestimates_all_locations_2.xlsx"), sheet = country_i, col_names = F, .name_repair = "unique_quiet")
         }, silent = T)
         xdata[[country_i]] = contacts
         
@@ -176,9 +176,9 @@ load_flu_data_contact = function(data=data, params=NULL , regenerate=T  , new_fr
     }
     
     dat_contact = xdata
-    save(dat_contact,file="output/contact.Rdata")
+    save(dat_contact,file=here("output/contact.Rdata"))
     
-  } else { load(file="output/contact.Rdata") }
+  } else { load(file=here("output/contact.Rdata")) }
   
   # adding to data 
   data$contact = dat_contact
@@ -188,7 +188,7 @@ load_flu_data_contact = function(data=data, params=NULL , regenerate=T  , new_fr
 
 load_flu_data_helpers_respicompass = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
   
-  file_doesnot_exist = !file.exists("output/respicompass_helpers.Rdata")
+  file_doesnot_exist = !file.exists(here("output/respicompass_helpers.Rdata"))
   
   if ( file_doesnot_exist|regenerate==T ) {
     
@@ -197,22 +197,22 @@ load_flu_data_helpers_respicompass = function(data=data, params=NULL , regenerat
       xlocations = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/supporting-files/locations_iso2_codes.csv",show_col_types = F)
       xweeks = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/supporting-files/iso_weeks.csv",show_col_types = F)
       # write to disk
-      xlocations %>% write_csv(file="output/respicompass_locations.csv")
-      xweeks %>% write_csv(file="output/respicompass_weeks.csv")
+      xlocations %>% write_csv(file=here("output/respicompass_locations.csv"))
+      xweeks %>% write_csv(file=here("output/respicompass_weeks.csv"))
     }
     if (new_from_online==F) {
       # load data from local storage
-      xlocations = read_csv(file="output/respicompass_locations.csv",show_col_types = F)
-      xweeks = read_csv(file="output/respicompass_weeks.csv",show_col_types = F)
+      xlocations = read_csv(file=here("output/respicompass_locations.csv"),show_col_types = F)
+      xweeks = read_csv(file=here("output/respicompass_weeks.csv"),show_col_types = F)
     }
     
     dat_helpers = list(
       iso2_code = xlocations,
       iso_weeks = xweeks
     )
-    save(dat_helpers,file="output/respicompass_helpers.Rdata")
+    save(dat_helpers,file=here("output/respicompass_helpers.Rdata"))
     
-  } else { load(file="output/respicompass_helpers.Rdata") }
+  } else { load(file=here("output/respicompass_helpers.Rdata")) }
   
   # adding to data 
   data$helpers_respicompass = dat_helpers
@@ -221,15 +221,15 @@ load_flu_data_helpers_respicompass = function(data=data, params=NULL , regenerat
 }
 
 load_flu_data_demography_ECDC = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
-  file_doesnot_exist = !file.exists("output/demography.Rdata")
+  file_doesnot_exist = !file.exists(here("output/demography.Rdata"))
   if ( file_doesnot_exist|regenerate==T ) {
     
     if (new_from_online==T) {
       # load data freshly from the internet
       # required libraries
       pr=paste("Loading demography data from database ... \n"); cat(green(pr))
-      source('db/logger.R')
-      source('db/sql_utils.R')
+      source(here('db/logger.R'))
+      source(here('db/sql_utils.R'))
       # Logger is needed for running SQL utils
       logger <- forge_logger()(logLevel = 'INFO')
       # This is where the SQL Profiles are stored (always needed)
@@ -264,20 +264,20 @@ load_flu_data_demography_ECDC = function(data=data, params=NULL , regenerate=T  
         group_by(country=CountryCode,age_group=AgeGroup) %>% 
         mutate(Population=as.numeric(Population)) %>% 
         summarise(population=sum(Population)) %>% ungroup() -> mdat
-      write_fst(mdat,path="data/population_pyramid.fst")
+      write_fst(mdat,path=here("data/population_pyramid.fst"))
     }
     if (new_from_online==F) {
       # load data from local storage
       pr=paste("Loading demography data from disk ... \n"); cat(green(pr))
-      mdat = read_fst(path="data/population_pyramid.fst") %>% as_tibble()
+      mdat = read_fst(path=here("data/population_pyramid.fst")) %>% as_tibble()
     }
     
     dat_demography = list(
       population_pyramid = mdat
     )
-    save(dat_demography,file="output/demography.Rdata")
+    save(dat_demography,file=here("output/demography.Rdata"))
     
-  } else { load(file="output/demography.Rdata") }
+  } else { load(file=here("output/demography.Rdata")) }
   
   # adding to data 
   data$demography_ECDC = dat_demography
@@ -286,14 +286,14 @@ load_flu_data_demography_ECDC = function(data=data, params=NULL , regenerate=T  
 }
 
 load_flu_data_demography_respicast = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
-  file_doesnot_exist = !file.exists("output/demography_respicast.Rdata")
+  file_doesnot_exist = !file.exists(here("output/demography_respicast.Rdata"))
   if ( file_doesnot_exist|regenerate==T ) {
     
     if (new_from_online==T) {
       # load data freshly from the internet
       pop_df = NULL
       pop_fine_df = NULL
-      xlocations = read_csv(file="output/respicompass_locations.csv",show_col_types = F)
+      xlocations = read_csv(file=here("output/respicompass_locations.csv"),show_col_types = F)
       country_v = xlocations$location_name
       for (country_i in country_v) {
         pr=paste("> Loading pop data for:",country_i,"... \n"); cat(green(pr))
@@ -307,26 +307,26 @@ load_flu_data_demography_respicast = function(data=data, params=NULL , regenerat
         pop_fine_df=rbind(pop_fine_df,xdf_fine)
       }
       pop_df = pop_df %>% select(country,age_group,population)
-      pop_df %>% write_csv("output/population_pyramid_respicast.csv")
+      pop_df %>% write_csv(here("output/population_pyramid_respicast.csv"))
       
       pop_fine_df = pop_fine_df %>% select(country,age_group,population)
-      pop_fine_df %>% write_csv("output/population_pyramid_fine_respicast.csv")
+      pop_fine_df %>% write_csv(here("output/population_pyramid_fine_respicast.csv"))
       
     }
     if (new_from_online==F) {
       # load data from local storage
       pr=paste("Loading respicast demography data from disk ... \n"); cat(green(pr))
-      pop_df = read_csv("output/population_pyramid_respicast.csv",show_col_types = F)
-      pop_fine_df = read_csv("output/population_pyramid_fine_respicast.csv",show_col_types = F)
+      pop_df = read_csv(here("output/population_pyramid_respicast.csv"),show_col_types = F)
+      pop_fine_df = read_csv(here("output/population_pyramid_fine_respicast.csv"),show_col_types = F)
     }
     
     dat_demography = list(
       population_pyramid = pop_df,
       population_pyramid_fine = pop_fine_df
     )
-    save(dat_demography,file="output/demography_respicast.Rdata")
+    save(dat_demography,file=here("output/demography_respicast.Rdata"))
     
-  } else { load(file="output/demography_respicast.Rdata") }
+  } else { load(file=here("output/demography_respicast.Rdata")) }
   
   # adding to data 
   data$demography_respicast = dat_demography

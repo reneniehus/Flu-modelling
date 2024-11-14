@@ -1,5 +1,5 @@
-# ---- |-Start empty ----
-rm(list = ls(all.names = TRUE)); gc() # clear environment & memory
+# ---- |-Clear ----
+gc() # clear environment & memory
 
 # ---- |-Set up ----
 source("code/01_main_supporting/setup.R")

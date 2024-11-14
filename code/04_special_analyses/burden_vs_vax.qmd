@@ -1,0 +1,33 @@
+# Understanding the vaccine impact
+
+```{r}
+# ---- |-Set up ----
+source(here("code/01_main_supporting/setup_clean.R") )
+source(here("code/01_main_supporting/flu_functions.R") )
+source(here("code/01_main_supporting/load_flu_data.R") )
+```
+
+```{r}
+# ---- |-load flu data ----
+data_flu = load_flu_data( params, regenerate = F, new_from_online = F) # loads the data # regenerate=T recreates the data lists, new_from_online=T uses the online versions for recreation
+```
+
+### Projected vax effect between low versus high vax scenarios
+
+```{r}
+# ---- |-Projected vax effect low versus high vax scenarios ----
+# What is the percent difference between the high/low vax scenario? 
+df_flu_vax_diff = data_flu$vax$data_vax %>% 
+  mutate(vax_diff=higher_vax_coverage-lower_vax_coverage)
+df_flu_vax_diff$vax_diff %>% median() # 12.8%
+
+# What is difference in projected burden between high/low vax scenario?
+(154 - 118)/154 # 23.4%
+
+# What is the percent change in burden when increasing vaccine coverage by 10%
+23.4/12.8 *10 # 18% reduction
+
+# ---- |-Modelled vax effect low verus high vax scenarios ----
+```
+
+We can compare the hub projections for ILI+ in individuals 65 and older between the high versus the low vaccine scenarios. The median difference in absolute vaccine coverage between high and low are 12.8 percentage points. From across country analysis we know that for every 10% increase in vaccine coverage there is an additional 6% decrease is ILI+ burden in individuals 65 and older.
