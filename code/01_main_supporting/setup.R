@@ -218,13 +218,10 @@ cleancat <- function(astring, width=80) {
                              legend.key.size = ggplot2::unit(0.4, "cm"))
 
 # amazing: overriding function defaults
-ggplot <- function(...) ggplot2::ggplot(...) + scale_color_brewer(palette="Set3")
 geom_interval <- function(...) ggdist::geom_interval(...,alpha=0.4)
 geom_lineribbon <- function(...) ggdist::geom_lineribbon(...,alpha=0.4)
 geom_ribbon <- function(...) ggplot2::geom_ribbon(...,alpha=0.4)
-
 ggplot <- function(...) ggplot2::ggplot(...) + scale_color_brewer(palette="Dark2")
-
 mean_qi <- function(...) ggdist::mean_qi(...,.width=0.80)
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
