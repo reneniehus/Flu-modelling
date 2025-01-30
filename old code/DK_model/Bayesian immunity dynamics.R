@@ -46,7 +46,7 @@ source("bayesian_priors/priors_explore.R")
 # current prior exploration
 
 # prob severe, but consider that infections here are "fully immunising" infections
-rnorm( 3000,mean=logit(0.02), sd=abs(logit(0.02)-logit(0.20)) ) %>% inv_logit() %>% dens(show.HPDI = 0.8)
+rnorm( 3000,mean=logit(0.02), sd=abs(logit(0.02)-logit(0.20)) ) %>% inv_logit() %>% dens()
 
 # S ini for flu # genetic drift/shift of virus + waning immunity since last waves/vaccination
 rnorm( 3000,mean=logit(0.7), sd=abs(logit(0.7)-logit(0.4)) ) %>% inv_logit() %>% dens(show.HPDI = 0.8)

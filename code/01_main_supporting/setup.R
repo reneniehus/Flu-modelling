@@ -271,6 +271,24 @@ EU_long <- function(name_short,greece="GR" # or "EL
   return(name_long)
 }
 
+# Custom ggplot-based density function (similar to the rethinking::dens() )
+dens <- function(x, title = "", fill_color = "steelblue", line_color = "black", alpha = 0.5) {
+  # Convert to data frame for ggplot
+  df <- data.frame(Value = x)
+  
+  # Create density plot
+  p <- ggplot(df, aes(x = Value)) +
+    geom_density(aes(y = after_stat(density) ), fill = fill_color, color = line_color, alpha = alpha) +
+    labs(title = title, x = "Value", y = "Density") +
+    theme_minimal(base_size = 14) +
+    theme(
+      plot.title = element_text(hjust = 0.5, face = "bold"),
+      axis.title = element_text(face = "bold")
+    )
+  
+  print(p)
+}
+
 ecdc_weektodate <- function( year_week ){
   if ( any( nchar( year_week )!=7 ) ){
     stop( "Input must be of the format yyyy-ww !")
