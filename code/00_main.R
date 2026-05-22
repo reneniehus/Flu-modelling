@@ -17,7 +17,7 @@ source("code/01_main_supporting/model_SIR_multiseason.R")
 source("code/06_sandbox/generate_ili_epi_test.R")
 
 # ---- |-load flu data ----
-data = load_flu_data( params, regenerate = T, new_from_online = T) # loads the data # regenerate=T recreates the data lists, new_from_online=T uses the online versions for recreation
+data = load_flu_data( params, regenerate = F, new_from_online = F) # loads the data # regenerate=T recreates the data lists, new_from_online=T uses the online versions for recreation
 
 # ---- |-run flu models (fitting and projections) ----
 models_out = run_flu_models( params, data ) # runs the model scripts
