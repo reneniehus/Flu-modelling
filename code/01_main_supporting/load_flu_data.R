@@ -15,7 +15,7 @@ load_flu_data_epi = function(data=data, params=NULL, regenerate=T , new_from_onl
       erviss_ili_ari = read_csv(file="https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/ILIARIRates.csv",show_col_types = FALSE)
       data_sentinel_detections = read_csv(file="https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/sentinelTestsDetectionsPositivity.csv",show_col_types = FALSE)
       data_nonsentinel_detections = read_csv(file="https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/nonSentinelTestsDetections.csv",show_col_types = FALSE)
-      data_respicompass_iliplus = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/target-data/influenza/ili_plus.csv",show_col_types = FALSE)
+      data_respicompass_iliplus = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/target-data/influenza/ili_plus.csv",show_col_types = FALSE)
       # save locally
       erviss_ili_ari %>% write_csv(file=here("data/erviss_iliari_snapshot_2024-05-24.csv"))
       data_sentinel_detections %>% write_csv(file=here("data/erviss_detections_sentinel_snapshot_2024-05-24.csv"))
@@ -116,9 +116,9 @@ load_flu_data_vax = function(data=data, params=NULL , regenerate=T  , new_from_o
     
     if (new_from_online==T) {
       # load data freshly from the internet
-      data_vax = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/influenza/vaccination/influenza_vax_scenarios.csv",show_col_types = FALSE)
-      data_vax_hist = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/influenza/vaccination/vaccine_coverage_65plus.csv",show_col_types = FALSE)
-      data_vax_hist_all = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/influenza/vaccination/vaccine_coverage_all.csv",show_col_types = F)
+      data_vax = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/auxiliary-data/influenza/vaccination/influenza_vax_scenarios.csv",show_col_types = FALSE)
+      data_vax_hist = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/auxiliary-data/influenza/vaccination/vaccine_coverage_65plus.csv",show_col_types = FALSE)
+      data_vax_hist_all = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/auxiliary-data/influenza/vaccination/vaccine_coverage_all.csv",show_col_types = F)
       
       # write
       data_vax %>% write_csv(file=here("data/vax_flu_scenarios.csv"))
@@ -161,7 +161,7 @@ load_flu_data_contact = function(data=data, params=NULL , regenerate=T  , new_fr
     if (new_from_online==F) {
       # load data from local storage
       xdata = list()
-      xlocations = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/supporting-files/locations_iso2_codes.csv",show_col_types = F)
+      xlocations = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/supporting-files/locations_iso2_codes.csv",show_col_types = F)
       for (country_i in xlocations$location_name){ # country_i = xlocations$location_name[1]
         contacts = 0
         try({ # As there are two files, each with half the countries, try to get contact matrix for a given country from both files
@@ -194,8 +194,8 @@ load_flu_data_helpers_respicompass = function(data=data, params=NULL , regenerat
     
     if (new_from_online==T) {
       # load data freshly from the internet
-      xlocations = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/supporting-files/locations_iso2_codes.csv",show_col_types = F)
-      xweeks = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/supporting-files/iso_weeks.csv",show_col_types = F)
+      xlocations = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/supporting-files/locations_iso2_codes.csv",show_col_types = F)
+      xweeks = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/supporting-files/iso_weeks.csv",show_col_types = F)
       # write to disk
       xlocations %>% write_csv(file=here("output/respicompass_locations.csv"))
       xweeks %>% write_csv(file=here("output/respicompass_weeks.csv"))
@@ -297,8 +297,8 @@ load_flu_data_demography_respicast = function(data=data, params=NULL , regenerat
       country_v = xlocations$location_name
       for (country_i in country_v) {
         pr=paste("> Loading pop data for:",country_i,"... \n"); cat(green(pr))
-        read_file=paste0("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/miscellaneous/population/",country_i,"_aggr.csv")
-        read_file_fine = paste0("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/main/auxiliary-data/miscellaneous/population/",country_i,".csv")
+        read_file=paste0("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/auxiliary-data/miscellaneous/population/",country_i,"_aggr.csv")
+        read_file_fine = paste0("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/auxiliary-data/miscellaneous/population/",country_i,".csv")
         xdf = read_csv(read_file,show_col_types = FALSE)
         xdf_fine = read_csv(read_file_fine,show_col_types = FALSE)
         xdf$country = country_i
@@ -341,7 +341,7 @@ load_flu_data = function( params=NULL , regenerate=F,new_from_online=T  ){
   
   data = list() # reset data list
   
-  data = load_flu_data_epi( data=data, params=NULL , new_from_online=T , regenerate=T )
+  data = load_flu_data_epi( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate )
   
   data = load_flu_data_vax( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate)
   
