@@ -6,7 +6,7 @@ settings = function() {
   
   # debug/fast modes
   params$rapid_stan_fit = T # T: runs scripts with settings that reduce run-time
-  params$load_earlyfit  = F # T: saved fits will be used
+  params$load_earlyfit  = T # T: saved fits will be used
   
   # ---- |-Resport setting ----
   params$send_report = T

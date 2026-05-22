@@ -12,3 +12,5 @@ packrat/lib*/
 output/RespiCompass_round1.Rdata
 output/rep_list.Rdata
 output/RespiCompass_round1.Rdata
+# Generated large model output files
+output/rep_list.Rdata

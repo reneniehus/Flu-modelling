@@ -114,7 +114,7 @@ process_and_save = function(params=NULL, data=NULL, models_out=NULL,save_submiss
     df_para=df_para,
     ppar=ppar
   )
-  save(rep_list,file="./output/rep_list.Rdata")
+  #save(rep_list,file="./output/rep_list.Rdata") # comment as this file is too large for github
   if (save_submission) save(data,params,rep_list,models_out,file="../Big data/RespiCompass_round1_models_out.Rdata") # ca 13 MBs
   
   return(rep_list)
