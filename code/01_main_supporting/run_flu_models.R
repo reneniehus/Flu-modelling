@@ -30,7 +30,7 @@ run_flu_models = function( params=NULL , data=NULL ){
     # ---- |-Run model for each country ----
     target_input=target_input_v[1]
     country_short_input_v = params$run_countries  # country_short_input_v[!country_short_input_v %in% c("AT","IT")] # params$run_countries # c("IT","AT")
-    m <- stan_model(file='./stan/SIR_multiseason_age_vax_2.stan')
+    stan_mod_file = './stan/SIR_multiseason_age_vax_2.stan'
     for (country_short_input in country_short_input_v ) { # country_short_input="IT"; country_short_input_v
       # ---- |-Prepare country specific data ----
       
@@ -53,7 +53,7 @@ run_flu_models = function( params=NULL , data=NULL ){
       tryCatch(
         {
           # Run model
-          fitout=fit_with_stan(params,stan_list,mod_path=mod_path,all_season_fit_wide,country_short_input,m)
+          fitout=fit_with_stan(params,stan_list,mod_path=mod_path,all_season_fit_wide,country_short_input,stan_mod_file)
           if (F) fitout=fit_with_eabc(params,stan_list)
         },
         error = function(cond) {
@@ -61,7 +61,6 @@ run_flu_models = function( params=NULL , data=NULL ){
         }
       )
       pr=paste("> Fitting:",target_input,"for",country_short_input,"Done \n"); cleancat(green(pr))
-      
       mout[[country_short_input]] <- fitout
     }
     end_time <- Sys.time() # 

@@ -7,17 +7,13 @@ library <- function(...) suppressPackageStartupMessages(base::library(...,quietl
 
 # libraries
 start_time <- Sys.time()
-library( caTools ) #for the function runmean
-library( limSolve ) #for solving constrained linear least squares
-library( sparsevar ) #for computing the spectral radius
-library( glmc )
 library( mgcv) # for splines
 library( forecast ) # forecast
 library(gamlss)
 library( pracma )
 library(magrittr) # better pipes
 library(tidyverse) 
-#library(rstan)
+library(rstan)
 library(scales)
 library(ggpubr)
 library(fitdistrplus)
@@ -169,7 +165,7 @@ if (F) {
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ### Other Options ##########
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-rstan_options(auto_write = TRUE)
+# rstan_options(auto_write = TRUE) # stan options
 n_chains <-  2
 options(mc.cores = parallel::detectCores())
 # Reset R's most annoying default options

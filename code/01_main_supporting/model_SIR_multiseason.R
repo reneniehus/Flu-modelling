@@ -1,4 +1,4 @@
-fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_short_input,m) {
+fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_short_input,stan_mod_file) {
   # run the model fit
   fname = paste0("../Big data/fit",country_short_input,".Rdata")
   duration_fit = "NA:NA:NA"
@@ -6,7 +6,7 @@ fit_with_stan = function(params,stan_list,mod_path,all_season_fit_wide,country_s
     load(file = fname)
   } else {
     start_fit <- Sys.time()
-    
+    m <- stan_model(file=stan_mod_file) # 
     # rstan:vb settings
     # grad_samples: samples to determine the gradient ( 2 is slower than 5, )
     # tol_rel_obj: default=0.01, smaller means more strict with convergence
